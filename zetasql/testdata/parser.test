@@ -1,0 +1,297 @@
+
+SELECT 1
+--
+QueryStatement [0-8]
+  Query [0-8]
+    Select [0-8]
+      SelectList [7-8]
+        SelectColumn [7-8]
+          IntLiteral(1) [7-8]
+--
+SELECT
+  1
+==
+
+select 1; # NBSP
+--
+QueryStatement [0-9]
+  Query [0-9]
+    Select [0-9]
+      SelectList [8-9]
+        SelectColumn [8-9]
+          IntLiteral(1) [8-9]
+--
+SELECT
+  1
+==
+
+select
+# full line comment
+/* block
+   comment */
+-- full line comment
+1# partial line comment
++-- partial line comment
+2/*partial line block comment*/+3;
+--
+QueryStatement [0-153]
+  Query [0-153]
+    Select [0-153]
+      SelectList [71-153]
+        SelectColumn [71-153]
+          BinaryExpression(+) [71-153]
+            BinaryExpression(+) [71-121]
+              IntLiteral(1) [71-72]
+              IntLiteral(2) [120-121]
+            IntLiteral(3) [152-153]
+--
+SELECT
+  1 + 2 + 3
+==
+
+SELECT 1 + 2 + 3
+--
+QueryStatement [0-16]
+  Query [0-16]
+    Select [0-16]
+      SelectList [7-16]
+        SelectColumn [7-16]
+          BinaryExpression(+) [7-16]
+            BinaryExpression(+) [7-12]
+              IntLiteral(1) [7-8]
+              IntLiteral(2) [11-12]
+            IntLiteral(3) [15-16]
+--
+SELECT
+  1 + 2 + 3
+==
+
+Select 1 * 2 + 3
+--
+QueryStatement [0-16]
+  Query [0-16]
+    Select [0-16]
+      SelectList [7-16]
+        SelectColumn [7-16]
+          BinaryExpression(+) [7-16]
+            BinaryExpression(*) [7-12]
+              IntLiteral(1) [7-8]
+              IntLiteral(2) [11-12]
+            IntLiteral(3) [15-16]
+--
+SELECT
+  1 * 2 + 3
+==
+
+Select 1 + 2 * 3 + 4 + 4 * 6 * 7 + 8
+--
+QueryStatement [0-36]
+  Query [0-36]
+    Select [0-36]
+      SelectList [7-36]
+        SelectColumn [7-36]
+          BinaryExpression(+) [7-36]
+            BinaryExpression(+) [7-32]
+              BinaryExpression(+) [7-20]
+                BinaryExpression(+) [7-16]
+                  IntLiteral(1) [7-8]
+                  BinaryExpression(*) [11-16]
+                    IntLiteral(2) [11-12]
+                    IntLiteral(3) [15-16]
+                IntLiteral(4) [19-20]
+              BinaryExpression(*) [23-32]
+                BinaryExpression(*) [23-28]
+                  IntLiteral(4) [23-24]
+                  IntLiteral(6) [27-28]
+                IntLiteral(7) [31-32]
+            IntLiteral(8) [35-36]
+--
+SELECT
+  1 + 2 * 3 + 4 + 4 * 6 * 7 + 8
+==
+
+select--comment
+--comment
+1 -- comment
++--
+2--comment
+--
+QueryStatement [0-44]
+  Query [0-44]
+    Select [0-44]
+      SelectList [26-44]
+        SelectColumn [26-44]
+          BinaryExpression(+) [26-44]
+            IntLiteral(1) [26-27]
+            IntLiteral(2) [43-44]
+--
+SELECT
+  1 + 2
+==
+
+# "--" with no space.
+select --
+5
+--
+QueryStatement [22-33]
+  Query [22-33]
+    Select [22-33]
+      SelectList [32-33]
+        SelectColumn [32-33]
+          IntLiteral(5) [32-33]
+--
+SELECT
+  5
+==
+
+# "-- " with a space.
+select --
+5
+--
+QueryStatement [22-33]
+  Query [22-33]
+    Select [22-33]
+      SelectList [32-33]
+        SelectColumn [32-33]
+          IntLiteral(5) [32-33]
+--
+SELECT
+  5
+==
+
+select --- 1
+2
+--
+QueryStatement [0-14]
+  Query [0-14]
+    Select [0-14]
+      SelectList [13-14]
+        SelectColumn [13-14]
+          IntLiteral(2) [13-14]
+--
+SELECT
+  2
+==
+
+select - - 1
+--
+QueryStatement [0-12]
+  Query [0-12]
+    Select [0-12]
+      SelectList [7-12]
+        SelectColumn [7-12]
+          UnaryExpression(-) [7-12]
+            UnaryExpression(-) [9-12]
+              IntLiteral(1) [11-12]
+--
+SELECT
+  - -1
+==
+
+select - - - - - - - 1
+--
+QueryStatement [0-22]
+  Query [0-22]
+    Select [0-22]
+      SelectList [7-22]
+        SelectColumn [7-22]
+          UnaryExpression(-) [7-22]
+            UnaryExpression(-) [9-22]
+              UnaryExpression(-) [11-22]
+                UnaryExpression(-) [13-22]
+                  UnaryExpression(-) [15-22]
+                    UnaryExpression(-) [17-22]
+                      UnaryExpression(-) [19-22]
+                        IntLiteral(1) [21-22]
+--
+SELECT
+  - - - - - - -1
+==
+
+# No comments inside strings.
+select "abc -- def",
+       "abc # def",
+       "abc /* def */ ghi"
+--
+QueryStatement [30-97]
+  Query [30-97]
+    Select [30-97]
+      SelectList [37-97]
+        SelectColumn [37-49]
+          StringLiteral("abc -- def") [37-49]
+        SelectColumn [58-69]
+          StringLiteral("abc # def") [58-69]
+        SelectColumn [78-97]
+          StringLiteral("abc /* def */ ghi") [78-97]
+--
+SELECT
+  "abc -- def",
+  "abc # def",
+  "abc /* def */ ghi"
+==
+
+select /* no nested comments # -- /* */ 1;
+--
+QueryStatement [0-41]
+  Query [0-41]
+    Select [0-41]
+      SelectList [40-41]
+        SelectColumn [40-41]
+          IntLiteral(1) [40-41]
+--
+SELECT
+  1
+==
+
+select f1, f2 from T
+--
+QueryStatement [0-20]
+  Query [0-20]
+    Select [0-20]
+      SelectList [7-13]
+        SelectColumn [7-9]
+          PathExpression [7-9]
+            Identifier(f1) [7-9]
+        SelectColumn [11-13]
+          PathExpression [11-13]
+            Identifier(f2) [11-13]
+      FromClause [14-20]
+        TablePathExpression [19-20]
+          PathExpression [19-20]
+            Identifier(T) [19-20]
+--
+SELECT
+  f1,
+  f2
+FROM
+  T
+==
+
+select f1, `f 2` from T where b;
+--
+QueryStatement [0-31]
+  Query [0-31]
+    Select [0-31]
+      SelectList [7-16]
+        SelectColumn [7-9]
+          PathExpression [7-9]
+            Identifier(f1) [7-9]
+        SelectColumn [11-16]
+          PathExpression [11-16]
+            Identifier(`f 2`) [11-16]
+      FromClause [17-23]
+        TablePathExpression [22-23]
+          PathExpression [22-23]
+            Identifier(T) [22-23]
+      WhereClause [24-31]
+        PathExpression [30-31]
+          Identifier(b) [30-31]
+--
+SELECT
+  f1,
+  `f 2`
+FROM
+  T
+WHERE
+  b
+==

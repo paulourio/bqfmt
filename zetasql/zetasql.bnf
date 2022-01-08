@@ -1,0 +1,490 @@
+/* Lexical part */
+
+/* String and bytes literals */
+string_literal:
+      _triple_quoted_string
+    | _quoted_string
+    | _raw_string
+    ;
+
+/* Date or time literals */
+date:
+      ( 'd' | 'D' ) ( 'a' | 'A' ) ( 't' | 'T' ) ( 'e' | 'E' )
+    ;
+
+/* Numeric and decimal prefixes */
+numeric_or_decimal:
+      ( 'n' | 'N' ) ( 'u' | 'U' ) ( 'm' | 'M' ) ( 'e' | 'E' )
+      ( 'r' | 'R' ) ( 'i' | 'I' ) ( 'c' | 'C' )
+    | ( 'd' | 'D' ) ( 'e' | 'E' ) ( 'c' | 'C' ) ( 'i' | 'I' )
+      ( 'm' | 'M' ) ( 'a' | 'A' ) ( 'l' | 'L' )
+    ;
+
+select:
+      ( 's' | 'S' ) ( 'e' | 'E' ) ( 'l' | 'L' ) ( 'e' | 'E' )
+      ( 'c' | 'C' ) ( 't' | 'T' )
+    ;
+
+not:
+      ( 'n' | 'N' ) ( 'o' | 'O' ) ( 't' | 'T' )
+    ;
+
+from:
+      ( 'f' | 'F' ) ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'm' | 'M' )
+    ;
+
+where:
+      ( 'w' | 'W' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'e' | 'E' )
+    ;
+
+/* Integer literals */
+integer_literal:
+      ( _decimal_literal | _hex_literal )
+    ;
+
+_decimal_literal:
+      _decimal_digit { _decimal_digit }
+    ;
+
+_decimal_digit:
+      '0'-'9'
+    ;
+
+_hex_literal:
+      '0' ( 'x' | 'X' ) _hex_digit { _hex_digit }
+    ;
+
+_hex_digit:
+      _decimal_digit | 'a'-'f' | 'A'-'F'
+    ;
+
+comment:
+      '-' '-' { _single_line_comment_char } [ '\n' ]
+    | '#' { _single_line_comment_char } [ '\n' ]
+    | '/' '*' { ( . | '*' ) } '*' '/'
+    ;
+
+_triple_quoted_string:
+      '"' '"' '"' { ( _char | '`' | '\'' | '"' | '\n' ) } '"' '"' '"'
+    | '\'' '\'' '\'' { ( _char | '`' | '\'' | '"' | '\n' ) } '\'' '\'' '\''
+    ;
+
+_quoted_string:
+      '"' { ( _char | '`' | '\'' ) } '"'
+    | '\'' { ( _char | '`' | '"' ) } '\''
+    ;
+
+_raw_string_value:
+      '"' { ( _unescaped_char | '`' | '\'' ) } '"'
+    | '\'' { ( _unescaped_char | '`' | '"' ) } '\''
+    | '\'' '\'' '\'' { ( _unescaped_char | '`' | '"' ) } '\'' '\'' '\''
+    | '"' '"' '"' { ( _unescaped_char | '`' | '"' ) } '"' '"' '"'
+    ;
+
+_char:
+      _ascii_char | _unicode_value | _byte_value | _escaped_char
+    ;
+
+_unescaped_char:
+      _ascii_char | _unicode_char | '\\'
+    ;
+
+_raw_string:
+      _raw_string_prefix _raw_string_value
+    ;
+
+/* An arbitrary ASCII character except a few. */
+_ascii_char:
+      '\x01'-'\x09' /* skip null (0x00) */
+    | '\x0B'-'\x21' /* skip line feed (0x0A) */
+    | '\x23'-'\x26' /* skip double quote (0x22) */
+    | '\x28'-'\x5B' /* skip single quote (0x27) */
+    | '\x5D'-'\x5F' /* skip backslash (0x5C) */
+    | '\x61'-'\x7F' /* skip backtick (0x60) */
+    ;
+
+_unicode_char:
+      _ascii_char
+    | _unicode_byte
+    ;
+
+/* skip invalid code point (\uFFFD) */
+_unicode_byte:
+      '\u0080'-'\uFFFC'
+    | '\uFFFE'-'\U0010FFFF'
+    ;
+
+_raw_string_prefix:
+      ( 'r' | 'R' )
+    ;
+
+_escaped_char:
+      '\\' ( 'a' | 'b' | 'f' | 'n' | 'r' | 't'
+                 | 'v' | '"' | '?' | '`' | '\\' | '\'' )
+    ;
+
+_byte_value:
+      _octal_byte_value | _hex_byte_value
+    ;
+
+_octal_byte_value:
+      '\\' _octal_digit _octal_digit _octal_digit
+    ;
+
+_hex_byte_value:
+      '\\' { 'x' | 'X' } _hex_digit _hex_digit
+    ;
+
+_unicode_value:
+      _unicode_char | _little_u_value | _big_u_value
+    ;
+
+_big_u_value:
+      '\\' 'U'
+      _hex_digit _hex_digit _hex_digit _hex_digit
+      _hex_digit _hex_digit _hex_digit _hex_digit
+    ;
+
+_little_u_value:
+      '\\' 'u' _hex_digit _hex_digit _hex_digit _hex_digit
+    ;
+
+_octal_digit:
+      '0'-'7'
+    ;
+
+_single_line_comment_char:
+      '\x01'-'\x09'         /* skip null (0x00) */
+    | '\x0B'-'\x7F'         /* skip line feed (0x0A) */
+    | '\u0080'-'\uFFFC'
+    | '\uFFFE'-'\U0010FFFF' /* skip invalid code point (\uFFFD) */
+    ;
+
+identifier:
+	  _unquoted_id_char { _unquoted_id_char | _decimal_digit }
+    | '`' _quoted_identifier '`'
+    ;
+
+_unquoted_id_char:
+      _ascii_letter
+    | '_'
+    ;
+
+/* Letters and digits */
+_letter:
+      _ascii_letter
+    | _unicode_byte
+    | '_'
+    ;
+
+_ascii_letter:
+      'a'-'z'
+    | 'A'-'Z'
+    ;
+
+_quoted_identifier:
+      _quoted_identifier_character
+    | _quoted_identifier_character { _quoted_identifier_character }
+    ;
+
+_quoted_identifier_character:
+      _letter
+    | _decimal_digit
+    | ' '
+    | _symbol
+    ;
+
+_symbol:
+      '!' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '(' | ')'
+    | '-' | '[' | ']' | '{' | '}' | ':' | ';' | ',' | '.' | '?'
+    | '/' | '~' | '<' | '>' | '"' | '\\' | '\''
+    ;
+
+!whitespace:
+      ' ' | '\t' | '\n' | '\r' | '\u00a0'
+    ;
+
+/* Syntax part */
+
+<<
+import (
+    "github.com/paulourio/bqfmt/zetasql/ast"
+	"github.com/paulourio/bqfmt/zetasql/token"
+)
+
+func UpdateLoc(n ast.NodeHandler, a Attrib) {
+    tok := a.(*token.Token)
+    n.ExpandLoc(tok.Pos.Offset, tok.Pos.Offset + len(tok.Lit))
+}
+
+func WithExtraChild(a Attrib, c Attrib) (Attrib, error) {
+    node := a.(ast.NodeHandler)
+    child := c.(ast.NodeHandler)
+    node.AddChild(child)
+    return a, nil
+}
+
+func WrapWithLoc(a Attrib, t Attrib) (Attrib, error) {
+    tok := t.(*token.Token)
+    start := tok.Pos.Offset
+    end := tok.Pos.Offset + len(tok.Lit)
+    return ast.WrapWithLoc(a, start, end)
+}
+
+func InitLiteral(lit ast.LeafHandler, t Attrib) (Attrib, error) {
+    tok := t.(*token.Token)
+    lit.SetImage(string(tok.Lit))
+    lit.SetStartLoc(tok.Pos.Offset)
+    lit.SetEndLoc(tok.Pos.Offset + len(tok.Lit))
+    return lit, nil
+}
+
+func InitIntLiteral(t Attrib) (Attrib, error) {
+    lit, err := ast.NewIntLiteral()
+    if err != nil {
+        return nil, err
+    }
+    return InitLiteral(lit, t)
+}
+
+func InitStringLiteral(t Attrib) (Attrib, error) {
+    lit, err := ast.NewStringLiteral()
+    if err != nil {
+        return nil, err
+    }
+    return InitLiteral(lit, t)
+}
+
+func NewDashedIdentifier(lhs Attrib, rhs Attrib) (*ast.Identifier, error) {
+    a := lhs.(*token.Token)
+    b := rhs.(*token.Token)
+	expected := len(a.Lit) + 1
+	actual := b.Offset - a.Offset + 1
+	if expected != actual {
+		return nil, ast.ErrInvalidDashedIdentifier
+	}
+	if a.Lit[0] == '`' || b.Lit[0] == '`' {
+		return nil, ast.ErrInvalidDashedIdentifier
+	}
+	r := append(a.Lit, '-')
+	r = append(r, b.Lit...)
+	value := string(r)
+	return ast.NewIdentifier(value)
+}
+
+func NewIdentifier(a Attrib) (Attrib, error) {
+    tok := a.(*token.Token)
+    wrapped, err := WrapWithLoc(string(tok.Lit), tok)
+    if err != nil {
+        return nil, err
+    }
+    return ast.NewIdentifier(wrapped)
+}
+>>
+
+StartMode:
+     SQLStatement
+    ;
+
+SQLStatement:
+      UnterminatedSQLStatement OptSemicolon
+    ;
+
+UnterminatedSQLStatement:
+      SQLStatementBody
+    ;
+
+OptSemicolon:
+      ";"
+    | empty
+    ;
+
+SQLStatementBody:
+      QueryStatement
+    ;
+
+QueryStatement:
+      Query
+      << ast.NewQueryStatement($0) >>
+    ;
+
+Query:
+      QueryPrimaryOrSetOperation
+      << ast.NewQuery(nil, $0, nil, nil) >>
+    ;
+
+QueryPrimaryOrSetOperation:
+      QueryPrimary
+    ;
+
+QueryPrimary:
+      Select
+    ;
+
+Select:
+      select
+      SelectList
+      OptFromClause
+      OptWhereClause
+      <<
+      func() (Attrib, error) {
+          s, err := ast.NewSelect(nil, nil, $1, $2, $3, nil, nil, nil, nil)
+          if err != nil {
+              return nil, err
+          }
+          UpdateLoc(s, $0)
+          return s, nil
+      }()
+      >>
+    ;
+
+SelectList:
+      SelectListPrefix
+    | SelectListPrefix ","
+    ;
+
+SelectListPrefix:
+      SelectColumn
+      << ast.NewSelectList($0) >>
+    | SelectListPrefix "," SelectColumn
+      << WithExtraChild($0, $2) >>
+    ;
+
+SelectColumn:
+      Expression
+      << ast.NewSelectColumn($0, nil) >>
+    ;
+
+OptFromClause:
+      from FromClauseContents
+      <<
+      func() (Attrib, error) {
+          f, err := ast.NewFromClause($1)
+          if err != nil {
+              return nil, err
+          }
+          UpdateLoc(f, $0)
+          return f, nil
+      }()
+      >>
+    | empty
+    ;
+
+OptWhereClause:
+      WhereClause
+    | empty
+    ;
+
+WhereClause:
+      where Expression
+      <<
+      func() (Attrib, error) {
+          f, err := ast.NewWhereClause($1)
+          if err != nil {
+              return nil, err
+          }
+          UpdateLoc(f, $0)
+          return f, nil
+      }()
+      >>
+    ;
+
+FromClauseContents:
+      TablePrimary
+    ;
+
+TablePrimary:
+      TablePathExpression
+    ;
+
+TablePathExpression:
+      TablePathExpressionBase
+      << ast.NewTablePathExpression($0, nil, nil) >>
+    ;
+
+TablePathExpressionBase:
+      MaybeDashedPathExpression
+    ;
+
+Expression:
+      IntegerLiteral
+    | StringLiteral
+    | Identifier
+      << ast.NewPathExpression($0) >>
+    | Expression AdditiveOperator Expression2
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression2
+    | UnaryOperator Expression
+      << ast.NewUnaryExpression($1, $0) >>
+    ;
+
+Expression2:
+      Expression2 MultiplicativeOperator Expression3
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression3
+    ;
+
+Expression3:
+      "(" Expression ")"
+    | IntegerLiteral
+    ;
+
+UnaryOperator:
+      "+"  << WrapWithLoc(ast.UnaryPlus, $0) >>
+    | "-"  << WrapWithLoc(ast.UnaryMinus, $0) >>
+    | "~"  << WrapWithLoc(ast.UnaryBitwiseNot, $0) >>
+    | not  << WrapWithLoc(ast.UnaryNot, $0) >>
+    ;
+
+MultiplicativeOperator:
+      "*"  << WrapWithLoc(ast.BinaryMultiply, $0) >>
+    | "/"  << WrapWithLoc(ast.BinaryDivide, $0) >>
+    ;
+
+AdditiveOperator:
+      "+"  << WrapWithLoc(ast.BinaryPlus, $0) >>
+    | "-"  << WrapWithLoc(ast.BinaryMinus, $0) >>
+    ;
+
+IntegerLiteral:
+      integer_literal << InitIntLiteral($0) >>
+    ;
+
+StringLiteral:
+      string_literal << InitStringLiteral($0) >>
+    ;
+
+
+MaybeDashedPathExpression:
+      PathExpression
+    | DashedPathExpression
+    ;
+
+PathExpression:
+      Identifier
+      << ast.NewPathExpression($0) >>
+    | PathExpression "." Identifier
+      << WithExtraChild($0, $2) >>
+    ;
+
+DashedPathExpression:
+      DashedIdentifier
+    | DashedPathExpression "." Identifier
+    ;
+
+DashedIdentifier:
+      identifier "-" identifier
+      << NewDashedIdentifier($0, $1) >>
+    ;
+
+Identifier:
+      identifier
+      << NewIdentifier($0) >>
+    | KeywordAsIdentifier
+      << NewIdentifier($0) >>
+    ;
+
+KeywordAsIdentifier:
+      date
+    | numeric_or_decimal
+    ;

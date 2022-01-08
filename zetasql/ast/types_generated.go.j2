@@ -1,0 +1,158 @@
+package ast
+
+import (
+	"fmt"
+)
+
+// types_generated.go is generated from type_generated.go.j2 by
+// gen_types.py.
+
+// defaultCapacity is the default capacity for new slices.
+const defaultCapacity = 4
+
+{% for node in nodes -%}
+{%- if node.comment -%}
+{{ make_comment(node.comment, 0, 72) }}
+{% endif -%}
+type {{ node.name }} struct {
+	{% for field in node.fields -%}
+	{%- if field.comment -%}
+	{{ make_comment(field.comment, 4, 72-4) }}
+	{% endif -%}
+	{{ field.name }} {% if field.field_loader == FieldLoader.REPEATED %}[]{% endif %}{{ field.type }}
+	{% endfor %}
+	{{ node.composition }}
+}
+
+{% endfor -%}
+
+{% for node in nodes -%}
+func New{{ node.name }}(
+	{% for field in node.fields if field.init -%}
+	{{ field.arg_name }} interface{},
+	{% endfor -%}) (*{{ node.name }}, error) {
+	fmt.Printf("New{{ node.name }}(
+		{%- for field in node.fields if field.init -%}
+		  %v{{ ', ' if not loop.last -}}
+		{%- endfor %})\n",
+		{%- for field in node.fields if field.init -%}
+		{{ field.arg_name }},
+		{% endfor -%})
+	nn := &{{ node.name }}{}
+	nn.SetKind({{ node.name }}Kind)
+	{% for field in node.fields if field.init -%}
+	{%- if field.field_loader == FieldLoader.OPTIONAL %}
+	if {{ field.arg_name }} != nil {
+		if n, ok := {{ field.arg_name }}.(NodeHandler); ok {
+			nn.{{ field.name }} = {{ field.arg_name }}.({{ field.type }})
+			nn.AddChild(n)
+		} else if w, ok := {{ field.arg_name }}.(*Wrapped); ok {
+			nn.{{ field.name }} = w.Value.({{ field.type }})
+			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			nn.{{ field.name }} = {{ field.arg_name }}.({{ field.type }})
+		}
+	}
+	{%- elif field.field_loader == FieldLoader.REQUIRED %}
+	if {{ field.arg_name }} == nil {
+		return nil, ErrMissingRequiredField
+	}
+	if n, ok := {{ field.arg_name }}.(NodeHandler); ok {
+		nn.{{ field.name }} = {{ field.arg_name }}.({{ field.type }})
+		nn.AddChild(n)
+	} else if w, ok := {{ field.arg_name }}.(*Wrapped); ok {
+		nn.{{ field.name }} = w.Value.({{ field.type }})
+		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		nn.{{ field.name }} = {{ field.arg_name }}.({{ field.type }})
+	}
+	{%- elif field.field_loader == FieldLoader.REPEATED %}
+	nn.{{ field.name }} = make([]{{ field.type }}, 0, defaultCapacity)
+	if n, ok := {{ field.arg_name }}.(NodeHandler); ok {
+		nn.AddChild(n)
+	} else if w, ok := {{ field.arg_name }}.(*Wrapped); ok {
+		newElem := w.Value.({{ field.type }})
+		nn.{{ field.name }} = append(nn.{{ field.name }}, newElem)
+		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := {{ field.arg_name }}.({{ field.type }})
+		nn.{{ field.name }} = append(nn.{{ field.name }}, newElem)
+	}
+	{%- endif -%}
+	{% endfor %}
+	return nn, nil
+}
+
+{% for field in node.fields -%}
+{%- if field.field_loader == FieldLoader.REPEATED %}
+func (n *{{ node.name }}) AddChild(c NodeHandler) {
+	n.{{ field.name }} = append(n.{{ field.name }}, c.({{ field.type }}))
+	n.Node.AddChild(c)
+	c.SetParent(n)
+}
+
+func (n *{{ node.name }}) AddChildren(children []NodeHandler) {
+	for _, c := range children {
+		if c == nil {
+			continue
+		}
+		n.{{ field.name }} = append(n.{{ field.name }}, c.({{ field.type }}))
+		n.Node.AddChild(c)
+		c.SetParent(n)
+	}
+}
+{%- endif -%}
+{%- endfor %}
+
+{% endfor -%}
+
+type Visitor interface {
+	{% for node in nodes -%}
+	Visit{{ node.name }}(*{{ node.name }}, interface{})
+	{% endfor %}
+}
+
+{% for node in nodes -%}
+func (n *{{ node.name }}) Accept(v Visitor, d interface{}) {
+	fmt.Printf("Visit{{ node.name }} %s\n",
+		n.SingleNodeDebugString())
+
+	v.Visit{{ node.name }}(n, d)
+}
+
+{% endfor %}
+
+// Operation is the base for new operations using visitors.
+type Operation struct {
+	// visitor is the visitor to passed when fallbacking to walk.
+	visitor Visitor
+}
+
+{% for node in nodes -%}
+func (o *Operation) Visit{{ node.name }}(n *{{ node.name }}, d interface{}) {
+	for _, c := range n.Children() {
+		fmt.Printf("%s -> %s\n",
+			n.SingleNodeDebugString(),
+			c.(NodeStringer).SingleNodeDebugString())
+		c.Accept(o.visitor, d)
+	}
+}
+{% endfor %}
+
+type NodeKind int
+
+const (
+{%- for node in nodes %}
+	{{ node.name }}Kind{% if loop.first %} NodeKind = iota{% endif %}
+{%- endfor -%})
+
+func (k NodeKind) String() string {
+	switch k {
+	{%- for node in nodes %}
+	case {{ node.name }}Kind:
+		return "{{ node.name }}"
+	{%- endfor %}
+ 	}
+	panic("unexpected kind")
+ }
+
