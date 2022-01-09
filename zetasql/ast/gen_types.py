@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 import os
 import textwrap
+import subprocess
 
 import jinja2
 
@@ -92,8 +93,9 @@ class TreeGenerator:
         template = env.get_template('types_generated.go.j2')
         oname = os.path.join(output_path, 'types_generated.go')
         print('Writing', oname)
-        with open(oname, 'w') as out:
-            out.write(template.render(context))
+        materialized = template.render(context).encode()
+        r = subprocess.run(['gofmt', '-w', oname], input=materialized)
+        print(r)
 
 
 def make_comment(text: str, indent: int, width: int) -> str:

@@ -11,7 +11,7 @@ const defaultCapacity = 4
 // QueryStatement represents a single query statement.
 type QueryStatement struct {
 	Query *Query
-	
+
 	Statement
 }
 
@@ -26,52 +26,51 @@ type Query struct {
 	// LimitOffset applies, if present, after the result of QueryExpr
 	// and OrderBy.
 	LimitOffset *LimitOffset
-	IsNested bool
-	
+	IsNested    bool
+
 	QueryExpression
 }
 
 type Select struct {
-	Distinct bool
-	SelectAs *SelectAs
-	SelectList *SelectList
-	FromClause *FromClause
-	WhereClause *WhereClause
-	GroupBy *GroupBy
-	Having *Having
-	Qualify *Qualify
+	Distinct     bool
+	SelectAs     *SelectAs
+	SelectList   *SelectList
+	FromClause   *FromClause
+	WhereClause  *WhereClause
+	GroupBy      *GroupBy
+	Having       *Having
+	Qualify      *Qualify
 	WindowClause *WindowClause
-	
+
 	QueryExpression
 }
 
 type SelectList struct {
 	Columns []*SelectColumn
-	
+
 	Node
 }
 
 type SelectColumn struct {
 	Expression ExpressionHandler
-	Alias *Alias
-	
+	Alias      *Alias
+
 	Node
 }
 
 type IntLiteral struct {
-	
 	Leaf
 }
 
 type Identifier struct {
 	IDString string
-	
+
 	Expression
 }
 
 type Alias struct {
 	Identifier *Identifier
-	
+
 	Node
 }
 
@@ -79,7 +78,7 @@ type Alias struct {
 // dotting into arbitrary expressions (see DotIdentifier).
 type PathExpression struct {
 	Names []*Identifier
-	
+
 	Expression
 }
 
@@ -87,10 +86,10 @@ type PathExpression struct {
 // scan, referenced by a path expression or UNNEST, can optionally have
 // aliases.  Exactly one of PathExpr or UnnestExpr must be non nil.
 type TablePathExpression struct {
-	PathExpr *PathExpression
+	PathExpr   *PathExpression
 	UnnestExpr *UnnestExpression
-	Alias *Alias
-	
+	Alias      *Alias
+
 	TableExpression
 }
 
@@ -99,53 +98,52 @@ type FromClause struct {
 	// the FROM clause has commas, they will expressed as a tree of Join
 	// nodes with JoinType=Comma.
 	TableExpression TableExpressionHandler
-	
+
 	Node
 }
 
 type WhereClause struct {
 	Expression ExpressionHandler
-	
+
 	Node
 }
 
 type BooleanLiteral struct {
 	Value bool
-	
+
 	Leaf
 }
 
 type AndExpr struct {
 	Conjuncts []ExpressionHandler
-	
+
 	Expression
 }
 
 type BinaryExpression struct {
-	Op BinaryOp
+	Op  BinaryOp
 	LHS ExpressionHandler
 	RHS ExpressionHandler
 	// IsNot indicates whether the binary operator has a preceding
 	// NOT to it.  For NOT LIKE and IS NOT.
 	IsNot bool
-	
+
 	Expression
 }
 
 type StringLiteral struct {
 	StringValue string
-	
+
 	Leaf
 }
 
 type Star struct {
-	
 	Leaf
 }
 
 type OrExpr struct {
 	Disjuncts []ExpressionHandler
-	
+
 	Expression
 }
 
@@ -154,28 +152,28 @@ type OrExpr struct {
 // Expression and Rollup will be non-nil.
 type GroupingItem struct {
 	Expression ExpressionHandler
-	Rollup *Rollup
-	
+	Rollup     *Rollup
+
 	Node
 }
 
 type GroupBy struct {
 	GroupingItems []*GroupingItem
-	
+
 	Node
 }
 
 type OrderingExpression struct {
-	Expression ExpressionHandler
-	NullOrder *NullOrder
+	Expression   ExpressionHandler
+	NullOrder    *NullOrder
 	OrderingSpec OrderingSpec
-	
+
 	Node
 }
 
 type OrderBy struct {
 	OrderingExpression []*OrderingExpression
-	
+
 	Node
 }
 
@@ -184,73 +182,70 @@ type LimitOffset struct {
 	Limit ExpressionHandler
 	// Offset is the optional OFFSET value, or nil.
 	Offset ExpressionHandler
-	
+
 	Node
 }
 
 type FloatLiteral struct {
-	
 	Leaf
 }
 
 type NullLiteral struct {
-	
 	Leaf
 }
 
 type OnClause struct {
 	Expression ExpressionHandler
-	
+
 	Node
 }
 
 type WithClauseEntry struct {
 	Alias *Identifier
 	Query *Query
-	
+
 	Node
 }
 
 // Join can introduce multiple scans and cannot have aliases. It can
 // also represent a JOIN with a list of consecutive ON/USING clauses.
 type Join struct {
-	LHS TableExpressionHandler
-	RHS TableExpressionHandler
-	ClauseList *OnOrUsingClauseList
-	JoinType JoinType
+	LHS               TableExpressionHandler
+	RHS               TableExpressionHandler
+	ClauseList        *OnOrUsingClauseList
+	JoinType          JoinType
 	ContainsCommaJoin bool
-	
+
 	TableExpression
 }
 
 type UsingClause struct {
 	keys []*Identifier
-	
+
 	Node
 }
 
 type WithClause struct {
 	With []*WithClauseEntry
-	
+
 	Node
 }
 
 type Having struct {
-	
 	Node
 }
 
 type NamedType struct {
-	TypeName *PathExpression
+	TypeName       *PathExpression
 	TypeParameters *TypeParameterList
-	
+
 	Type
 }
 
 type ArrayType struct {
-	ElementType TypeHandler
+	ElementType    TypeHandler
 	TypeParameters *TypeParameterList
-	
+
 	Type
 }
 
@@ -258,23 +253,23 @@ type StructField struct {
 	// Name will be nil for anonymous fields like in STRUCT<int,
 	// string>.
 	Name *Identifier
-	
+
 	Node
 }
 
 type StructType struct {
-	StructFields *StructField
+	StructFields      *StructField
 	TypeParameterList *TypeParameterList
-	
+
 	Type
 }
 
 type CastExpression struct {
-	Expr ExpressionHandler
-	Type TypeHandler
-	Format *FormatClause
+	Expr       ExpressionHandler
+	Type       TypeHandler
+	Format     *FormatClause
 	IsSafeCast bool
-	
+
 	Expression
 }
 
@@ -283,19 +278,19 @@ type CastExpression struct {
 // <TypeName> is present.
 type SelectAs struct {
 	TypeName *PathExpression
-	AsMode AsMode
-	
+	AsMode   AsMode
+
 	Node
 }
 
 type Rollup struct {
 	Expressions []ExpressionHandler
-	
+
 	Node
 }
 
 type FunctionCall struct {
-	Function ExpressionHandler
+	Function  ExpressionHandler
 	Arguments []ExpressionHandler
 	// OrderBy is set when the function is called with FUNC(args
 	// ORDER BY cols).
@@ -309,23 +304,23 @@ type FunctionCall struct {
 	// Distinct is true when the function is called with
 	// FUNC(DISTINCT args).
 	Distinct bool
-	
+
 	Expression
 }
 
 type ArrayConstructor struct {
 	// Type may be nil, depending on whether the array is constructed
 	// through ARRAY<type>[...] syntax or ARRAY[...] or [...].
-	Type *ArrayType
+	Type     *ArrayType
 	Elements []ExpressionHandler
-	
+
 	Expression
 }
 
 type StructConstructorArg struct {
 	Expression ExpressionHandler
-	Alias *Alias
-	
+	Alias      *Alias
+
 	Node
 }
 
@@ -333,7 +328,7 @@ type StructConstructorArg struct {
 // with (expr, expr, ...) with at least two expressions.
 type StructConstructorWithParens struct {
 	FieldExpressions []ExpressionHandler
-	
+
 	Node
 }
 
@@ -343,8 +338,8 @@ type StructConstructorWithParens struct {
 // nil when the type is explicitly defined.
 type StructConstructorWithKeyword struct {
 	StructType *StructType
-	Fields []*StructConstructorArg
-	
+	Fields     []*StructConstructorArg
+
 	Expression
 }
 
@@ -352,14 +347,14 @@ type StructConstructorWithKeyword struct {
 // UNNEST(...), and expr IN (query). Exactly one of InList, Query, or
 // UnnestExpr is present.
 type InExpression struct {
-	LHS ExpressionHandler
-	InList *InList
-	Query *Query
+	LHS        ExpressionHandler
+	InList     *InList
+	Query      *Query
 	UnnestExpr *UnnestExpression
 	// IsNot signifies whether the IN operator as a preceding NOT to
 	// it.
 	IsNot bool
-	
+
 	Expression
 }
 
@@ -367,61 +362,58 @@ type InExpression struct {
 type InList struct {
 	// List contains the expressions present in the InList node.
 	List []ExpressionHandler
-	
+
 	Node
 }
 
 // BetweenExpression is resulted through <LHS> BETWEEN <Low> AND
 // <High>.
 type BetweenExpression struct {
-	LHS ExpressionHandler
-	Low ExpressionHandler
+	LHS  ExpressionHandler
+	Low  ExpressionHandler
 	High ExpressionHandler
 	// IsNot signifies whether the BETWEEN operator has a preceding
 	// NOT to it.
 	IsNot bool
-	
+
 	Expression
 }
 
 type NumericLiteral struct {
-	
 	Leaf
 }
 
 type BigNumericLiteral struct {
-	
 	Leaf
 }
 
 type BytesLiteral struct {
-	
 	Leaf
 }
 
 type DateOrTimeLiteral struct {
 	StringLiteral *StringLiteral
-	TypeKind TypeKind
-	
+	TypeKind      TypeKind
+
 	Expression
 }
 
 type CaseValueExpression struct {
 	Arguments []ExpressionHandler
-	
+
 	Expression
 }
 
 type CaseNoValueExpression struct {
 	Arguments []ExpressionHandler
-	
+
 	Expression
 }
 
 type ArrayElement struct {
-	Array ExpressionHandler
+	Array    ExpressionHandler
 	Position ExpressionHandler
-	
+
 	Expression
 }
 
@@ -431,7 +423,7 @@ type BitwiseShiftExpression struct {
 	// IsLeftShift signifies whether the bitwise shift is of left
 	// shift type "<<" or right shift type ">>".
 	IsLeftShift bool
-	
+
 	Expression
 }
 
@@ -441,7 +433,7 @@ type BitwiseShiftExpression struct {
 type DotGeneralizedField struct {
 	Expr ExpressionHandler
 	Path *PathExpression
-	
+
 	Expression
 }
 
@@ -451,22 +443,22 @@ type DotGeneralizedField struct {
 type DotIdentifier struct {
 	Expr ExpressionHandler
 	Name *Identifier
-	
+
 	Expression
 }
 
 type DotStar struct {
 	Expr ExpressionHandler
-	
+
 	Expression
 }
 
 // DotStarWithModifiers is an expression constructed through SELECT
 // x.* EXCEPT (...) REPLACE (...).
 type DotStarWithModifiers struct {
-	Expr ExpressionHandler
+	Expr      ExpressionHandler
 	Modifiers *StarModifiers
-	
+
 	Expression
 }
 
@@ -477,81 +469,81 @@ type ExpressionSubquery struct {
 	// Modifier is the syntactic modifier on this expression
 	// subquery.
 	Modifier SubqueryModifier
-	
+
 	Expression
 }
 
 // ExtractExpression is resulted from EXTRACT(<LHS> FROM <RHS>
 // <TimeZone>).
 type ExtractExpression struct {
-	LHS ExpressionHandler
-	RHS ExpressionHandler
+	LHS      ExpressionHandler
+	RHS      ExpressionHandler
 	TimeZone ExpressionHandler
-	
+
 	Expression
 }
 
 type IntervalExpr struct {
-	IntervalValue ExpressionHandler
-	DatePartName ExpressionHandler
+	IntervalValue  ExpressionHandler
+	DatePartName   ExpressionHandler
 	DatePartNameTo ExpressionHandler
-	
+
 	Expression
 }
 
 type NullOrder struct {
 	NullsFirst bool
-	
+
 	Node
 }
 
 type OnOrUsingClauseList struct {
 	// List is a list of OnClause and UsingClause elements.
 	List []NodeHandler
-	
+
 	Node
 }
 
 type ParenthesizedJoin struct {
-	Join *Join
+	Join         *Join
 	SampleClause SampleClause
-	
+
 	TableExpression
 }
 
 type PartitionBy struct {
 	PartitioningExpressions []ExpressionHandler
-	
+
 	Node
 }
 
 type SetOperation struct {
-	Inputs []QueryExpressionHandler
-	OpType SetOp
+	Inputs   []QueryExpressionHandler
+	OpType   SetOp
 	Distinct bool
-	
+
 	QueryExpression
 }
 
 type StarExceptList struct {
 	Identifiers []*Identifier
-	
+
 	Node
 }
 
 // StarModifiers is resulted from SELECT * EXCEPT (...) REPLACE
 // (...).
 type StarModifiers struct {
-	ExceptList *StarExceptList
+	ExceptList   *StarExceptList
 	ReplaceItems []*StarReplaceItem
-	
+
 	Node
 }
 
 type StarReplaceItem struct {
 	Expression ExpressionHandler
-	Alias *Identifier
-	
+	Alias      *Identifier
+
 	Node
 }
 
@@ -559,51 +551,51 @@ type StarReplaceItem struct {
 // (...).
 type StarWithModifiers struct {
 	Modifiers *StarModifiers
-	
+
 	Expression
 }
 
 // TableSubquery contains the table subquery, which can contain
 // either a PivotClause or an UnpivotClause.
 type TableSubquery struct {
-	Subquery *Query
-	Alias *Alias
+	Subquery     *Query
+	Alias        *Alias
 	SampleClause *SampleClause
-	
+
 	TableExpression
 }
 
 type UnaryExpression struct {
 	Operand ExpressionHandler
-	Op UnaryOp
-	
+	Op      UnaryOp
+
 	Expression
 }
 
 type UnnestExpression struct {
 	Expression ExpressionHandler
-	
+
 	Node
 }
 
 type WindowClause struct {
 	Windows []*WindowDefinition
-	
+
 	Node
 }
 
 type WindowDefinition struct {
-	Name *Identifier
+	Name       *Identifier
 	WindowSpec *WindowSpecification
-	
+
 	Node
 }
 
 type WindowFrame struct {
 	StartExpr *WindowFrameExpr
-	EndExpr *WindowFrameExpr
+	EndExpr   *WindowFrameExpr
 	FrameUnit FrameUnit
-	
+
 	Node
 }
 
@@ -611,106 +603,106 @@ type WindowFrameExpr struct {
 	// Expression specifies the boundary as a logical or physical
 	// offset to current row. It is present when BoundaryType is
 	// OffsetPreceding or OffsetFollowing.
-	Expression ExpressionHandler
+	Expression   ExpressionHandler
 	BoundaryType BoundaryType
-	
+
 	Node
 }
 
 type LikeExpression struct {
-	LHS ExpressionHandler
+	LHS    ExpressionHandler
 	InList *InList
-	IsNot bool
-	
+	IsNot  bool
+
 	Expression
 }
 
 type WindowSpecification struct {
 	BaseWindowName *Identifier
-	PartitionBy *PartitionBy
-	OrderBy *OrderBy
-	WindowFrame *WindowFrame
-	
+	PartitionBy    *PartitionBy
+	OrderBy        *OrderBy
+	WindowFrame    *WindowFrame
+
 	Node
 }
 
 type WithOffset struct {
 	Alias *Alias
-	
+
 	Node
 }
 
 type TypeParameterList struct {
 	Parameters []LeafHandler
-	
+
 	Node
 }
 
 type SampleClause struct {
 	SampleMethod *Identifier
-	SampleSize *SampleSize
+	SampleSize   *SampleSize
 	SampleSuffix *SampleSuffix
-	
+
 	Node
 }
 
 type SampleSize struct {
-	Size ExpressionHandler
+	Size        ExpressionHandler
 	PartitionBy *PartitionBy
-	Unit SampleSizeUnit
-	
+	Unit        SampleSizeUnit
+
 	Node
 }
 
 type SampleSuffix struct {
 	Weight *WithWeight
 	Repeat *RepeatableClause
-	
+
 	Node
 }
 
 type WithWeight struct {
 	Alias *Alias
-	
+
 	Node
 }
 
 type RepeatableClause struct {
 	Argument ExpressionHandler
-	
+
 	Node
 }
 
 type Qualify struct {
 	Expression ExpressionHandler
-	
+
 	Node
 }
 
 type FormatClause struct {
-	Format ExpressionHandler
+	Format       ExpressionHandler
 	TimeZoneExpr ExpressionHandler
-	
+
 	Node
 }
 
 type ParameterExpr struct {
 	Name *Identifier
-	
+
 	Expression
 }
 
 type AnalyticFunctionCall struct {
-	Expr ExpressionHandler
+	Expr       ExpressionHandler
 	WindowSpec *WindowSpecification
-	
+
 	Expression
 }
 
 func NewQueryStatement(
 	query interface{},
-	) (*QueryStatement, error) {
-	
+) (*QueryStatement, error) {
+
 	nn := &QueryStatement{}
 	nn.SetKind(QueryStatementKind)
 
@@ -741,17 +733,13 @@ func (n *QueryStatement) InitQuery(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewQuery(
 	withclause interface{},
 	queryexpr interface{},
 	orderby interface{},
 	limitoffset interface{},
-	) (*Query, error) {
-	
+) (*Query, error) {
+
 	nn := &Query{}
 	nn.SetKind(QueryKind)
 
@@ -857,10 +845,6 @@ func (n *Query) InitIsNested(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewSelect(
 	distinct interface{},
 	selectas interface{},
@@ -871,8 +855,8 @@ func NewSelect(
 	having interface{},
 	qualify interface{},
 	windowclause interface{},
-	) (*Select, error) {
-	
+) (*Select, error) {
+
 	nn := &Select{}
 	nn.SetKind(SelectKind)
 
@@ -1063,14 +1047,10 @@ func (n *Select) InitWindowClause(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewSelectList(
 	columns interface{},
-	) (*SelectList, error) {
-	
+) (*SelectList, error) {
+
 	nn := &SelectList{}
 	nn.SetKind(SelectListKind)
 
@@ -1103,9 +1083,6 @@ func (n *SelectList) InitColumns(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *SelectList) AddChild(c NodeHandler) {
 	n.Columns = append(n.Columns, c.(*SelectColumn))
 	n.Node.AddChild(c)
@@ -1126,8 +1103,8 @@ func (n *SelectList) AddChildren(children []NodeHandler) {
 func NewSelectColumn(
 	expression interface{},
 	alias interface{},
-	) (*SelectColumn, error) {
-	
+) (*SelectColumn, error) {
+
 	nn := &SelectColumn{}
 	nn.SetKind(SelectColumnKind)
 
@@ -1178,13 +1155,8 @@ func (n *SelectColumn) InitAlias(d interface{}) error {
 	return nil
 }
 
+func NewIntLiteral() (*IntLiteral, error) {
 
-
-
-
-func NewIntLiteral(
-	) (*IntLiteral, error) {
-	
 	nn := &IntLiteral{}
 	nn.SetKind(IntLiteralKind)
 
@@ -1193,14 +1165,10 @@ func NewIntLiteral(
 	return nn, err
 }
 
-
-
-
-
 func NewIdentifier(
 	idstring interface{},
-	) (*Identifier, error) {
-	
+) (*Identifier, error) {
+
 	nn := &Identifier{}
 	nn.SetKind(IdentifierKind)
 
@@ -1229,14 +1197,10 @@ func (n *Identifier) InitIDString(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewAlias(
 	identifier interface{},
-	) (*Alias, error) {
-	
+) (*Alias, error) {
+
 	nn := &Alias{}
 	nn.SetKind(AliasKind)
 
@@ -1267,14 +1231,10 @@ func (n *Alias) InitIdentifier(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewPathExpression(
 	names interface{},
-	) (*PathExpression, error) {
-	
+) (*PathExpression, error) {
+
 	nn := &PathExpression{}
 	nn.SetKind(PathExpressionKind)
 
@@ -1307,9 +1267,6 @@ func (n *PathExpression) InitNames(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *PathExpression) AddChild(c NodeHandler) {
 	n.Names = append(n.Names, c.(*Identifier))
 	n.Node.AddChild(c)
@@ -1331,8 +1288,8 @@ func NewTablePathExpression(
 	pathexpr interface{},
 	unnestexpr interface{},
 	alias interface{},
-	) (*TablePathExpression, error) {
-	
+) (*TablePathExpression, error) {
+
 	nn := &TablePathExpression{}
 	nn.SetKind(TablePathExpressionKind)
 
@@ -1401,14 +1358,10 @@ func (n *TablePathExpression) InitAlias(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewFromClause(
 	tableexpression interface{},
-	) (*FromClause, error) {
-	
+) (*FromClause, error) {
+
 	nn := &FromClause{}
 	nn.SetKind(FromClauseKind)
 
@@ -1439,14 +1392,10 @@ func (n *FromClause) InitTableExpression(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWhereClause(
 	expression interface{},
-	) (*WhereClause, error) {
-	
+) (*WhereClause, error) {
+
 	nn := &WhereClause{}
 	nn.SetKind(WhereClauseKind)
 
@@ -1477,13 +1426,8 @@ func (n *WhereClause) InitExpression(d interface{}) error {
 	return nil
 }
 
+func NewBooleanLiteral() (*BooleanLiteral, error) {
 
-
-
-
-func NewBooleanLiteral(
-	) (*BooleanLiteral, error) {
-	
 	nn := &BooleanLiteral{}
 	nn.SetKind(BooleanLiteralKind)
 
@@ -1507,14 +1451,10 @@ func (n *BooleanLiteral) InitValue(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewAndExpr(
 	conjuncts interface{},
-	) (*AndExpr, error) {
-	
+) (*AndExpr, error) {
+
 	nn := &AndExpr{}
 	nn.SetKind(AndExprKind)
 
@@ -1547,9 +1487,6 @@ func (n *AndExpr) InitConjuncts(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *AndExpr) AddChild(c NodeHandler) {
 	n.Conjuncts = append(n.Conjuncts, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -1572,8 +1509,8 @@ func NewBinaryExpression(
 	lhs interface{},
 	rhs interface{},
 	isnot interface{},
-	) (*BinaryExpression, error) {
-	
+) (*BinaryExpression, error) {
+
 	nn := &BinaryExpression{}
 	nn.SetKind(BinaryExpressionKind)
 
@@ -1666,13 +1603,8 @@ func (n *BinaryExpression) InitIsNot(d interface{}) error {
 	return nil
 }
 
+func NewStringLiteral() (*StringLiteral, error) {
 
-
-
-
-func NewStringLiteral(
-	) (*StringLiteral, error) {
-	
 	nn := &StringLiteral{}
 	nn.SetKind(StringLiteralKind)
 
@@ -1696,13 +1628,8 @@ func (n *StringLiteral) InitStringValue(d interface{}) error {
 	return nil
 }
 
+func NewStar() (*Star, error) {
 
-
-
-
-func NewStar(
-	) (*Star, error) {
-	
 	nn := &Star{}
 	nn.SetKind(StarKind)
 
@@ -1711,14 +1638,10 @@ func NewStar(
 	return nn, err
 }
 
-
-
-
-
 func NewOrExpr(
 	disjuncts interface{},
-	) (*OrExpr, error) {
-	
+) (*OrExpr, error) {
+
 	nn := &OrExpr{}
 	nn.SetKind(OrExprKind)
 
@@ -1751,9 +1674,6 @@ func (n *OrExpr) InitDisjuncts(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *OrExpr) AddChild(c NodeHandler) {
 	n.Disjuncts = append(n.Disjuncts, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -1774,8 +1694,8 @@ func (n *OrExpr) AddChildren(children []NodeHandler) {
 func NewGroupingItem(
 	expression interface{},
 	rollup interface{},
-	) (*GroupingItem, error) {
-	
+) (*GroupingItem, error) {
+
 	nn := &GroupingItem{}
 	nn.SetKind(GroupingItemKind)
 
@@ -1824,14 +1744,10 @@ func (n *GroupingItem) InitRollup(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewGroupBy(
 	groupingitems interface{},
-	) (*GroupBy, error) {
-	
+) (*GroupBy, error) {
+
 	nn := &GroupBy{}
 	nn.SetKind(GroupByKind)
 
@@ -1864,9 +1780,6 @@ func (n *GroupBy) InitGroupingItems(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *GroupBy) AddChild(c NodeHandler) {
 	n.GroupingItems = append(n.GroupingItems, c.(*GroupingItem))
 	n.Node.AddChild(c)
@@ -1888,8 +1801,8 @@ func NewOrderingExpression(
 	expression interface{},
 	nullorder interface{},
 	orderingspec interface{},
-	) (*OrderingExpression, error) {
-	
+) (*OrderingExpression, error) {
+
 	nn := &OrderingExpression{}
 	nn.SetKind(OrderingExpressionKind)
 
@@ -1960,14 +1873,10 @@ func (n *OrderingExpression) InitOrderingSpec(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewOrderBy(
 	orderingexpression interface{},
-	) (*OrderBy, error) {
-	
+) (*OrderBy, error) {
+
 	nn := &OrderBy{}
 	nn.SetKind(OrderByKind)
 
@@ -2000,9 +1909,6 @@ func (n *OrderBy) InitOrderingExpression(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *OrderBy) AddChild(c NodeHandler) {
 	n.OrderingExpression = append(n.OrderingExpression, c.(*OrderingExpression))
 	n.Node.AddChild(c)
@@ -2023,8 +1929,8 @@ func (n *OrderBy) AddChildren(children []NodeHandler) {
 func NewLimitOffset(
 	limit interface{},
 	offset interface{},
-	) (*LimitOffset, error) {
-	
+) (*LimitOffset, error) {
+
 	nn := &LimitOffset{}
 	nn.SetKind(LimitOffsetKind)
 
@@ -2075,13 +1981,8 @@ func (n *LimitOffset) InitOffset(d interface{}) error {
 	return nil
 }
 
+func NewFloatLiteral() (*FloatLiteral, error) {
 
-
-
-
-func NewFloatLiteral(
-	) (*FloatLiteral, error) {
-	
 	nn := &FloatLiteral{}
 	nn.SetKind(FloatLiteralKind)
 
@@ -2090,13 +1991,8 @@ func NewFloatLiteral(
 	return nn, err
 }
 
+func NewNullLiteral() (*NullLiteral, error) {
 
-
-
-
-func NewNullLiteral(
-	) (*NullLiteral, error) {
-	
 	nn := &NullLiteral{}
 	nn.SetKind(NullLiteralKind)
 
@@ -2105,14 +2001,10 @@ func NewNullLiteral(
 	return nn, err
 }
 
-
-
-
-
 func NewOnClause(
 	expression interface{},
-	) (*OnClause, error) {
-	
+) (*OnClause, error) {
+
 	nn := &OnClause{}
 	nn.SetKind(OnClauseKind)
 
@@ -2143,15 +2035,11 @@ func (n *OnClause) InitExpression(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWithClauseEntry(
 	alias interface{},
 	query interface{},
-	) (*WithClauseEntry, error) {
-	
+) (*WithClauseEntry, error) {
+
 	nn := &WithClauseEntry{}
 	nn.SetKind(WithClauseEntryKind)
 
@@ -2204,17 +2092,13 @@ func (n *WithClauseEntry) InitQuery(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewJoin(
 	lhs interface{},
 	rhs interface{},
 	clauselist interface{},
 	jointype interface{},
-	) (*Join, error) {
-	
+) (*Join, error) {
+
 	nn := &Join{}
 	nn.SetKind(JoinKind)
 
@@ -2322,14 +2206,10 @@ func (n *Join) InitContainsCommaJoin(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewUsingClause(
 	keys interface{},
-	) (*UsingClause, error) {
-	
+) (*UsingClause, error) {
+
 	nn := &UsingClause{}
 	nn.SetKind(UsingClauseKind)
 
@@ -2362,9 +2242,6 @@ func (n *UsingClause) Initkeys(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *UsingClause) AddChild(c NodeHandler) {
 	n.keys = append(n.keys, c.(*Identifier))
 	n.Node.AddChild(c)
@@ -2384,8 +2261,8 @@ func (n *UsingClause) AddChildren(children []NodeHandler) {
 
 func NewWithClause(
 	with interface{},
-	) (*WithClause, error) {
-	
+) (*WithClause, error) {
+
 	nn := &WithClause{}
 	nn.SetKind(WithClauseKind)
 
@@ -2418,9 +2295,6 @@ func (n *WithClause) InitWith(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *WithClause) AddChild(c NodeHandler) {
 	n.With = append(n.With, c.(*WithClauseEntry))
 	n.Node.AddChild(c)
@@ -2438,9 +2312,8 @@ func (n *WithClause) AddChildren(children []NodeHandler) {
 	}
 }
 
-func NewHaving(
-	) (*Having, error) {
-	
+func NewHaving() (*Having, error) {
+
 	nn := &Having{}
 	nn.SetKind(HavingKind)
 
@@ -2449,15 +2322,11 @@ func NewHaving(
 	return nn, err
 }
 
-
-
-
-
 func NewNamedType(
 	typename interface{},
 	typeparameters interface{},
-	) (*NamedType, error) {
-	
+) (*NamedType, error) {
+
 	nn := &NamedType{}
 	nn.SetKind(NamedTypeKind)
 
@@ -2508,15 +2377,11 @@ func (n *NamedType) InitTypeParameters(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewArrayType(
 	elementtype interface{},
 	typeparameters interface{},
-	) (*ArrayType, error) {
-	
+) (*ArrayType, error) {
+
 	nn := &ArrayType{}
 	nn.SetKind(ArrayTypeKind)
 
@@ -2567,14 +2432,10 @@ func (n *ArrayType) InitTypeParameters(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewStructField(
 	name interface{},
-	) (*StructField, error) {
-	
+) (*StructField, error) {
+
 	nn := &StructField{}
 	nn.SetKind(StructFieldKind)
 
@@ -2603,15 +2464,11 @@ func (n *StructField) InitName(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewStructType(
 	structfields interface{},
 	typeparameterlist interface{},
-	) (*StructType, error) {
-	
+) (*StructType, error) {
+
 	nn := &StructType{}
 	nn.SetKind(StructTypeKind)
 
@@ -2662,17 +2519,13 @@ func (n *StructType) InitTypeParameterList(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewCastExpression(
 	expr interface{},
 	typ interface{},
 	format interface{},
 	issafecast interface{},
-	) (*CastExpression, error) {
-	
+) (*CastExpression, error) {
+
 	nn := &CastExpression{}
 	nn.SetKind(CastExpressionKind)
 
@@ -2765,15 +2618,11 @@ func (n *CastExpression) InitIsSafeCast(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewSelectAs(
 	typename interface{},
 	asmode interface{},
-	) (*SelectAs, error) {
-	
+) (*SelectAs, error) {
+
 	nn := &SelectAs{}
 	nn.SetKind(SelectAsKind)
 
@@ -2822,14 +2671,10 @@ func (n *SelectAs) InitAsMode(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewRollup(
 	expressions interface{},
-	) (*Rollup, error) {
-	
+) (*Rollup, error) {
+
 	nn := &Rollup{}
 	nn.SetKind(RollupKind)
 
@@ -2862,9 +2707,6 @@ func (n *Rollup) InitExpressions(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *Rollup) AddChild(c NodeHandler) {
 	n.Expressions = append(n.Expressions, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -2885,8 +2727,8 @@ func (n *Rollup) AddChildren(children []NodeHandler) {
 func NewFunctionCall(
 	function interface{},
 	distinct interface{},
-	) (*FunctionCall, error) {
-	
+) (*FunctionCall, error) {
+
 	nn := &FunctionCall{}
 	nn.SetKind(FunctionCallKind)
 
@@ -3001,9 +2843,6 @@ func (n *FunctionCall) InitDistinct(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *FunctionCall) AddChild(c NodeHandler) {
 	n.Arguments = append(n.Arguments, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -3024,8 +2863,8 @@ func (n *FunctionCall) AddChildren(children []NodeHandler) {
 func NewArrayConstructor(
 	typ interface{},
 	elements interface{},
-	) (*ArrayConstructor, error) {
-	
+) (*ArrayConstructor, error) {
+
 	nn := &ArrayConstructor{}
 	nn.SetKind(ArrayConstructorKind)
 
@@ -3078,9 +2917,6 @@ func (n *ArrayConstructor) InitElements(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *ArrayConstructor) AddChild(c NodeHandler) {
 	n.Elements = append(n.Elements, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -3101,8 +2937,8 @@ func (n *ArrayConstructor) AddChildren(children []NodeHandler) {
 func NewStructConstructorArg(
 	expression interface{},
 	alias interface{},
-	) (*StructConstructorArg, error) {
-	
+) (*StructConstructorArg, error) {
+
 	nn := &StructConstructorArg{}
 	nn.SetKind(StructConstructorArgKind)
 
@@ -3155,14 +2991,10 @@ func (n *StructConstructorArg) InitAlias(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewStructConstructorWithParens(
 	fieldexpressions interface{},
-	) (*StructConstructorWithParens, error) {
-	
+) (*StructConstructorWithParens, error) {
+
 	nn := &StructConstructorWithParens{}
 	nn.SetKind(StructConstructorWithParensKind)
 
@@ -3195,9 +3027,6 @@ func (n *StructConstructorWithParens) InitFieldExpressions(d interface{}) error 
 	return nil
 }
 
-
-
-
 func (n *StructConstructorWithParens) AddChild(c NodeHandler) {
 	n.FieldExpressions = append(n.FieldExpressions, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -3218,8 +3047,8 @@ func (n *StructConstructorWithParens) AddChildren(children []NodeHandler) {
 func NewStructConstructorWithKeyword(
 	structtype interface{},
 	fields interface{},
-	) (*StructConstructorWithKeyword, error) {
-	
+) (*StructConstructorWithKeyword, error) {
+
 	nn := &StructConstructorWithKeyword{}
 	nn.SetKind(StructConstructorWithKeywordKind)
 
@@ -3272,9 +3101,6 @@ func (n *StructConstructorWithKeyword) InitFields(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *StructConstructorWithKeyword) AddChild(c NodeHandler) {
 	n.Fields = append(n.Fields, c.(*StructConstructorArg))
 	n.Node.AddChild(c)
@@ -3298,8 +3124,8 @@ func NewInExpression(
 	query interface{},
 	unnestexpr interface{},
 	isnot interface{},
-	) (*InExpression, error) {
-	
+) (*InExpression, error) {
+
 	nn := &InExpression{}
 	nn.SetKind(InExpressionKind)
 
@@ -3410,14 +3236,10 @@ func (n *InExpression) InitIsNot(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewInList(
 	list interface{},
-	) (*InList, error) {
-	
+) (*InList, error) {
+
 	nn := &InList{}
 	nn.SetKind(InListKind)
 
@@ -3450,9 +3272,6 @@ func (n *InList) InitList(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *InList) AddChild(c NodeHandler) {
 	n.List = append(n.List, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -3475,8 +3294,8 @@ func NewBetweenExpression(
 	low interface{},
 	high interface{},
 	isnot interface{},
-	) (*BetweenExpression, error) {
-	
+) (*BetweenExpression, error) {
+
 	nn := &BetweenExpression{}
 	nn.SetKind(BetweenExpressionKind)
 
@@ -3571,13 +3390,8 @@ func (n *BetweenExpression) InitIsNot(d interface{}) error {
 	return nil
 }
 
+func NewNumericLiteral() (*NumericLiteral, error) {
 
-
-
-
-func NewNumericLiteral(
-	) (*NumericLiteral, error) {
-	
 	nn := &NumericLiteral{}
 	nn.SetKind(NumericLiteralKind)
 
@@ -3586,13 +3400,8 @@ func NewNumericLiteral(
 	return nn, err
 }
 
+func NewBigNumericLiteral() (*BigNumericLiteral, error) {
 
-
-
-
-func NewBigNumericLiteral(
-	) (*BigNumericLiteral, error) {
-	
 	nn := &BigNumericLiteral{}
 	nn.SetKind(BigNumericLiteralKind)
 
@@ -3601,13 +3410,8 @@ func NewBigNumericLiteral(
 	return nn, err
 }
 
+func NewBytesLiteral() (*BytesLiteral, error) {
 
-
-
-
-func NewBytesLiteral(
-	) (*BytesLiteral, error) {
-	
 	nn := &BytesLiteral{}
 	nn.SetKind(BytesLiteralKind)
 
@@ -3616,15 +3420,11 @@ func NewBytesLiteral(
 	return nn, err
 }
 
-
-
-
-
 func NewDateOrTimeLiteral(
 	stringliteral interface{},
 	typekind interface{},
-	) (*DateOrTimeLiteral, error) {
-	
+) (*DateOrTimeLiteral, error) {
+
 	nn := &DateOrTimeLiteral{}
 	nn.SetKind(DateOrTimeLiteralKind)
 
@@ -3675,14 +3475,10 @@ func (n *DateOrTimeLiteral) InitTypeKind(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewCaseValueExpression(
 	arguments interface{},
-	) (*CaseValueExpression, error) {
-	
+) (*CaseValueExpression, error) {
+
 	nn := &CaseValueExpression{}
 	nn.SetKind(CaseValueExpressionKind)
 
@@ -3715,9 +3511,6 @@ func (n *CaseValueExpression) InitArguments(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *CaseValueExpression) AddChild(c NodeHandler) {
 	n.Arguments = append(n.Arguments, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -3737,8 +3530,8 @@ func (n *CaseValueExpression) AddChildren(children []NodeHandler) {
 
 func NewCaseNoValueExpression(
 	arguments interface{},
-	) (*CaseNoValueExpression, error) {
-	
+) (*CaseNoValueExpression, error) {
+
 	nn := &CaseNoValueExpression{}
 	nn.SetKind(CaseNoValueExpressionKind)
 
@@ -3771,9 +3564,6 @@ func (n *CaseNoValueExpression) InitArguments(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *CaseNoValueExpression) AddChild(c NodeHandler) {
 	n.Arguments = append(n.Arguments, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -3794,8 +3584,8 @@ func (n *CaseNoValueExpression) AddChildren(children []NodeHandler) {
 func NewArrayElement(
 	array interface{},
 	position interface{},
-	) (*ArrayElement, error) {
-	
+) (*ArrayElement, error) {
+
 	nn := &ArrayElement{}
 	nn.SetKind(ArrayElementKind)
 
@@ -3848,16 +3638,12 @@ func (n *ArrayElement) InitPosition(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewBitwiseShiftExpression(
 	lhs interface{},
 	rhs interface{},
 	isleftshift interface{},
-	) (*BitwiseShiftExpression, error) {
-	
+) (*BitwiseShiftExpression, error) {
+
 	nn := &BitwiseShiftExpression{}
 	nn.SetKind(BitwiseShiftExpressionKind)
 
@@ -3930,15 +3716,11 @@ func (n *BitwiseShiftExpression) InitIsLeftShift(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewDotGeneralizedField(
 	expr interface{},
 	path interface{},
-	) (*DotGeneralizedField, error) {
-	
+) (*DotGeneralizedField, error) {
+
 	nn := &DotGeneralizedField{}
 	nn.SetKind(DotGeneralizedFieldKind)
 
@@ -3991,15 +3773,11 @@ func (n *DotGeneralizedField) InitPath(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewDotIdentifier(
 	expr interface{},
 	name interface{},
-	) (*DotIdentifier, error) {
-	
+) (*DotIdentifier, error) {
+
 	nn := &DotIdentifier{}
 	nn.SetKind(DotIdentifierKind)
 
@@ -4052,14 +3830,10 @@ func (n *DotIdentifier) InitName(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewDotStar(
 	expr interface{},
-	) (*DotStar, error) {
-	
+) (*DotStar, error) {
+
 	nn := &DotStar{}
 	nn.SetKind(DotStarKind)
 
@@ -4090,15 +3864,11 @@ func (n *DotStar) InitExpr(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewDotStarWithModifiers(
 	expr interface{},
 	modifiers interface{},
-	) (*DotStarWithModifiers, error) {
-	
+) (*DotStarWithModifiers, error) {
+
 	nn := &DotStarWithModifiers{}
 	nn.SetKind(DotStarWithModifiersKind)
 
@@ -4151,15 +3921,11 @@ func (n *DotStarWithModifiers) InitModifiers(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewExpressionSubquery(
 	query interface{},
 	modifier interface{},
-	) (*ExpressionSubquery, error) {
-	
+) (*ExpressionSubquery, error) {
+
 	nn := &ExpressionSubquery{}
 	nn.SetKind(ExpressionSubqueryKind)
 
@@ -4212,16 +3978,12 @@ func (n *ExpressionSubquery) InitModifier(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewExtractExpression(
 	lhs interface{},
 	rhs interface{},
 	timezone interface{},
-	) (*ExtractExpression, error) {
-	
+) (*ExtractExpression, error) {
+
 	nn := &ExtractExpression{}
 	nn.SetKind(ExtractExpressionKind)
 
@@ -4294,16 +4056,12 @@ func (n *ExtractExpression) InitTimeZone(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewIntervalExpr(
 	intervalvalue interface{},
 	datepartname interface{},
 	datepartnameto interface{},
-	) (*IntervalExpr, error) {
-	
+) (*IntervalExpr, error) {
+
 	nn := &IntervalExpr{}
 	nn.SetKind(IntervalExprKind)
 
@@ -4376,14 +4134,10 @@ func (n *IntervalExpr) InitDatePartNameTo(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewNullOrder(
 	nullsfirst interface{},
-	) (*NullOrder, error) {
-	
+) (*NullOrder, error) {
+
 	nn := &NullOrder{}
 	nn.SetKind(NullOrderKind)
 
@@ -4412,14 +4166,10 @@ func (n *NullOrder) InitNullsFirst(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewOnOrUsingClauseList(
 	list interface{},
-	) (*OnOrUsingClauseList, error) {
-	
+) (*OnOrUsingClauseList, error) {
+
 	nn := &OnOrUsingClauseList{}
 	nn.SetKind(OnOrUsingClauseListKind)
 
@@ -4452,9 +4202,6 @@ func (n *OnOrUsingClauseList) InitList(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *OnOrUsingClauseList) AddChild(c NodeHandler) {
 	n.List = append(n.List, c.(NodeHandler))
 	n.Node.AddChild(c)
@@ -4475,8 +4222,8 @@ func (n *OnOrUsingClauseList) AddChildren(children []NodeHandler) {
 func NewParenthesizedJoin(
 	join interface{},
 	sampleclause interface{},
-	) (*ParenthesizedJoin, error) {
-	
+) (*ParenthesizedJoin, error) {
+
 	nn := &ParenthesizedJoin{}
 	nn.SetKind(ParenthesizedJoinKind)
 
@@ -4527,14 +4274,10 @@ func (n *ParenthesizedJoin) InitSampleClause(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewPartitionBy(
 	partitioningexpressions interface{},
-	) (*PartitionBy, error) {
-	
+) (*PartitionBy, error) {
+
 	nn := &PartitionBy{}
 	nn.SetKind(PartitionByKind)
 
@@ -4567,9 +4310,6 @@ func (n *PartitionBy) InitPartitioningExpressions(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *PartitionBy) AddChild(c NodeHandler) {
 	n.PartitioningExpressions = append(n.PartitioningExpressions, c.(ExpressionHandler))
 	n.Node.AddChild(c)
@@ -4591,8 +4331,8 @@ func NewSetOperation(
 	inputs interface{},
 	optype interface{},
 	distinct interface{},
-	) (*SetOperation, error) {
-	
+) (*SetOperation, error) {
+
 	nn := &SetOperation{}
 	nn.SetKind(SetOperationKind)
 
@@ -4665,9 +4405,6 @@ func (n *SetOperation) InitDistinct(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *SetOperation) AddChild(c NodeHandler) {
 	n.Inputs = append(n.Inputs, c.(QueryExpressionHandler))
 	n.Node.AddChild(c)
@@ -4687,8 +4424,8 @@ func (n *SetOperation) AddChildren(children []NodeHandler) {
 
 func NewStarExceptList(
 	identifiers interface{},
-	) (*StarExceptList, error) {
-	
+) (*StarExceptList, error) {
+
 	nn := &StarExceptList{}
 	nn.SetKind(StarExceptListKind)
 
@@ -4721,9 +4458,6 @@ func (n *StarExceptList) InitIdentifiers(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *StarExceptList) AddChild(c NodeHandler) {
 	n.Identifiers = append(n.Identifiers, c.(*Identifier))
 	n.Node.AddChild(c)
@@ -4744,8 +4478,8 @@ func (n *StarExceptList) AddChildren(children []NodeHandler) {
 func NewStarModifiers(
 	exceptlist interface{},
 	replaceitems interface{},
-	) (*StarModifiers, error) {
-	
+) (*StarModifiers, error) {
+
 	nn := &StarModifiers{}
 	nn.SetKind(StarModifiersKind)
 
@@ -4798,9 +4532,6 @@ func (n *StarModifiers) InitReplaceItems(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *StarModifiers) AddChild(c NodeHandler) {
 	n.ReplaceItems = append(n.ReplaceItems, c.(*StarReplaceItem))
 	n.Node.AddChild(c)
@@ -4821,8 +4552,8 @@ func (n *StarModifiers) AddChildren(children []NodeHandler) {
 func NewStarReplaceItem(
 	expression interface{},
 	alias interface{},
-	) (*StarReplaceItem, error) {
-	
+) (*StarReplaceItem, error) {
+
 	nn := &StarReplaceItem{}
 	nn.SetKind(StarReplaceItemKind)
 
@@ -4875,14 +4606,10 @@ func (n *StarReplaceItem) InitAlias(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewStarWithModifiers(
 	modifiers interface{},
-	) (*StarWithModifiers, error) {
-	
+) (*StarWithModifiers, error) {
+
 	nn := &StarWithModifiers{}
 	nn.SetKind(StarWithModifiersKind)
 
@@ -4913,16 +4640,12 @@ func (n *StarWithModifiers) InitModifiers(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewTableSubquery(
 	subquery interface{},
 	alias interface{},
 	sampleclause interface{},
-	) (*TableSubquery, error) {
-	
+) (*TableSubquery, error) {
+
 	nn := &TableSubquery{}
 	nn.SetKind(TableSubqueryKind)
 
@@ -4993,15 +4716,11 @@ func (n *TableSubquery) InitSampleClause(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewUnaryExpression(
 	operand interface{},
 	op interface{},
-	) (*UnaryExpression, error) {
-	
+) (*UnaryExpression, error) {
+
 	nn := &UnaryExpression{}
 	nn.SetKind(UnaryExpressionKind)
 
@@ -5052,14 +4771,10 @@ func (n *UnaryExpression) InitOp(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewUnnestExpression(
 	expression interface{},
-	) (*UnnestExpression, error) {
-	
+) (*UnnestExpression, error) {
+
 	nn := &UnnestExpression{}
 	nn.SetKind(UnnestExpressionKind)
 
@@ -5090,14 +4805,10 @@ func (n *UnnestExpression) InitExpression(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWindowClause(
 	windows interface{},
-	) (*WindowClause, error) {
-	
+) (*WindowClause, error) {
+
 	nn := &WindowClause{}
 	nn.SetKind(WindowClauseKind)
 
@@ -5130,9 +4841,6 @@ func (n *WindowClause) InitWindows(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *WindowClause) AddChild(c NodeHandler) {
 	n.Windows = append(n.Windows, c.(*WindowDefinition))
 	n.Node.AddChild(c)
@@ -5153,8 +4861,8 @@ func (n *WindowClause) AddChildren(children []NodeHandler) {
 func NewWindowDefinition(
 	name interface{},
 	windowspec interface{},
-	) (*WindowDefinition, error) {
-	
+) (*WindowDefinition, error) {
+
 	nn := &WindowDefinition{}
 	nn.SetKind(WindowDefinitionKind)
 
@@ -5207,16 +4915,12 @@ func (n *WindowDefinition) InitWindowSpec(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWindowFrame(
 	startexpr interface{},
 	endexpr interface{},
 	frameunit interface{},
-	) (*WindowFrame, error) {
-	
+) (*WindowFrame, error) {
+
 	nn := &WindowFrame{}
 	nn.SetKind(WindowFrameKind)
 
@@ -5291,15 +4995,11 @@ func (n *WindowFrame) InitFrameUnit(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWindowFrameExpr(
 	expression interface{},
 	boundarytype interface{},
-	) (*WindowFrameExpr, error) {
-	
+) (*WindowFrameExpr, error) {
+
 	nn := &WindowFrameExpr{}
 	nn.SetKind(WindowFrameExprKind)
 
@@ -5350,16 +5050,12 @@ func (n *WindowFrameExpr) InitBoundaryType(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewLikeExpression(
 	lhs interface{},
 	inlist interface{},
 	isnot interface{},
-	) (*LikeExpression, error) {
-	
+) (*LikeExpression, error) {
+
 	nn := &LikeExpression{}
 	nn.SetKind(LikeExpressionKind)
 
@@ -5432,17 +5128,13 @@ func (n *LikeExpression) InitIsNot(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWindowSpecification(
 	basewindowname interface{},
 	partitionby interface{},
 	orderby interface{},
 	windowframe interface{},
-	) (*WindowSpecification, error) {
-	
+) (*WindowSpecification, error) {
+
 	nn := &WindowSpecification{}
 	nn.SetKind(WindowSpecificationKind)
 
@@ -5531,14 +5223,10 @@ func (n *WindowSpecification) InitWindowFrame(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWithOffset(
 	alias interface{},
-	) (*WithOffset, error) {
-	
+) (*WithOffset, error) {
+
 	nn := &WithOffset{}
 	nn.SetKind(WithOffsetKind)
 
@@ -5567,14 +5255,10 @@ func (n *WithOffset) InitAlias(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewTypeParameterList(
 	parameters interface{},
-	) (*TypeParameterList, error) {
-	
+) (*TypeParameterList, error) {
+
 	nn := &TypeParameterList{}
 	nn.SetKind(TypeParameterListKind)
 
@@ -5607,9 +5291,6 @@ func (n *TypeParameterList) InitParameters(d interface{}) error {
 	return nil
 }
 
-
-
-
 func (n *TypeParameterList) AddChild(c NodeHandler) {
 	n.Parameters = append(n.Parameters, c.(LeafHandler))
 	n.Node.AddChild(c)
@@ -5631,8 +5312,8 @@ func NewSampleClause(
 	samplemethod interface{},
 	samplesize interface{},
 	samplesuffix interface{},
-	) (*SampleClause, error) {
-	
+) (*SampleClause, error) {
+
 	nn := &SampleClause{}
 	nn.SetKind(SampleClauseKind)
 
@@ -5705,16 +5386,12 @@ func (n *SampleClause) InitSampleSuffix(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewSampleSize(
 	size interface{},
 	partitionby interface{},
 	unit interface{},
-	) (*SampleSize, error) {
-	
+) (*SampleSize, error) {
+
 	nn := &SampleSize{}
 	nn.SetKind(SampleSizeKind)
 
@@ -5785,15 +5462,11 @@ func (n *SampleSize) InitUnit(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewSampleSuffix(
 	weight interface{},
 	repeat interface{},
-	) (*SampleSuffix, error) {
-	
+) (*SampleSuffix, error) {
+
 	nn := &SampleSuffix{}
 	nn.SetKind(SampleSuffixKind)
 
@@ -5842,14 +5515,10 @@ func (n *SampleSuffix) InitRepeat(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewWithWeight(
 	alias interface{},
-	) (*WithWeight, error) {
-	
+) (*WithWeight, error) {
+
 	nn := &WithWeight{}
 	nn.SetKind(WithWeightKind)
 
@@ -5878,14 +5547,10 @@ func (n *WithWeight) InitAlias(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewRepeatableClause(
 	argument interface{},
-	) (*RepeatableClause, error) {
-	
+) (*RepeatableClause, error) {
+
 	nn := &RepeatableClause{}
 	nn.SetKind(RepeatableClauseKind)
 
@@ -5916,14 +5581,10 @@ func (n *RepeatableClause) InitArgument(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewQualify(
 	expression interface{},
-	) (*Qualify, error) {
-	
+) (*Qualify, error) {
+
 	nn := &Qualify{}
 	nn.SetKind(QualifyKind)
 
@@ -5954,15 +5615,11 @@ func (n *Qualify) InitExpression(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewFormatClause(
 	format interface{},
 	timezoneexpr interface{},
-	) (*FormatClause, error) {
-	
+) (*FormatClause, error) {
+
 	nn := &FormatClause{}
 	nn.SetKind(FormatClauseKind)
 
@@ -6013,14 +5670,10 @@ func (n *FormatClause) InitTimeZoneExpr(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewParameterExpr(
 	name interface{},
-	) (*ParameterExpr, error) {
-	
+) (*ParameterExpr, error) {
+
 	nn := &ParameterExpr{}
 	nn.SetKind(ParameterExprKind)
 
@@ -6049,15 +5702,11 @@ func (n *ParameterExpr) InitName(d interface{}) error {
 	return nil
 }
 
-
-
-
-
 func NewAnalyticFunctionCall(
 	expr interface{},
 	windowspec interface{},
-	) (*AnalyticFunctionCall, error) {
-	
+) (*AnalyticFunctionCall, error) {
+
 	nn := &AnalyticFunctionCall{}
 	nn.SetKind(AnalyticFunctionCallKind)
 
@@ -6109,10 +5758,6 @@ func (n *AnalyticFunctionCall) InitWindowSpec(d interface{}) error {
 	}
 	return nil
 }
-
-
-
-
 
 type Visitor interface {
 	VisitQueryStatement(*QueryStatement, interface{})
@@ -6205,7 +5850,6 @@ type Visitor interface {
 	VisitFormatClause(*FormatClause, interface{})
 	VisitParameterExpr(*ParameterExpr, interface{})
 	VisitAnalyticFunctionCall(*AnalyticFunctionCall, interface{})
-	
 }
 
 func (n *QueryStatement) Accept(v Visitor, d interface{}) {
@@ -6567,8 +6211,6 @@ func (n *ParameterExpr) Accept(v Visitor, d interface{}) {
 func (n *AnalyticFunctionCall) Accept(v Visitor, d interface{}) {
 	v.VisitAnalyticFunctionCall(n, d)
 }
-
-
 
 // Operation is the base for new operations using visitors.
 type Operation struct {
@@ -7027,7 +6669,6 @@ func (o *Operation) VisitAnalyticFunctionCall(n *AnalyticFunctionCall, d interfa
 	}
 }
 
-
 type NodeKind int
 
 const (
@@ -7120,7 +6761,8 @@ const (
 	QualifyKind
 	FormatClauseKind
 	ParameterExprKind
-	AnalyticFunctionCallKind)
+	AnalyticFunctionCallKind
+)
 
 func (k NodeKind) String() string {
 	switch k {
@@ -7304,6 +6946,6 @@ func (k NodeKind) String() string {
 		return "ParameterExpr"
 	case AnalyticFunctionCallKind:
 		return "AnalyticFunctionCall"
- 	}
+	}
 	panic("unexpected kind")
- }
+}
