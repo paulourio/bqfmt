@@ -368,3 +368,381 @@ SELECT
 FROM
   bar
 ==
+
+select a AND b from T;
+--
+QueryStatement [0-21]
+  Query [0-21]
+    Select [0-21]
+      SelectList [7-14]
+        SelectColumn [7-14]
+          AndExpr [7-14]
+            PathExpression [7-8]
+              Identifier(a) [7-8]
+            PathExpression [13-14]
+              Identifier(b) [13-14]
+      FromClause [15-21]
+        TablePathExpression [20-21]
+          PathExpression [20-21]
+            Identifier(T) [20-21]
+--
+SELECT
+  a AND b
+FROM
+  T
+==
+
+select f(x + y) from A;
+--
+QueryStatement [0-22]
+  Query [0-22]
+    Select [0-22]
+      SelectList [7-15]
+        SelectColumn [7-15]
+          FunctionCall [7-15]
+            PathExpression [7-8]
+              Identifier(f) [7-8]
+            BinaryExpression(+) [9-14]
+              PathExpression [9-10]
+                Identifier(x) [9-10]
+              PathExpression [13-14]
+                Identifier(y) [13-14]
+      FromClause [16-22]
+        TablePathExpression [21-22]
+          PathExpression [21-22]
+            Identifier(A) [21-22]
+--
+SELECT
+  f(x + y)
+FROM
+  A
+==
+
+select count(abc.def), count(*), anon_count(*, 0, 1) from T;
+--
+QueryStatement [0-59]
+  Query [0-59]
+    Select [0-59]
+      SelectList [7-52]
+        SelectColumn [7-21]
+          FunctionCall [7-21]
+            PathExpression [7-12]
+              Identifier(count) [7-12]
+            PathExpression [13-20]
+              Identifier(abc) [13-16]
+              Identifier(def) [17-20]
+        SelectColumn [23-31]
+          FunctionCall [23-31]
+            PathExpression [23-28]
+              Identifier(count) [23-28]
+            Star(*) [29-30]
+        SelectColumn [33-52]
+          FunctionCall [33-52]
+            PathExpression [33-43]
+              Identifier(anon_count) [33-43]
+            Star(*) [44-45]
+            IntLiteral(0) [47-48]
+            IntLiteral(1) [50-51]
+      FromClause [53-59]
+        TablePathExpression [58-59]
+          PathExpression [58-59]
+            Identifier(T) [58-59]
+--
+SELECT
+  count(abc.def),
+  count(*),
+  anon_count(*, 0, 1)
+FROM
+  T
+==
+
+select a.b.f(x.y) from T;
+--
+QueryStatement [0-24]
+  Query [0-24]
+    Select [0-24]
+      SelectList [7-17]
+        SelectColumn [7-17]
+          FunctionCall [7-17]
+            PathExpression [7-12]
+              Identifier(a) [7-8]
+              Identifier(b) [9-10]
+              Identifier(f) [11-12]
+            PathExpression [13-16]
+              Identifier(x) [13-14]
+              Identifier(y) [15-16]
+      FromClause [18-24]
+        TablePathExpression [23-24]
+          PathExpression [23-24]
+            Identifier(T) [23-24]
+--
+SELECT
+  a.b.f(x.y)
+FROM
+  T
+==
+
+select *, a.b.f(x.y) from T;
+--
+QueryStatement [0-27]
+  Query [0-27]
+    Select [0-27]
+      SelectList [7-20]
+        SelectColumn [7-8]
+          Star(*) [7-8]
+        SelectColumn [10-20]
+          FunctionCall [10-20]
+            PathExpression [10-15]
+              Identifier(a) [10-11]
+              Identifier(b) [12-13]
+              Identifier(f) [14-15]
+            PathExpression [16-19]
+              Identifier(x) [16-17]
+              Identifier(y) [18-19]
+      FromClause [21-27]
+        TablePathExpression [26-27]
+          PathExpression [26-27]
+            Identifier(T) [26-27]
+--
+SELECT
+  *,
+  a.b.f(x.y)
+FROM
+  T
+==
+
+select f(g(x)), f(1), h() AS foo from T;
+--
+QueryStatement [0-39]
+  Query [0-39]
+    Select [0-39]
+      SelectList [7-32]
+        SelectColumn [7-14]
+          FunctionCall [7-14]
+            PathExpression [7-8]
+              Identifier(f) [7-8]
+            FunctionCall [9-13]
+              PathExpression [9-10]
+                Identifier(g) [9-10]
+              PathExpression [11-12]
+                Identifier(x) [11-12]
+        SelectColumn [16-20]
+          FunctionCall [16-20]
+            PathExpression [16-17]
+              Identifier(f) [16-17]
+            IntLiteral(1) [18-19]
+        SelectColumn [22-32]
+          FunctionCall [22-25]
+            PathExpression [22-23]
+              Identifier(h) [22-23]
+          Alias [26-32]
+            Identifier(foo) [29-32]
+      FromClause [33-39]
+        TablePathExpression [38-39]
+          PathExpression [38-39]
+            Identifier(T) [38-39]
+--
+SELECT
+  f(g(x)),
+  f(1),
+  h() AS foo
+FROM
+  T
+==
+
+select f(1, x, "a", true, g(y)) AS bar from T;
+--
+QueryStatement [0-45]
+  Query [0-45]
+    Select [0-45]
+      SelectList [7-38]
+        SelectColumn [7-38]
+          FunctionCall [7-31]
+            PathExpression [7-8]
+              Identifier(f) [7-8]
+            IntLiteral(1) [9-10]
+            PathExpression [12-13]
+              Identifier(x) [12-13]
+            StringLiteral("a") [15-18]
+            BooleanLiteral(true) [20-24]
+            FunctionCall [26-30]
+              PathExpression [26-27]
+                Identifier(g) [26-27]
+              PathExpression [28-29]
+                Identifier(y) [28-29]
+          Alias [32-38]
+            Identifier(bar) [35-38]
+      FromClause [39-45]
+        TablePathExpression [44-45]
+          PathExpression [44-45]
+            Identifier(T) [44-45]
+--
+SELECT
+  f(1, x, "a", true, g(y)) AS bar
+FROM
+  T
+==
+
+select -1, +2, NOT a from T;
+--
+QueryStatement [0-27]
+  Query [0-27]
+    Select [0-27]
+      SelectList [7-20]
+        SelectColumn [7-9]
+          UnaryExpression(-) [7-9]
+            IntLiteral(1) [8-9]
+        SelectColumn [11-13]
+          UnaryExpression(+) [11-13]
+            IntLiteral(2) [12-13]
+        SelectColumn [15-20]
+          UnaryExpression(NOT) [15-20]
+            PathExpression [19-20]
+              Identifier(a) [19-20]
+      FromClause [21-27]
+        TablePathExpression [26-27]
+          PathExpression [26-27]
+            Identifier(T) [26-27]
+--
+SELECT
+  -1,
+  +2,
+  NOT a
+FROM
+  T
+==
+
+select 1 as `This is an\\n\\talias on a new line.`
+--
+QueryStatement [0-50]
+  Query [0-50]
+    Select [0-50]
+      SelectList [7-50]
+        SelectColumn [7-50]
+          IntLiteral(1) [7-8]
+          Alias [9-50]
+            Identifier(`This is an\\n\\talias on a new line.`) [12-50]
+--
+SELECT
+  1 AS `This is an\\n\\talias on a new line.`
+==
+
+select 1 as `\\t`, 2 as `\\n`, 3 as `\\010`, 4 as `\\xafh`, 5 as `\\u00045678`,
+       6 as `\\U00045678`, '\\x53' as `\\x54`;
+--
+QueryStatement [0-125]
+  Query [0-125]
+    Select [0-125]
+      SelectList [7-125]
+        SelectColumn [7-17]
+          IntLiteral(1) [7-8]
+          Alias [9-17]
+            Identifier(`\\t`) [12-17]
+        SelectColumn [19-29]
+          IntLiteral(2) [19-20]
+          Alias [21-29]
+            Identifier(`\\n`) [24-29]
+        SelectColumn [31-43]
+          IntLiteral(3) [31-32]
+          Alias [33-43]
+            Identifier(`\\010`) [36-43]
+        SelectColumn [45-58]
+          IntLiteral(4) [45-46]
+          Alias [47-58]
+            Identifier(`\\xafh`) [50-58]
+        SelectColumn [60-78]
+          IntLiteral(5) [60-61]
+          Alias [62-78]
+            Identifier(`\\u00045678`) [65-78]
+        SelectColumn [87-105]
+          IntLiteral(6) [87-88]
+          Alias [89-105]
+            Identifier(`\\U00045678`) [92-105]
+        SelectColumn [107-125]
+          StringLiteral('\\x53') [107-114]
+          Alias [115-125]
+            Identifier(`\\x54`) [118-125]
+--
+SELECT
+  1 AS `\\t`,
+  2 AS `\\n`,
+  3 AS `\\010`,
+  4 AS `\\xafh`,
+  5 AS `\\u00045678`,
+  6 AS `\\U00045678`,
+  '\\x53' AS `\\x54`
+==
+
+select '\\u1235' as `\\u1234`, "\\U00012346" as `\\U00012345`;
+--
+QueryStatement [0-61]
+  Query [0-61]
+    Select [0-61]
+      SelectList [7-61]
+        SelectColumn [7-29]
+          StringLiteral('\\u1235') [7-16]
+          Alias [17-29]
+            Identifier(`\\u1234`) [20-29]
+        SelectColumn [31-61]
+          StringLiteral("\\U00012346") [31-44]
+          Alias [45-61]
+            Identifier(`\\U00012345`) [48-61]
+--
+SELECT
+  '\\u1235' AS `\\u1234`,
+  "\\U00012346" AS `\\U00012345`
+==
+
+select safe_cast("1" as int32);
+--
+QueryStatement [0-30]
+  Query [0-30]
+    Select [0-30]
+      SelectList [7-30]
+        SelectColumn [7-30]
+          CastExpression(return_null_on_error=true) [7-30]
+            StringLiteral("1") [17-20]
+            NamedType [24-29]
+              PathExpression [24-29]
+                Identifier(int32) [24-29]
+--
+SELECT
+  SAFE_CAST("1" AS int32)
+==
+
+select cast("1" as int32);
+--
+QueryStatement [0-25]
+  Query [0-25]
+    Select [0-25]
+      SelectList [7-25]
+        SelectColumn [7-25]
+          CastExpression [7-25]
+            StringLiteral("1") [12-15]
+            NamedType [19-24]
+              PathExpression [19-24]
+                Identifier(int32) [19-24]
+--
+SELECT
+  CAST("1" AS int32)
+==
+
+select cast(x as string(10));
+--
+QueryStatement [0-28]
+  Query [0-28]
+    Select [0-28]
+      SelectList [7-28]
+        SelectColumn [7-28]
+          CastExpression [7-28]
+            PathExpression [12-13]
+              Identifier(x) [12-13]
+            NamedType [17-27]
+              PathExpression [17-23]
+                Identifier(string) [17-23]
+              TypeParameterList [23-27]
+                IntLiteral(10) [24-26]
+--
+SELECT
+  CAST(x AS string(10))
+==

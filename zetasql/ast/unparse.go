@@ -85,6 +85,9 @@ func (u *unparser) VisitUnaryExpression(n *UnaryExpression, d interface{}) {
 		u.out.WriteString("(")
 	}
 	u.out.WriteString(n.Op.String())
+	if n.Op == UnaryNot {
+		u.out.WriteRune(' ')
+	}
 	switch n.Operand.(type) {
 	case *UnaryExpression:
 		// Add space to avoid generating something like "--1"
@@ -158,9 +161,31 @@ func (u *unparser) VisitPathExpression(n *PathExpression, d interface{}) {
 	}
 }
 
+func (u *unparser) VisitCastExpression(n *CastExpression, d interface{}) {
+	if n.IsSafeCast {
+		u.out.WriteString("SAFE_CAST(")
+	} else {
+		u.out.WriteString("CAST(")
+	}
+	n.Expr.Accept(u, d)
+	u.out.WriteString(" AS ")
+	n.Type.Accept(u, d)
+	if n.Format != nil {
+		if n.Format.Format != nil {
+			u.out.WriteString("FORMAT ")
+			n.Format.Format.Accept(u, d)
+		}
+		if n.Format.TimeZoneExpr != nil {
+			u.out.WriteString("AT TIME ZONE ")
+			n.Format.TimeZoneExpr.Accept(u, d)
+		}
+	}
+	u.out.WriteRune(')')
+}
+
 func (u *unparser) VisitFunctionCall(n *FunctionCall, d interface{}) {
 	n.Function.Accept(u, n)
-	u.out.WriteString("(")
+	u.out.WriteRune('(')
 	if n.Distinct {
 		u.out.WriteString("DISTINCT ")
 	}
@@ -170,7 +195,38 @@ func (u *unparser) VisitFunctionCall(n *FunctionCall, d interface{}) {
 		}
 		arg.Accept(u, d)
 	}
-	u.out.WriteString(")")
+	u.out.WriteRune(')')
+}
+
+func (u *unparser) VisitAndExpr(n *AndExpr, d interface{}) {
+	for i, c := range n.Conjuncts {
+		if i > 0 {
+			u.out.WriteString(" AND ")
+		}
+		c.Accept(u, d)
+	}
+}
+
+func (u *unparser) VisitStar(n *Star, d interface{}) {
+	u.out.WriteString(n.Image())
+}
+
+func (u *unparser) VisitBooleanLiteral(n *BooleanLiteral, d interface{}) {
+	u.out.WriteString(n.Image())
+}
+
+func (u *unparser) VisitNamedType(n *NamedType, d interface{}) {
+	n.Name.Accept(u, d)
+	if t := n.TypeParameters(); t != nil {
+		u.out.WriteRune('(')
+		for i, p := range t.Parameters {
+			if i > 0 {
+				u.out.WriteString(", ")
+			}
+			p.Accept(u, d)
+		}
+		u.out.WriteRune(')')
+	}
 }
 
 func (u *unparser) indent() {

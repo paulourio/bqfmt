@@ -54,29 +54,33 @@ func New{{ node.name }}(
 {% for field in node.fields -%}
 func (n *{{ node.name }}) Init{{ field.name }}(d interface{}) error {
 	{% if field.field_loader == FieldLoader.OPTIONAL -%}
-	if d != nil {
-		if c, ok := d.(NodeHandler); ok {
-			n.{{ field.name }} = d.({{ field.type }})
-			n.{{ node.composition }}.AddChild(c)
-		} else if w, ok := d.(*Wrapped); ok {
-			n.{{ field.name }} = w.Value.({{ field.type }})
-			n.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			n.{{ field.name }} = d.({{ field.type }})
-		}
+	switch t := d.(type) {
+	case nil:
+	{% if not field.scalar -%}
+	case NodeHandler:
+		n.{{ field.name }} = d.({{ field.type }}) {# Cannot cast t here #}
+		n.{{ node.composition }}.AddChild(t)
+	{% endif -%}
+	case *Wrapped:
+		n.{{ field.name }} = t.Value.({{ field.type }})
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+	default:
+		n.{{ field.name }} = d.({{ field.type }})
 	}
 	{%- elif field.field_loader == FieldLoader.REQUIRED -%}
-	if d == nil {
+	switch t := d.(type) {
+	{% if not field.scalar -%}
+	case nil:
 		return fmt.Errorf("{{ node.name }}.{{ field.name}}: %w",
 			ErrMissingRequiredField)
-	}
-	if c, ok := d.(NodeHandler); ok {
-		n.{{ field.name }} = d.({{ field.type }})
-		n.{{ node.composition }}.AddChild(c)
-	} else if w, ok := d.(*Wrapped); ok {
-		n.{{ field.name }} = w.Value.({{ field.type }})
-		n.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
+	case NodeHandler:
+		n.{{ field.name }} = d.({{ field.type }}) {# Cannot cast t here #}
+		n.{{ node.composition }}.AddChild(t)
+	{% endif -%}
+	case *Wrapped:
+		n.{{ field.name }} = t.Value.({{ field.type }})
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+	default:
 		n.{{ field.name }} = d.({{ field.type }})
 	}
 	{%- elif field.field_loader == FieldLoader.REPEATED -%}
@@ -85,13 +89,18 @@ func (n *{{ node.name }}) Init{{ field.name }}(d interface{}) error {
 			ErrFieldAlreadyInitialized)
 	}
 	n.{{ field.name }} = make([]{{ field.type }}, 0, defaultCapacity)
-	if c, ok := d.(NodeHandler); ok {
-		n.AddChild(c)
-	} else if w, ok := d.(*Wrapped); ok {
-		newElem := w.Value.({{ field.type }})
-		n.{{ field.name }} = append(n.{{ field.name }}, newElem)
-		n.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
+	switch t := d.(type) {
+	case NodeHandler:
+		n.AddChild(t)
+	case *Wrapped:
+		e := t.Value.({{ field.type }})
+		n.{{ field.name }} = append(n.{{ field.name }}, e)
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+	case []interface{}:
+		for _, elem := range t {
+			n.AddChild(elem.(NodeHandler))
+		}
+	default:
 		newElem := d.({{ field.type }})
 		n.{{ field.name }} = append(n.{{ field.name }}, newElem)
 	}
@@ -125,6 +134,17 @@ func (n *{{ node.name }}) AddChildren(children []NodeHandler) {
 {% endfor -%}
 
 type Visitor interface {
+	// Visit by type composition. These one are called when the visit
+	// for the concrete type is not implemented.
+	VisitNodeHandler(NodeHandler, interface{})
+	VisitTableExpressionHandler(TableExpressionHandler, interface{})
+	VisitQueryExpressionHandler(QueryExpressionHandler, interface{})
+	VisitExpressionHandler(ExpressionHandler, interface{})
+	VisitTypeHandler(TypeHandler, interface{})
+	VisitLeafHandler(LeafHandler, interface{})
+	VisitStatementHandler(StatementHandler, interface{})
+
+	// Visit by concrete type
 	{% for node in nodes -%}
 	Visit{{ node.name }}(*{{ node.name }}, interface{})
 	{% endfor %}
@@ -143,11 +163,33 @@ type Operation struct {
 	visitor Visitor
 }
 
-{% for node in nodes -%}
-func (o *Operation) Visit{{ node.name }}(n *{{ node.name }}, d interface{}) {
+func (o *Operation) VisitNodeHandler(n NodeHandler, d interface{}) {
 	for _, c := range n.Children() {
 		c.Accept(o.visitor, d)
 	}
+}
+func (o *Operation) VisitTableExpressionHandler(n TableExpressionHandler, d interface{}) {
+	o.visitor.VisitNodeHandler(n, d)
+}
+func (o *Operation) VisitQueryExpressionHandler(n QueryExpressionHandler, d interface{}) {
+	o.visitor.VisitNodeHandler(n, d)
+}
+func (o *Operation) VisitExpressionHandler(n ExpressionHandler, d interface{}) {
+	o.visitor.VisitNodeHandler(n, d)
+}
+func (o *Operation) VisitTypeHandler(n TypeHandler, d interface{}) {
+	o.visitor.VisitNodeHandler(n, d)
+}
+func (o *Operation) VisitLeafHandler(n LeafHandler, d interface{}) {
+	o.visitor.VisitExpressionHandler(n, d)
+}
+func (o *Operation) VisitStatementHandler(n StatementHandler, d interface{}) {
+	o.visitor.VisitNodeHandler(n, d)
+}
+
+{% for node in nodes -%}
+func (o *Operation) Visit{{ node.name }}(n *{{ node.name }}, d interface{}) {
+	o.visitor.Visit{{ node.composition }}Handler(n, d)
 }
 {% endfor %}
 

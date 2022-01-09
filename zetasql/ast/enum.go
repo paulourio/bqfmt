@@ -77,7 +77,7 @@ func (o UnaryOp) String() string {
 	case NoUnaryOp:
 		return "NOT_SET"
 	case UnaryNot:
-		return "-"
+		return "NOT"
 	case UnaryBitwiseNot:
 		return "~"
 	case UnaryMinus:

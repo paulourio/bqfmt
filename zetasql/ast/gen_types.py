@@ -1,9 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 import os
 import textwrap
 import subprocess
+import sys
 
 import jinja2
 
@@ -23,10 +24,19 @@ class Field:
     field_loader: FieldLoader = FieldLoader.OPTIONAL
     comment: Optional[str] = None
     init: bool = True  # Whether the field should be required in New()
+    scalar: bool = False  # Handle initialization as a scalar.
 
     def __post_init__(self):
         if self.field_loader == FieldLoader.REQUIRED:
             assert self.init, 'required fields must be present in the init'
+        if self.scalar:
+            assert (
+                self.field_loader != FieldLoader.REPEATED), (
+                'scalar fields cannot be repeated')
+            assert (
+                self.field_loader == FieldLoader.REQUIRED
+                or not self.init), (
+                'scalar fields must be required if present in the init')
 
     @property
     def arg_name(self):
@@ -94,8 +104,14 @@ class TreeGenerator:
         oname = os.path.join(output_path, 'types_generated.go')
         print('Writing', oname)
         materialized = template.render(context).encode()
-        r = subprocess.run(['gofmt', '-w', oname], input=materialized)
-        print(r)
+        with open(oname, 'wb') as out:
+            out.write(materialized)
+        r = subprocess.run(['gofmt', '-w', oname], input=materialized,
+                           stdout=subprocess.PIPE)
+        if r.returncode != 0:
+            print(r.stdout.decode('utf-8'))
+            print('ERROR: could not run gofmt, writing generated code.')
+            sys.exit(r.returncode)
 
 
 def make_comment(text: str, indent: int, width: int) -> str:
@@ -145,7 +161,7 @@ def main():
                     'LimitOffset applies, if present, after the result '
                     'of QueryExpr and OrderBy.'
                 )),
-            Field('IsNested', 'bool', init=False),
+            Field('IsNested', 'bool', init=False, scalar=True),
         ])
 
     gen.add_node(
@@ -153,7 +169,7 @@ def main():
         composition='QueryExpression',
         custom_methods=['DebugString'],
         fields=[
-            Field('Distinct', 'bool'),
+            Field('Distinct', 'bool', FieldLoader.REQUIRED, scalar=True),
             Field('SelectAs', '*SelectAs'),
             Field('SelectList', '*SelectList', FieldLoader.REQUIRED),
             Field('FromClause', '*FromClause'),
@@ -186,7 +202,7 @@ def main():
         composition='Expression',
         custom_methods=['DebugString'],
         fields=[
-            Field('IDString', 'string')
+            Field('IDString', 'string', FieldLoader.REQUIRED, scalar=True)
         ])
 
     gen.add_node(
@@ -248,7 +264,7 @@ def main():
         name='BooleanLiteral',
         composition='Leaf',
         fields=[
-            Field('Value', 'bool', init=False)
+            Field('Value', 'bool', init=False, scalar=True)
         ])
 
     gen.add_node(
@@ -263,7 +279,7 @@ def main():
         composition='Expression',
         custom_methods=['DebugString'],
         fields=[
-            Field('Op', 'BinaryOp'),
+            Field('Op', 'BinaryOp', FieldLoader.REQUIRED, scalar=True),
             Field('LHS', 'ExpressionHandler', FieldLoader.REQUIRED),
             Field('RHS', 'ExpressionHandler', FieldLoader.REQUIRED),
             Field(
@@ -378,7 +394,7 @@ def main():
             Field('LHS', 'TableExpressionHandler', FieldLoader.REQUIRED),
             Field('RHS', 'TableExpressionHandler', FieldLoader.REQUIRED),
             Field('ClauseList', '*OnOrUsingClauseList'),
-            Field('JoinType', 'JoinType'),
+            Field('JoinType', 'JoinType', FieldLoader.REQUIRED, scalar=True),
             Field('ContainsCommaJoin', 'bool', init=False),
         ])
 
@@ -404,8 +420,7 @@ def main():
         name='NamedType',
         composition='Type',
         fields=[
-            Field('TypeName', '*PathExpression', FieldLoader.REQUIRED),
-            Field('TypeParameters', '*TypeParameterList')
+            Field('Name', '*PathExpression', FieldLoader.REQUIRED),
         ])
 
     gen.add_node(
@@ -413,7 +428,6 @@ def main():
         composition='Type',
         fields=[
             Field('ElementType', 'TypeHandler', FieldLoader.REQUIRED),
-            Field('TypeParameters', '*TypeParameterList'),
         ])
 
     gen.add_node(
@@ -443,7 +457,7 @@ def main():
             Field('Expr', 'ExpressionHandler', FieldLoader.REQUIRED),
             Field('Type', 'TypeHandler', FieldLoader.REQUIRED),
             Field('Format', '*FormatClause'),
-            Field('IsSafeCast', 'bool'),
+            Field('IsSafeCast', 'bool', FieldLoader.REQUIRED, scalar=True),
         ])
 
     gen.add_node(
@@ -455,7 +469,7 @@ def main():
             'SELECT AS <TypeName> is present.'),
         fields=[
             Field('TypeName', '*PathExpression'),
-            Field('AsMode', 'AsMode'),
+            Field('AsMode', 'AsMode', FieldLoader.REQUIRED, scalar=True),
         ])
 
     gen.add_node(
@@ -747,7 +761,7 @@ def main():
         name='NullOrder',
         composition='Node',
         fields=[
-            Field('NullsFirst', 'bool')
+            Field('NullsFirst', 'bool', FieldLoader.REQUIRED, scalar=True)
         ])
 
     gen.add_node(
@@ -786,8 +800,8 @@ def main():
         composition='QueryExpression',
         fields=[
             Field('Inputs', 'QueryExpressionHandler', FieldLoader.REPEATED),
-            Field('OpType', 'SetOp'),
-            Field('Distinct', 'bool'),
+            Field('OpType', 'SetOp', FieldLoader.REQUIRED, scalar=True),
+            Field('Distinct', 'bool', FieldLoader.REQUIRED, scalar=True),
         ])
 
     gen.add_node(
@@ -846,7 +860,7 @@ def main():
         composition='Expression',
         fields=[
             Field('Operand', 'ExpressionHandler', FieldLoader.REQUIRED),
-            Field('Op', 'UnaryOp'),
+            Field('Op', 'UnaryOp', FieldLoader.REQUIRED, scalar=True),
         ])
 
     gen.add_node(
@@ -901,7 +915,7 @@ def main():
         fields=[
             Field('LHS', 'ExpressionHandler', FieldLoader.REQUIRED),
             Field('InList', '*InList', FieldLoader.REQUIRED),
-            Field('IsNot', 'bool'),
+            Field('IsNot', 'bool', FieldLoader.REQUIRED, scalar=True),
         ])
 
     gen.add_node(

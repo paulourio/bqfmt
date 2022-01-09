@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -79,29 +78,39 @@ func runTest(t *testing.T, path string, input string) {
 			p := parser.NewParser()
 			r, err := p.Parse(l)
 			if err != nil {
-				t.Log("Input:", string(input))
-				t.Log("Expected", expectedError)
-				t.Log(reflect.TypeOf(err))
-				t.Log(err.(*errors.Error).String())
-				t.Log(r)
+				fmt.Println("Input:")
+				fmt.Println(string(input))
+				fmt.Println("---")
+				fmt.Println("Error")
+				fmt.Println(err.(*errors.Error).String())
+				fmt.Println("Expected Error")
+				fmt.Println(expectedError)
+				fmt.Println("---")
 				t.Fatalf("Error: %v", err)
 			}
+
 			dump := r.(ast.NodeStringer).DebugString("")
 			if expectedDump != dump {
-				t.Log("Input")
-				t.Log(string(input))
-				t.Log("Dump")
-				t.Log(dump)
+				fmt.Println("Input:")
+				fmt.Println(string(input))
+				fmt.Println("---")
+				fmt.Println("Dump:")
+				fmt.Println(dump)
+				fmt.Println("---")
 			}
+
 			unparsed := ast.Unparse(r.(ast.NodeHandler))
-			fmt.Println("Unparsed:")
-			fmt.Println(unparsed)
-			fmt.Println("---")
+			if unparsed != expectedUnparse {
+				fmt.Println("Unparsed:")
+				fmt.Println(unparsed)
+				fmt.Println("---")
+				fmt.Println("Expected:")
+				fmt.Println(expectedUnparse)
+				fmt.Println("---")
+			}
+
 			assert.Equal(t, expectedDump, dump)
-
 			assert.Equal(t, expectedUnparse, unparsed)
-
-			t.Log(expectedUnparse)
 		})
 	}
 }

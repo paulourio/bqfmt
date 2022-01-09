@@ -350,6 +350,11 @@ on:
       ( 'o' | 'O' ) ( 'n' | 'N' )
     ;
 
+safe_cast:
+      ( 's' | 'S' ) ( 'a' | 'A' ) ( 'f' | 'F' ) ( 'e' | 'E' ) '_'
+      ( 'c' | 'C' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 't' | 'T' )
+    ;
+
 where:
       ( 'w' | 'W' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'e' | 'E' )
     ;
@@ -577,7 +582,7 @@ import (
 	"github.com/paulourio/bqfmt/zetasql/token"
 )
 
-func UpdateLoc(node Attrib, tokens ...Attrib) (Attrib, error) {
+func UpdateLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
     n := node.(ast.NodeHandler)
     for _, t := range tokens {
         if t == nil {
@@ -586,13 +591,16 @@ func UpdateLoc(node Attrib, tokens ...Attrib) (Attrib, error) {
         tok := t.(*token.Token)
         n.ExpandLoc(tok.Pos.Offset, tok.Pos.Offset + len(tok.Lit))
     }
+
     return n, nil
 }
 
 func WithExtraChild(a Attrib, c Attrib) (Attrib, error) {
     node := a.(ast.NodeHandler)
     child := c.(ast.NodeHandler)
+
     node.AddChild(child)
+
     return a, nil
 }
 
@@ -614,7 +622,17 @@ func WrapWithLoc(a Attrib, tokens ...Attrib) (Attrib, error) {
             end = e
         }
     }
+
     return ast.WrapWithLoc(a, start, end)
+}
+
+func List(a ...Attrib) []interface{} {
+    r := make([]interface{}, 0, len(a))
+    for _, e := range a {
+       r = append(r, e.(interface{}))
+    }
+
+    return r
 }
 
 func InitLiteral(lit ast.LeafHandler, t Attrib) (Attrib, error) {
@@ -628,26 +646,32 @@ func InitLiteral(lit ast.LeafHandler, t Attrib) (Attrib, error) {
 func NewDashedIdentifier(lhs Attrib, rhs Attrib) (*ast.Identifier, error) {
     a := lhs.(*token.Token)
     b := rhs.(*token.Token)
-	expected := len(a.Lit) + 1
-	actual := b.Offset - a.Offset + 1
-	if expected != actual {
-		return nil, ast.ErrInvalidDashedIdentifier
-	}
-	if a.Lit[0] == '`' || b.Lit[0] == '`' {
-		return nil, ast.ErrInvalidDashedIdentifier
-	}
-	r := append(a.Lit, '-')
-	r = append(r, b.Lit...)
-	value := string(r)
-	return ast.NewIdentifier(value)
+    expected := len(a.Lit) + 1
+    actual := b.Offset - a.Offset + 1
+
+    if expected != actual {
+      return nil, ast.ErrInvalidDashedIdentifier
+    }
+
+    if a.Lit[0] == '`' || b.Lit[0] == '`' {
+      return nil, ast.ErrInvalidDashedIdentifier
+    }
+
+    r := append(a.Lit, '-')
+    r = append(r, b.Lit...)
+
+    value := string(r)
+    return ast.NewIdentifier(value)
 }
 
 func NewIdentifier(a Attrib) (Attrib, error) {
     tok := a.(*token.Token)
     wrapped, err := WrapWithLoc(string(tok.Lit), tok)
+
     if err != nil {
         return nil, err
     }
+
     return ast.NewIdentifier(wrapped)
 }
 >>
@@ -698,12 +722,11 @@ Select:
       OptWhereClause
       <<
       func() (Attrib, error) {
-          s, err := ast.NewSelect(nil, nil, $1, $2, $3, nil, nil, nil, nil)
+          s, err := ast.NewSelect(false, nil, $1, $2, $3, nil, nil, nil, nil)
           if err != nil {
               return nil, err
           }
-          UpdateLoc(s, $0)
-          return s, nil
+          return UpdateLoc(s, $0)
       }()
       >>
     ;
@@ -724,9 +747,32 @@ SelectColumn:
       Expression
       << ast.NewSelectColumn($0, nil) >>
     | Expression as Alias
-      << ast.NewSelectColumn($0, $2) >>
+      <<
+      func() (Attrib, error) {
+          a, err := UpdateLoc($2, $1)
+          if err != nil {
+              return nil, err
+          }
+          return ast.NewSelectColumn($0, a)
+      }()
+      >>
     | Expression Alias
       << ast.NewSelectColumn($0, $1) >>
+    | "*"
+      <<
+      func() (Attrib, error) {
+          s, err := ast.NewStar()
+          if err != nil {
+              return nil, err
+          }
+          s.SetImage("*")
+          c, err := UpdateLoc(s, $0)
+          if err != nil {
+              return nil, err
+          }
+          return ast.NewSelectColumn(c, nil)
+      }()
+      >>
     ;
 
 Alias:
@@ -1042,6 +1088,20 @@ IsOperator:
 
 Type:
       RawType OptTypeParameters
+      <<
+      func() (Attrib, error) {
+          switch t := $1.(type) {
+          case nil:
+              return $0, nil
+          case *ast.TypeParameterList:
+            n := $0.(ast.TypeHandler)
+            n.SetTypeParameters(t)
+            n.AddChild(t)
+            return n, nil
+          }
+          return nil, ast.ErrMalformedParser
+      }()
+      >>
     ;
 
 RawType:
@@ -1050,12 +1110,35 @@ RawType:
 
 TypeName:
       PathExpression
-      << ast.NewNamedType($0, nil) >>
+      << ast.NewNamedType($0) >>
     ;
 
 Expression:
-      IntegerLiteral
+      ParenthesizedExpression
+    | Expression or Expression2
+      << ast.NewOrExpr(List($0, $2)) >>
+    | Expression LikeOperator Expression2
+      << ast.NewBinaryExpression(ast.BinaryLike, $0, $2, $1) >>
+    | Expression AdditiveOperator Expression2
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression2
+    ;
+
+Expression2:
+      Expression2 MultiplicativeOperator Expression3
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression2 and Expression3
+      << ast.NewAndExpr(List($0, $2)) >>
+    | Expression3
+    ;
+
+Expression3:
+      "(" Expression ")"
+      << UpdateLoc($1, $0, $2) >>
+    | IntegerLiteral
+    | BooleanLiteral
     | StringLiteral
+    | CastExpression
     | FunctionCallExpressionWithClauses
     | Identifier
       << ast.NewPathExpression($0) >>
@@ -1070,23 +1153,8 @@ Expression:
           return ast.NewDotIdentifier($0, $2)
       }()
       >>
-    | ParenthesizedExpression
-    | Expression AdditiveOperator Expression2
-      << ast.NewBinaryExpression($1, $0, $2, false) >>
-    | Expression2
-    | UnaryOperator Expression
+    | UnaryOperator Expression2
       << ast.NewUnaryExpression($1, $0) >>
-    ;
-
-Expression2:
-      Expression2 MultiplicativeOperator Expression3
-      << ast.NewBinaryExpression($1, $0, $2, false) >>
-    | Expression3
-    ;
-
-Expression3:
-      "(" Expression ")"
-    | IntegerLiteral
     ;
 
 UnaryOperator:
@@ -1383,15 +1451,24 @@ PartitionByClausePrefix:
     ;
 
 OptTypeParameters:
-      empty
-    | TypeParametersPrefix ")"
-    | TypeParametersPrefix "," ")"
+      TypeParametersPrefix ")"
+      << UpdateLoc($0, $1) >>
+    | empty
     ;
 
 TypeParametersPrefix:
       "(" TypeParameter
-      << UpdateLoc($1.(ast.NodeHandler), $0) >>
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewTypeParameterList($1)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0)
+      }()
+      >>
     | TypeParametersPrefix "," TypeParameter
+      << WithExtraChild($0, $2) >>
     ;
 
 TypeParameter:
@@ -1522,6 +1599,21 @@ FunctionCallExpression:
 FunctionCallExpressionWithArgsPrefix:
       FunctionCallExpressionBase FunctionCallArgument
       << WithExtraChild($0, $1) >>
+    | FunctionCallExpressionBase "*"
+      <<
+      func() (Attrib, error) {
+          s, err := ast.NewStar()
+          if err != nil {
+              return nil, err
+          }
+          s.SetImage("*")
+          l, err := UpdateLoc(s, $1)
+          if err != nil {
+              return nil, err
+          }
+          return WithExtraChild($0, l)
+      }()
+      >>
     | FunctionCallExpressionWithArgsPrefix "," FunctionCallArgument
       << WithExtraChild($0, $2) >>
     ;
@@ -1572,3 +1664,25 @@ OverClause:
       << UpdateLoc($1, $0) >>
     ;
 
+CastExpression:
+      cast "(" Expression as Type OptFormat ")"
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewCastExpression($2, $4, $5, false)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0, $6)
+      }()
+      >>
+    | safe_cast "(" Expression as Type OptFormat ")"
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewCastExpression($2, $4, $5, true)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0, $6)
+      }()
+      >>
+    ;

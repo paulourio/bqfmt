@@ -30,7 +30,6 @@ type NodeHandler interface {
 	EndLoc() int
 	SetStartLoc(int)
 	SetEndLoc(int)
-
 	// ExpandLoc updates the parsing location expanding when the given
 	// range is outside the current range.
 	ExpandLoc(start int, end int)
@@ -41,13 +40,10 @@ type NodeHandler interface {
 	// Tree handlers.
 	Parent() NodeHandler
 	SetParent(NodeHandler)
-
 	Children() []NodeHandler
-
 	// AddChild adds child to the list of children.  The child element
 	// must not be nil.
 	AddChild(NodeHandler)
-
 	// AddChildren all nodes to the list of children.  Elements that
 	// are nil are ignored.
 	AddChildren([]NodeHandler)
@@ -69,13 +65,32 @@ type NodeStringer interface {
 	SingleNodeDebugString() string
 }
 
+type Expression struct {
+	Node
+	parenthesized bool
+}
+
+type ExpressionHandler interface {
+	NodeHandler
+
+	IsExpression() bool
+	IsParenthesized() bool
+	SetParenthesized(bool)
+
+	// IsAllowedInComparison returns true when the expression is allowed
+	// to occur as a child of a comparison expression.  This is not
+	// allowed for unparenthesized comparison expressions and operators
+	// with a lower precedence level (AND, OR, and NOT).
+	IsAllowedInComparison() bool
+}
+
 type Leaf struct {
 	Expression
 	image string
 }
 
 type LeafHandler interface {
-	NodeHandler
+	ExpressionHandler
 
 	IsLeaf() bool
 	Image() string
@@ -98,25 +113,6 @@ type StatementHandler interface {
 
 	IsStatement() bool
 	IsSQLStatement() bool
-}
-
-type Expression struct {
-	Node
-	parenthesized bool
-}
-
-type ExpressionHandler interface {
-	NodeHandler
-
-	IsExpression() bool
-	IsParenthesized() bool
-	SetParenthesized(bool)
-
-	// IsAllowedInComparison returns true when the expression is allowed
-	// to occur as a child of a comparison expression.  This is not
-	// allowed for unparenthesized comparison expressions and operators
-	// with a lower precedence level (AND, OR, and NOT).
-	IsAllowedInComparison() bool
 }
 
 type QueryExpression struct {
@@ -159,12 +155,14 @@ type TableExpressionHandler interface {
 
 type Type struct {
 	Node
+	parameters *TypeParameterList
 }
 
 type TypeHandler interface {
 	NodeHandler
 
 	IsType() bool
+	SetTypeParameters(*TypeParameterList)
 	TypeParameters() *TypeParameterList
 }
 
@@ -294,6 +292,14 @@ func (n *Join) SingleNodeDebugString() string {
 	return fmt.Sprintf("%s(%v)", n.kind.String(), n.JoinType)
 }
 
+func (n *CastExpression) SingleNodeDebugString() string {
+	var opts string
+	if n.IsSafeCast {
+		opts = "(return_null_on_error=true)"
+	}
+	return fmt.Sprintf("%s%s", n.kind.String(), opts)
+}
+
 func (n *TablePathExpression) GetAlias() *Alias { return n.Alias }
 
 func (n *BooleanLiteral) SetImage(v string) {
@@ -304,3 +310,13 @@ func (n *BooleanLiteral) SetImage(v string) {
 	}
 	n.image = v
 }
+
+func (t *Type) SetTypeParameters(p *TypeParameterList) {
+	t.parameters = p
+}
+func (t *Type) TypeParameters() *TypeParameterList {
+	return t.parameters
+}
+
+var _ TypeHandler = (*Type)(nil)
+var _ TypeHandler = (*NamedType)(nil)
