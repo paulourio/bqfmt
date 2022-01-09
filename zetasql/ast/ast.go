@@ -1,6 +1,9 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Node struct {
 	// Loc holds the parser location.
@@ -283,7 +286,21 @@ func (n *UnaryExpression) SingleNodeDebugString() string {
 }
 
 func (n *Identifier) SingleNodeDebugString() string {
-	return fmt.Sprintf("%s(%v)", n.kind.String(), n.IDString)
+	return fmt.Sprintf("%s(%s)", n.kind.String(),
+		toIdentifierLiteral(n.IDString))
+}
+
+func (n *Join) SingleNodeDebugString() string {
+	return fmt.Sprintf("%s(%v)", n.kind.String(), n.JoinType)
 }
 
 func (n *TablePathExpression) GetAlias() *Alias { return n.Alias }
+
+func (n *BooleanLiteral) SetImage(v string) {
+	if strings.ToUpper(v) == "TRUE" {
+		n.Value = true
+	} else {
+		n.Value = false
+	}
+	n.image = v
+}

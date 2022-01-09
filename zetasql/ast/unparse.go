@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -21,7 +20,6 @@ func Unparse(n NodeHandler) string {
 }
 
 func (u *unparser) VisitSelect(n *Select, d interface{}) {
-	fmt.Println("VisitSelect called!")
 	u.out.WriteString("SELECT")
 	u.depth++
 	n.SelectList.Accept(u, d)
@@ -100,8 +98,79 @@ func (u *unparser) VisitUnaryExpression(n *UnaryExpression, d interface{}) {
 	}
 }
 
+func (u *unparser) VisitJoin(n *Join, d interface{}) {
+	n.LHS.Accept(u, d)
+	switch n.JoinType {
+	case DefaultJoin:
+		u.indentedNewline()
+		u.out.WriteString("JOIN")
+	case CommaJoin:
+		u.out.WriteString(",")
+	case CrossJoin:
+		u.indentedNewline()
+		u.out.WriteString("CROSS JOIN")
+	case FullJoin:
+		u.indentedNewline()
+		u.out.WriteString("FULL OUTER JOIN")
+	case InnerJoin:
+		u.indentedNewline()
+		u.out.WriteString("INNER JOIN")
+	case LeftJoin:
+		u.indentedNewline()
+		u.out.WriteString("LEFT JOIN")
+	case RightJoin:
+		u.indentedNewline()
+		u.out.WriteString("RIGHT JOIN")
+	}
+	u.indentedNewline()
+	n.RHS.Accept(u, d)
+}
+
+func (u *unparser) VisitTableSubquery(n *TableSubquery, d interface{}) {
+	u.out.WriteString("(")
+	u.depth++
+	u.indentedNewline()
+	n.Subquery.Accept(u, d)
+	u.depth--
+	u.indentedNewline()
+	u.out.WriteString(")")
+	if n.Alias != nil {
+		u.out.WriteString(" AS " + n.Alias.Identifier.IDString)
+	}
+}
+
 func (u *unparser) VisitIdentifier(n *Identifier, d interface{}) {
-	u.out.WriteString(n.IDString)
+	u.out.WriteString(toIdentifierLiteral(n.IDString))
+}
+
+func (u *unparser) VisitDotIdentifier(n *DotIdentifier, d interface{}) {
+	n.Expr.Accept(u, d)
+	u.out.WriteString(".")
+	n.Name.Accept(u, d)
+}
+
+func (u *unparser) VisitPathExpression(n *PathExpression, d interface{}) {
+	for i, p := range n.Names {
+		if i > 0 {
+			u.out.WriteRune('.')
+		}
+		p.Accept(u, d)
+	}
+}
+
+func (u *unparser) VisitFunctionCall(n *FunctionCall, d interface{}) {
+	n.Function.Accept(u, n)
+	u.out.WriteString("(")
+	if n.Distinct {
+		u.out.WriteString("DISTINCT ")
+	}
+	for i, arg := range n.Arguments {
+		if i > 0 {
+			u.out.WriteString(", ")
+		}
+		arg.Accept(u, d)
+	}
+	u.out.WriteString(")")
 }
 
 func (u *unparser) indent() {

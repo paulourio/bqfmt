@@ -295,3 +295,76 @@ FROM
 WHERE
   b
 ==
+
+select f1 from (select 1 f1) AS subquery_alias_1, (select 1 f1) subquery_alias_2
+--
+QueryStatement [0-80]
+  Query [0-80]
+    Select [0-80]
+      SelectList [7-9]
+        SelectColumn [7-9]
+          PathExpression [7-9]
+            Identifier(f1) [7-9]
+      FromClause [10-80]
+        Join(COMMA) [48-80]
+          TableSubquery [15-48]
+            Query [16-27]
+              Select [16-27]
+                SelectList [23-27]
+                  SelectColumn [23-27]
+                    IntLiteral(1) [23-24]
+                    Alias [25-27]
+                      Identifier(f1) [25-27]
+            Alias [29-48]
+              Identifier(subquery_alias_1) [32-48]
+          TableSubquery [50-80]
+            Query [51-62]
+              Select [51-62]
+                SelectList [58-62]
+                  SelectColumn [58-62]
+                    IntLiteral(1) [58-59]
+                    Alias [60-62]
+                      Identifier(f1) [60-62]
+            Alias [64-80]
+              Identifier(subquery_alias_2) [64-80]
+--
+SELECT
+  f1
+FROM
+  (
+    SELECT
+      1 AS f1
+  ) AS subquery_alias_1,
+  (
+    SELECT
+      1 AS f1
+  ) AS subquery_alias_2
+==
+
+select hll_count.extract(hll_count.merge(foo)) from bar;
+--
+QueryStatement [0-55]
+  Query [0-55]
+    Select [0-55]
+      SelectList [7-46]
+        SelectColumn [7-46]
+          FunctionCall [7-46]
+            PathExpression [7-24]
+              Identifier(hll_count) [7-16]
+              Identifier(`extract`) [17-24]
+            FunctionCall [25-45]
+              PathExpression [25-40]
+                Identifier(hll_count) [25-34]
+                Identifier(`merge`) [35-40]
+              PathExpression [41-44]
+                Identifier(foo) [41-44]
+      FromClause [47-55]
+        TablePathExpression [52-55]
+          PathExpression [52-55]
+            Identifier(bar) [52-55]
+--
+SELECT
+  hll_count.`extract`(hll_count.`merge`(foo))
+FROM
+  bar
+==

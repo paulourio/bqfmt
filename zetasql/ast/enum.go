@@ -92,20 +92,41 @@ type OrderingSpec int
 
 const (
 	NoOrderingSpec OrderingSpec = iota
-	OrderAscending
-	OrderDescending
+	AscendingOrder
+	DescendingOrder
 )
 
 type JoinType int
 
 const (
 	DefaultJoin JoinType = iota
+	CommaJoin
 	CrossJoin
-	OuterJoin
+	FullJoin
 	InnerJoin
 	LeftJoin
 	RightJoin
 )
+
+func (t JoinType) String() string {
+	switch t {
+	case DefaultJoin:
+		return "JOIN"
+	case CommaJoin:
+		return "COMMA"
+	case CrossJoin:
+		return "CROSS"
+	case FullJoin:
+		return "FULL"
+	case InnerJoin:
+		return "INNER"
+	case LeftJoin:
+		return "LEFT"
+	case RightJoin:
+		return "RIGHT"
+	}
+	panic("unknown join type")
+}
 
 type AsMode int
 
@@ -171,4 +192,11 @@ type FrameUnit int
 const (
 	Rows FrameUnit = iota
 	Range
+)
+
+type NotKeyword bool
+
+const (
+	NotKeywordAbsent  NotKeyword = false
+	NotKeywordPresent NotKeyword = true
 )

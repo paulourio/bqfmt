@@ -1,11 +1,9 @@
 package ast
 
-import (
-	"fmt"
-)
-
 // types_generated.go is generated from type_generated.go.j2 by
 // gen_types.py.
+
+import "fmt"
 
 // defaultCapacity is the default capacity for new slices.
 const defaultCapacity = 4
@@ -21,13 +19,14 @@ type Query struct {
 	// WithClause is the WITH clause wrapping this query.
 	WithClause *WithClause
 	// QueryExpr can be a single Select, or a more complex structure
-    // composed out of nodes like SetOperation and Query.
+	// composed out of nodes like SetOperation and Query.
 	QueryExpr QueryExpressionHandler
 	// OrderBy applies, if present, to the result of QueryExpr.
 	OrderBy *OrderBy
 	// LimitOffset applies, if present, after the result of QueryExpr
-    // and OrderBy.
+	// and OrderBy.
 	LimitOffset *LimitOffset
+	IsNested bool
 	
 	QueryExpression
 }
@@ -97,8 +96,8 @@ type TablePathExpression struct {
 
 type FromClause struct {
 	// TableExpression has exactly one table expression child.  If
-    // the FROM clause has commas, they will expressed as a tree of Join
-    // nodes with JoinType=Comma.
+	// the FROM clause has commas, they will expressed as a tree of Join
+	// nodes with JoinType=Comma.
 	TableExpression TableExpressionHandler
 	
 	Node
@@ -127,7 +126,7 @@ type BinaryExpression struct {
 	LHS ExpressionHandler
 	RHS ExpressionHandler
 	// IsNot indicates whether the binary operator has a preceding
-    // NOT to it.  For NOT LIKE and IS NOT.
+	// NOT to it.  For NOT LIKE and IS NOT.
 	IsNot bool
 	
 	Expression
@@ -219,8 +218,15 @@ type Join struct {
 	RHS TableExpressionHandler
 	ClauseList *OnOrUsingClauseList
 	JoinType JoinType
+	ContainsCommaJoin bool
 	
 	TableExpression
+}
+
+type UsingClause struct {
+	keys []*Identifier
+	
+	Node
 }
 
 type WithClause struct {
@@ -250,7 +256,7 @@ type ArrayType struct {
 
 type StructField struct {
 	// Name will be nil for anonymous fields like in STRUCT<int,
-    // string>.
+	// string>.
 	Name *Identifier
 	
 	Node
@@ -289,19 +295,19 @@ type Rollup struct {
 }
 
 type FunctionCall struct {
-	Function *PathExpression
+	Function ExpressionHandler
 	Arguments []ExpressionHandler
 	// OrderBy is set when the function is called with FUNC(args
-    // ORDER BY cols).
+	// ORDER BY cols).
 	OrderBy *OrderBy
 	// LimitOffset is set when the function is called with FUNC(args
-    // LIMIT n).
+	// LIMIT n).
 	LimitOffset *LimitOffset
 	// NullHandlingModifier is set when the function is called with
-    // FUNC(args {IGNORE|RESPECT} NULLS).
+	// FUNC(args {IGNORE|RESPECT} NULLS).
 	NullHandlingModifier NullHandlingModifier
 	// Distinct is true when the function is called with
-    // FUNC(DISTINCT args).
+	// FUNC(DISTINCT args).
 	Distinct bool
 	
 	Expression
@@ -309,7 +315,7 @@ type FunctionCall struct {
 
 type ArrayConstructor struct {
 	// Type may be nil, depending on whether the array is constructed
-    // through ARRAY<type>[...] syntax or ARRAY[...] or [...].
+	// through ARRAY<type>[...] syntax or ARRAY[...] or [...].
 	Type *ArrayType
 	Elements []ExpressionHandler
 	
@@ -351,7 +357,7 @@ type InExpression struct {
 	Query *Query
 	UnnestExpr *UnnestExpression
 	// IsNot signifies whether the IN operator as a preceding NOT to
-    // it.
+	// it.
 	IsNot bool
 	
 	Expression
@@ -372,7 +378,7 @@ type BetweenExpression struct {
 	Low ExpressionHandler
 	High ExpressionHandler
 	// IsNot signifies whether the BETWEEN operator has a preceding
-    // NOT to it.
+	// NOT to it.
 	IsNot bool
 	
 	Expression
@@ -423,7 +429,7 @@ type BitwiseShiftExpression struct {
 	LHS ExpressionHandler
 	RHS ExpressionHandler
 	// IsLeftShift signifies whether the bitwise shift is of left
-    // shift type "<<" or right shift type ">>".
+	// shift type "<<" or right shift type ">>".
 	IsLeftShift bool
 	
 	Expression
@@ -444,7 +450,7 @@ type DotGeneralizedField struct {
 // an identifier path, we use PathExpression instead.
 type DotIdentifier struct {
 	Expr ExpressionHandler
-	Path *PathExpression
+	Name *Identifier
 	
 	Expression
 }
@@ -469,7 +475,7 @@ type DotStarWithModifiers struct {
 type ExpressionSubquery struct {
 	Query *Query
 	// Modifier is the syntactic modifier on this expression
-    // subquery.
+	// subquery.
 	Modifier SubqueryModifier
 	
 	Expression
@@ -485,7 +491,7 @@ type ExtractExpression struct {
 	Expression
 }
 
-type IntervalExpression struct {
+type IntervalExpr struct {
 	IntervalValue ExpressionHandler
 	DatePartName ExpressionHandler
 	DatePartNameTo ExpressionHandler
@@ -594,17 +600,17 @@ type WindowDefinition struct {
 }
 
 type WindowFrame struct {
-	StartExpr *WindowFrameExpression
-	EndExpr *WindowFrameExpression
+	StartExpr *WindowFrameExpr
+	EndExpr *WindowFrameExpr
 	FrameUnit FrameUnit
 	
 	Node
 }
 
-type WindowFrameExpression struct {
+type WindowFrameExpr struct {
 	// Expression specifies the boundary as a logical or physical
-    // offset to current row. It is present when BoundaryType is
-    // OffsetPreceding or OffsetFollowing.
+	// offset to current row. It is present when BoundaryType is
+	// OffsetPreceding or OffsetFollowing.
 	Expression ExpressionHandler
 	BoundaryType BoundaryType
 	
@@ -688,28 +694,54 @@ type FormatClause struct {
 	Node
 }
 
+type ParameterExpr struct {
+	Name *Identifier
+	
+	Expression
+}
+
+type AnalyticFunctionCall struct {
+	Expr ExpressionHandler
+	WindowSpec *WindowSpecification
+	
+	Expression
+}
+
 func NewQueryStatement(
 	query interface{},
 	) (*QueryStatement, error) {
-	fmt.Printf("NewQueryStatement(%v)\n",query,
-		)
+	
 	nn := &QueryStatement{}
 	nn.SetKind(QueryStatementKind)
-	
-	if query == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitQuery(query)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := query.(NodeHandler); ok {
-		nn.Query = query.(*Query)
-		nn.AddChild(n)
-	} else if w, ok := query.(*Wrapped); ok {
-		nn.Query = w.Value.(*Query)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Query = query.(*Query)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *QueryStatement) InitQuery(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("QueryStatement.Query: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Query = d.(*Query)
+		n.Statement.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Query = w.Value.(*Query)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Query = d.(*Query)
+	}
+	return nil
+}
+
+
 
 
 
@@ -719,61 +751,113 @@ func NewQuery(
 	orderby interface{},
 	limitoffset interface{},
 	) (*Query, error) {
-	fmt.Printf("NewQuery(%v, %v, %v, %v)\n",withclause,
-		queryexpr,
-		orderby,
-		limitoffset,
-		)
+	
 	nn := &Query{}
 	nn.SetKind(QueryKind)
-	
-	if withclause != nil {
-		if n, ok := withclause.(NodeHandler); ok {
-			nn.WithClause = withclause.(*WithClause)
-			nn.AddChild(n)
-		} else if w, ok := withclause.(*Wrapped); ok {
-			nn.WithClause = w.Value.(*WithClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.WithClause = withclause.(*WithClause)
-		}
+
+	var err error
+
+	err = nn.InitWithClause(withclause)
+	if err != nil {
+		return nil, err
 	}
-	if queryexpr == nil {
-		return nil, ErrMissingRequiredField
+
+	err = nn.InitQueryExpr(queryexpr)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := queryexpr.(NodeHandler); ok {
-		nn.QueryExpr = queryexpr.(QueryExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := queryexpr.(*Wrapped); ok {
-		nn.QueryExpr = w.Value.(QueryExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.QueryExpr = queryexpr.(QueryExpressionHandler)
+
+	err = nn.InitOrderBy(orderby)
+	if err != nil {
+		return nil, err
 	}
-	if orderby != nil {
-		if n, ok := orderby.(NodeHandler); ok {
-			nn.OrderBy = orderby.(*OrderBy)
-			nn.AddChild(n)
-		} else if w, ok := orderby.(*Wrapped); ok {
-			nn.OrderBy = w.Value.(*OrderBy)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.OrderBy = orderby.(*OrderBy)
-		}
+
+	err = nn.InitLimitOffset(limitoffset)
+	if err != nil {
+		return nil, err
 	}
-	if limitoffset != nil {
-		if n, ok := limitoffset.(NodeHandler); ok {
-			nn.LimitOffset = limitoffset.(*LimitOffset)
-			nn.AddChild(n)
-		} else if w, ok := limitoffset.(*Wrapped); ok {
-			nn.LimitOffset = w.Value.(*LimitOffset)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.LimitOffset = limitoffset.(*LimitOffset)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *Query) InitWithClause(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.WithClause = d.(*WithClause)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.WithClause = w.Value.(*WithClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.WithClause = d.(*WithClause)
+		}
+	}
+	return nil
+}
+
+func (n *Query) InitQueryExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("Query.QueryExpr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.QueryExpr = d.(QueryExpressionHandler)
+		n.QueryExpression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.QueryExpr = w.Value.(QueryExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.QueryExpr = d.(QueryExpressionHandler)
+	}
+	return nil
+}
+
+func (n *Query) InitOrderBy(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.OrderBy = d.(*OrderBy)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.OrderBy = w.Value.(*OrderBy)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.OrderBy = d.(*OrderBy)
+		}
+	}
+	return nil
+}
+
+func (n *Query) InitLimitOffset(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.LimitOffset = d.(*LimitOffset)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.LimitOffset = w.Value.(*LimitOffset)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.LimitOffset = d.(*LimitOffset)
+		}
+	}
+	return nil
+}
+
+func (n *Query) InitIsNested(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IsNested = d.(bool)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IsNested = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.IsNested = d.(bool)
+		}
+	}
+	return nil
+}
+
+
 
 
 
@@ -788,145 +872,238 @@ func NewSelect(
 	qualify interface{},
 	windowclause interface{},
 	) (*Select, error) {
-	fmt.Printf("NewSelect(%v, %v, %v, %v, %v, %v, %v, %v, %v)\n",distinct,
-		selectas,
-		selectlist,
-		fromclause,
-		whereclause,
-		groupby,
-		having,
-		qualify,
-		windowclause,
-		)
+	
 	nn := &Select{}
 	nn.SetKind(SelectKind)
-	
-	if distinct != nil {
-		if n, ok := distinct.(NodeHandler); ok {
-			nn.Distinct = distinct.(bool)
-			nn.AddChild(n)
-		} else if w, ok := distinct.(*Wrapped); ok {
-			nn.Distinct = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Distinct = distinct.(bool)
-		}
+
+	var err error
+
+	err = nn.InitDistinct(distinct)
+	if err != nil {
+		return nil, err
 	}
-	if selectas != nil {
-		if n, ok := selectas.(NodeHandler); ok {
-			nn.SelectAs = selectas.(*SelectAs)
-			nn.AddChild(n)
-		} else if w, ok := selectas.(*Wrapped); ok {
-			nn.SelectAs = w.Value.(*SelectAs)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.SelectAs = selectas.(*SelectAs)
-		}
+
+	err = nn.InitSelectAs(selectas)
+	if err != nil {
+		return nil, err
 	}
-	if selectlist == nil {
-		return nil, ErrMissingRequiredField
+
+	err = nn.InitSelectList(selectlist)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := selectlist.(NodeHandler); ok {
-		nn.SelectList = selectlist.(*SelectList)
-		nn.AddChild(n)
-	} else if w, ok := selectlist.(*Wrapped); ok {
-		nn.SelectList = w.Value.(*SelectList)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.SelectList = selectlist.(*SelectList)
+
+	err = nn.InitFromClause(fromclause)
+	if err != nil {
+		return nil, err
 	}
-	if fromclause != nil {
-		if n, ok := fromclause.(NodeHandler); ok {
-			nn.FromClause = fromclause.(*FromClause)
-			nn.AddChild(n)
-		} else if w, ok := fromclause.(*Wrapped); ok {
-			nn.FromClause = w.Value.(*FromClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.FromClause = fromclause.(*FromClause)
-		}
+
+	err = nn.InitWhereClause(whereclause)
+	if err != nil {
+		return nil, err
 	}
-	if whereclause != nil {
-		if n, ok := whereclause.(NodeHandler); ok {
-			nn.WhereClause = whereclause.(*WhereClause)
-			nn.AddChild(n)
-		} else if w, ok := whereclause.(*Wrapped); ok {
-			nn.WhereClause = w.Value.(*WhereClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.WhereClause = whereclause.(*WhereClause)
-		}
+
+	err = nn.InitGroupBy(groupby)
+	if err != nil {
+		return nil, err
 	}
-	if groupby != nil {
-		if n, ok := groupby.(NodeHandler); ok {
-			nn.GroupBy = groupby.(*GroupBy)
-			nn.AddChild(n)
-		} else if w, ok := groupby.(*Wrapped); ok {
-			nn.GroupBy = w.Value.(*GroupBy)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.GroupBy = groupby.(*GroupBy)
-		}
+
+	err = nn.InitHaving(having)
+	if err != nil {
+		return nil, err
 	}
-	if having != nil {
-		if n, ok := having.(NodeHandler); ok {
-			nn.Having = having.(*Having)
-			nn.AddChild(n)
-		} else if w, ok := having.(*Wrapped); ok {
-			nn.Having = w.Value.(*Having)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Having = having.(*Having)
-		}
+
+	err = nn.InitQualify(qualify)
+	if err != nil {
+		return nil, err
 	}
-	if qualify != nil {
-		if n, ok := qualify.(NodeHandler); ok {
-			nn.Qualify = qualify.(*Qualify)
-			nn.AddChild(n)
-		} else if w, ok := qualify.(*Wrapped); ok {
-			nn.Qualify = w.Value.(*Qualify)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Qualify = qualify.(*Qualify)
-		}
+
+	err = nn.InitWindowClause(windowclause)
+	if err != nil {
+		return nil, err
 	}
-	if windowclause != nil {
-		if n, ok := windowclause.(NodeHandler); ok {
-			nn.WindowClause = windowclause.(*WindowClause)
-			nn.AddChild(n)
-		} else if w, ok := windowclause.(*Wrapped); ok {
-			nn.WindowClause = w.Value.(*WindowClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.WindowClause = windowclause.(*WindowClause)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *Select) InitDistinct(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Distinct = d.(bool)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Distinct = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Distinct = d.(bool)
+		}
+	}
+	return nil
+}
+
+func (n *Select) InitSelectAs(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.SelectAs = d.(*SelectAs)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.SelectAs = w.Value.(*SelectAs)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.SelectAs = d.(*SelectAs)
+		}
+	}
+	return nil
+}
+
+func (n *Select) InitSelectList(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("Select.SelectList: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.SelectList = d.(*SelectList)
+		n.QueryExpression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.SelectList = w.Value.(*SelectList)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.SelectList = d.(*SelectList)
+	}
+	return nil
+}
+
+func (n *Select) InitFromClause(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.FromClause = d.(*FromClause)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.FromClause = w.Value.(*FromClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.FromClause = d.(*FromClause)
+		}
+	}
+	return nil
+}
+
+func (n *Select) InitWhereClause(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.WhereClause = d.(*WhereClause)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.WhereClause = w.Value.(*WhereClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.WhereClause = d.(*WhereClause)
+		}
+	}
+	return nil
+}
+
+func (n *Select) InitGroupBy(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.GroupBy = d.(*GroupBy)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.GroupBy = w.Value.(*GroupBy)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.GroupBy = d.(*GroupBy)
+		}
+	}
+	return nil
+}
+
+func (n *Select) InitHaving(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Having = d.(*Having)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Having = w.Value.(*Having)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Having = d.(*Having)
+		}
+	}
+	return nil
+}
+
+func (n *Select) InitQualify(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Qualify = d.(*Qualify)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Qualify = w.Value.(*Qualify)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Qualify = d.(*Qualify)
+		}
+	}
+	return nil
+}
+
+func (n *Select) InitWindowClause(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.WindowClause = d.(*WindowClause)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.WindowClause = w.Value.(*WindowClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.WindowClause = d.(*WindowClause)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewSelectList(
 	columns interface{},
 	) (*SelectList, error) {
-	fmt.Printf("NewSelectList(%v)\n",columns,
-		)
+	
 	nn := &SelectList{}
 	nn.SetKind(SelectListKind)
-	
-	nn.Columns = make([]*SelectColumn, 0, defaultCapacity)
-	if n, ok := columns.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := columns.(*Wrapped); ok {
-		newElem := w.Value.(*SelectColumn)
-		nn.Columns = append(nn.Columns, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := columns.(*SelectColumn)
-		nn.Columns = append(nn.Columns, newElem)
+
+	var err error
+
+	err = nn.InitColumns(columns)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *SelectList) InitColumns(d interface{}) error {
+	if n.Columns != nil {
+		return fmt.Errorf("SelectList.Columns: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Columns = make([]*SelectColumn, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*SelectColumn)
+		n.Columns = append(n.Columns, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*SelectColumn)
+		n.Columns = append(n.Columns, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *SelectList) AddChild(c NodeHandler) {
@@ -950,121 +1127,187 @@ func NewSelectColumn(
 	expression interface{},
 	alias interface{},
 	) (*SelectColumn, error) {
-	fmt.Printf("NewSelectColumn(%v, %v)\n",expression,
-		alias,
-		)
+	
 	nn := &SelectColumn{}
 	nn.SetKind(SelectColumnKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *SelectColumn) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("SelectColumn.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.Expression = expression.(ExpressionHandler)
+		n.Expression = d.(ExpressionHandler)
 	}
-	if alias != nil {
-		if n, ok := alias.(NodeHandler); ok {
-			nn.Alias = alias.(*Alias)
-			nn.AddChild(n)
-		} else if w, ok := alias.(*Wrapped); ok {
-			nn.Alias = w.Value.(*Alias)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *SelectColumn) InitAlias(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Alias = d.(*Alias)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Alias = w.Value.(*Alias)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Alias = alias.(*Alias)
+			n.Alias = d.(*Alias)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewIntLiteral(
 	) (*IntLiteral, error) {
-	fmt.Printf("NewIntLiteral()\n",)
+	
 	nn := &IntLiteral{}
 	nn.SetKind(IntLiteralKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
 func NewIdentifier(
 	idstring interface{},
 	) (*Identifier, error) {
-	fmt.Printf("NewIdentifier(%v)\n",idstring,
-		)
+	
 	nn := &Identifier{}
 	nn.SetKind(IdentifierKind)
-	
-	if idstring != nil {
-		if n, ok := idstring.(NodeHandler); ok {
-			nn.IDString = idstring.(string)
-			nn.AddChild(n)
-		} else if w, ok := idstring.(*Wrapped); ok {
-			nn.IDString = w.Value.(string)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitIDString(idstring)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *Identifier) InitIDString(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IDString = d.(string)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IDString = w.Value.(string)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.IDString = idstring.(string)
+			n.IDString = d.(string)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewAlias(
 	identifier interface{},
 	) (*Alias, error) {
-	fmt.Printf("NewAlias(%v)\n",identifier,
-		)
+	
 	nn := &Alias{}
 	nn.SetKind(AliasKind)
-	
-	if identifier == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitIdentifier(identifier)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := identifier.(NodeHandler); ok {
-		nn.Identifier = identifier.(*Identifier)
-		nn.AddChild(n)
-	} else if w, ok := identifier.(*Wrapped); ok {
-		nn.Identifier = w.Value.(*Identifier)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Identifier = identifier.(*Identifier)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *Alias) InitIdentifier(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("Alias.Identifier: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Identifier = d.(*Identifier)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Identifier = w.Value.(*Identifier)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Identifier = d.(*Identifier)
+	}
+	return nil
+}
+
+
 
 
 
 func NewPathExpression(
 	names interface{},
 	) (*PathExpression, error) {
-	fmt.Printf("NewPathExpression(%v)\n",names,
-		)
+	
 	nn := &PathExpression{}
 	nn.SetKind(PathExpressionKind)
-	
-	nn.Names = make([]*Identifier, 0, defaultCapacity)
-	if n, ok := names.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := names.(*Wrapped); ok {
-		newElem := w.Value.(*Identifier)
-		nn.Names = append(nn.Names, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := names.(*Identifier)
-		nn.Names = append(nn.Names, newElem)
+
+	var err error
+
+	err = nn.InitNames(names)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *PathExpression) InitNames(d interface{}) error {
+	if n.Names != nil {
+		return fmt.Errorf("PathExpression.Names: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Names = make([]*Identifier, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*Identifier)
+		n.Names = append(n.Names, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*Identifier)
+		n.Names = append(n.Names, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *PathExpression) AddChild(c NodeHandler) {
@@ -1089,146 +1332,222 @@ func NewTablePathExpression(
 	unnestexpr interface{},
 	alias interface{},
 	) (*TablePathExpression, error) {
-	fmt.Printf("NewTablePathExpression(%v, %v, %v)\n",pathexpr,
-		unnestexpr,
-		alias,
-		)
+	
 	nn := &TablePathExpression{}
 	nn.SetKind(TablePathExpressionKind)
-	
-	if pathexpr != nil {
-		if n, ok := pathexpr.(NodeHandler); ok {
-			nn.PathExpr = pathexpr.(*PathExpression)
-			nn.AddChild(n)
-		} else if w, ok := pathexpr.(*Wrapped); ok {
-			nn.PathExpr = w.Value.(*PathExpression)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.PathExpr = pathexpr.(*PathExpression)
-		}
+
+	var err error
+
+	err = nn.InitPathExpr(pathexpr)
+	if err != nil {
+		return nil, err
 	}
-	if unnestexpr != nil {
-		if n, ok := unnestexpr.(NodeHandler); ok {
-			nn.UnnestExpr = unnestexpr.(*UnnestExpression)
-			nn.AddChild(n)
-		} else if w, ok := unnestexpr.(*Wrapped); ok {
-			nn.UnnestExpr = w.Value.(*UnnestExpression)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.UnnestExpr = unnestexpr.(*UnnestExpression)
-		}
+
+	err = nn.InitUnnestExpr(unnestexpr)
+	if err != nil {
+		return nil, err
 	}
-	if alias != nil {
-		if n, ok := alias.(NodeHandler); ok {
-			nn.Alias = alias.(*Alias)
-			nn.AddChild(n)
-		} else if w, ok := alias.(*Wrapped); ok {
-			nn.Alias = w.Value.(*Alias)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Alias = alias.(*Alias)
-		}
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *TablePathExpression) InitPathExpr(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.PathExpr = d.(*PathExpression)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.PathExpr = w.Value.(*PathExpression)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.PathExpr = d.(*PathExpression)
+		}
+	}
+	return nil
+}
+
+func (n *TablePathExpression) InitUnnestExpr(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.UnnestExpr = d.(*UnnestExpression)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.UnnestExpr = w.Value.(*UnnestExpression)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.UnnestExpr = d.(*UnnestExpression)
+		}
+	}
+	return nil
+}
+
+func (n *TablePathExpression) InitAlias(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Alias = d.(*Alias)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Alias = w.Value.(*Alias)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Alias = d.(*Alias)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewFromClause(
 	tableexpression interface{},
 	) (*FromClause, error) {
-	fmt.Printf("NewFromClause(%v)\n",tableexpression,
-		)
+	
 	nn := &FromClause{}
 	nn.SetKind(FromClauseKind)
-	
-	if tableexpression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitTableExpression(tableexpression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := tableexpression.(NodeHandler); ok {
-		nn.TableExpression = tableexpression.(TableExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := tableexpression.(*Wrapped); ok {
-		nn.TableExpression = w.Value.(TableExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.TableExpression = tableexpression.(TableExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *FromClause) InitTableExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("FromClause.TableExpression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.TableExpression = d.(TableExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.TableExpression = w.Value.(TableExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.TableExpression = d.(TableExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
 func NewWhereClause(
 	expression interface{},
 	) (*WhereClause, error) {
-	fmt.Printf("NewWhereClause(%v)\n",expression,
-		)
+	
 	nn := &WhereClause{}
 	nn.SetKind(WhereClauseKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expression = expression.(ExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *WhereClause) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WhereClause.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expression = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
 func NewBooleanLiteral(
-	value interface{},
 	) (*BooleanLiteral, error) {
-	fmt.Printf("NewBooleanLiteral(%v)\n",value,
-		)
+	
 	nn := &BooleanLiteral{}
 	nn.SetKind(BooleanLiteralKind)
-	
-	if value != nil {
-		if n, ok := value.(NodeHandler); ok {
-			nn.Value = value.(bool)
-			nn.AddChild(n)
-		} else if w, ok := value.(*Wrapped); ok {
-			nn.Value = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	return nn, err
+}
+
+func (n *BooleanLiteral) InitValue(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Value = d.(bool)
+			n.Leaf.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Value = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Value = value.(bool)
+			n.Value = d.(bool)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewAndExpr(
 	conjuncts interface{},
 	) (*AndExpr, error) {
-	fmt.Printf("NewAndExpr(%v)\n",conjuncts,
-		)
+	
 	nn := &AndExpr{}
 	nn.SetKind(AndExprKind)
-	
-	nn.Conjuncts = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := conjuncts.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := conjuncts.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.Conjuncts = append(nn.Conjuncts, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := conjuncts.(ExpressionHandler)
-		nn.Conjuncts = append(nn.Conjuncts, newElem)
+
+	var err error
+
+	err = nn.InitConjuncts(conjuncts)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *AndExpr) InitConjuncts(d interface{}) error {
+	if n.Conjuncts != nil {
+		return fmt.Errorf("AndExpr.Conjuncts: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Conjuncts = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.Conjuncts = append(n.Conjuncts, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.Conjuncts = append(n.Conjuncts, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *AndExpr) AddChild(c NodeHandler) {
@@ -1254,108 +1573,185 @@ func NewBinaryExpression(
 	rhs interface{},
 	isnot interface{},
 	) (*BinaryExpression, error) {
-	fmt.Printf("NewBinaryExpression(%v, %v, %v, %v)\n",op,
-		lhs,
-		rhs,
-		isnot,
-		)
+	
 	nn := &BinaryExpression{}
 	nn.SetKind(BinaryExpressionKind)
-	
-	if op != nil {
-		if n, ok := op.(NodeHandler); ok {
-			nn.Op = op.(BinaryOp)
-			nn.AddChild(n)
-		} else if w, ok := op.(*Wrapped); ok {
-			nn.Op = w.Value.(BinaryOp)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Op = op.(BinaryOp)
-		}
+
+	var err error
+
+	err = nn.InitOp(op)
+	if err != nil {
+		return nil, err
 	}
-	if lhs == nil {
-		return nil, ErrMissingRequiredField
+
+	err = nn.InitLHS(lhs)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := lhs.(NodeHandler); ok {
-		nn.LHS = lhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := lhs.(*Wrapped); ok {
-		nn.LHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.LHS = lhs.(ExpressionHandler)
+
+	err = nn.InitRHS(rhs)
+	if err != nil {
+		return nil, err
 	}
-	if rhs == nil {
-		return nil, ErrMissingRequiredField
+
+	err = nn.InitIsNot(isnot)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := rhs.(NodeHandler); ok {
-		nn.RHS = rhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := rhs.(*Wrapped); ok {
-		nn.RHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.RHS = rhs.(ExpressionHandler)
-	}
-	if isnot != nil {
-		if n, ok := isnot.(NodeHandler); ok {
-			nn.IsNot = isnot.(bool)
-			nn.AddChild(n)
-		} else if w, ok := isnot.(*Wrapped); ok {
-			nn.IsNot = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.IsNot = isnot.(bool)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *BinaryExpression) InitOp(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Op = d.(BinaryOp)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Op = w.Value.(BinaryOp)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Op = d.(BinaryOp)
+		}
+	}
+	return nil
+}
+
+func (n *BinaryExpression) InitLHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("BinaryExpression.LHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.LHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.LHS = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *BinaryExpression) InitRHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("BinaryExpression.RHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.RHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.RHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.RHS = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *BinaryExpression) InitIsNot(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IsNot = d.(bool)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IsNot = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.IsNot = d.(bool)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewStringLiteral(
 	) (*StringLiteral, error) {
-	fmt.Printf("NewStringLiteral()\n",)
+	
 	nn := &StringLiteral{}
 	nn.SetKind(StringLiteralKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+func (n *StringLiteral) InitStringValue(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.StringValue = d.(string)
+			n.Leaf.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.StringValue = w.Value.(string)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.StringValue = d.(string)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewStar(
 	) (*Star, error) {
-	fmt.Printf("NewStar()\n",)
+	
 	nn := &Star{}
 	nn.SetKind(StarKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
 func NewOrExpr(
 	disjuncts interface{},
 	) (*OrExpr, error) {
-	fmt.Printf("NewOrExpr(%v)\n",disjuncts,
-		)
+	
 	nn := &OrExpr{}
 	nn.SetKind(OrExprKind)
-	
-	nn.Disjuncts = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := disjuncts.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := disjuncts.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.Disjuncts = append(nn.Disjuncts, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := disjuncts.(ExpressionHandler)
-		nn.Disjuncts = append(nn.Disjuncts, newElem)
+
+	var err error
+
+	err = nn.InitDisjuncts(disjuncts)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *OrExpr) InitDisjuncts(d interface{}) error {
+	if n.Disjuncts != nil {
+		return fmt.Errorf("OrExpr.Disjuncts: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Disjuncts = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.Disjuncts = append(n.Disjuncts, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.Disjuncts = append(n.Disjuncts, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *OrExpr) AddChild(c NodeHandler) {
@@ -1379,60 +1775,96 @@ func NewGroupingItem(
 	expression interface{},
 	rollup interface{},
 	) (*GroupingItem, error) {
-	fmt.Printf("NewGroupingItem(%v, %v)\n",expression,
-		rollup,
-		)
+	
 	nn := &GroupingItem{}
 	nn.SetKind(GroupingItemKind)
-	
-	if expression != nil {
-		if n, ok := expression.(NodeHandler); ok {
-			nn.Expression = expression.(ExpressionHandler)
-			nn.AddChild(n)
-		} else if w, ok := expression.(*Wrapped); ok {
-			nn.Expression = w.Value.(ExpressionHandler)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Expression = expression.(ExpressionHandler)
-		}
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if rollup != nil {
-		if n, ok := rollup.(NodeHandler); ok {
-			nn.Rollup = rollup.(*Rollup)
-			nn.AddChild(n)
-		} else if w, ok := rollup.(*Wrapped); ok {
-			nn.Rollup = w.Value.(*Rollup)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Rollup = rollup.(*Rollup)
-		}
+
+	err = nn.InitRollup(rollup)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *GroupingItem) InitExpression(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Expression = d.(ExpressionHandler)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Expression = w.Value.(ExpressionHandler)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Expression = d.(ExpressionHandler)
+		}
+	}
+	return nil
+}
+
+func (n *GroupingItem) InitRollup(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Rollup = d.(*Rollup)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Rollup = w.Value.(*Rollup)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Rollup = d.(*Rollup)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewGroupBy(
 	groupingitems interface{},
 	) (*GroupBy, error) {
-	fmt.Printf("NewGroupBy(%v)\n",groupingitems,
-		)
+	
 	nn := &GroupBy{}
 	nn.SetKind(GroupByKind)
-	
-	nn.GroupingItems = make([]*GroupingItem, 0, defaultCapacity)
-	if n, ok := groupingitems.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := groupingitems.(*Wrapped); ok {
-		newElem := w.Value.(*GroupingItem)
-		nn.GroupingItems = append(nn.GroupingItems, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := groupingitems.(*GroupingItem)
-		nn.GroupingItems = append(nn.GroupingItems, newElem)
+
+	var err error
+
+	err = nn.InitGroupingItems(groupingitems)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *GroupBy) InitGroupingItems(d interface{}) error {
+	if n.GroupingItems != nil {
+		return fmt.Errorf("GroupBy.GroupingItems: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.GroupingItems = make([]*GroupingItem, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*GroupingItem)
+		n.GroupingItems = append(n.GroupingItems, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*GroupingItem)
+		n.GroupingItems = append(n.GroupingItems, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *GroupBy) AddChild(c NodeHandler) {
@@ -1457,73 +1889,118 @@ func NewOrderingExpression(
 	nullorder interface{},
 	orderingspec interface{},
 	) (*OrderingExpression, error) {
-	fmt.Printf("NewOrderingExpression(%v, %v, %v)\n",expression,
-		nullorder,
-		orderingspec,
-		)
+	
 	nn := &OrderingExpression{}
 	nn.SetKind(OrderingExpressionKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expression = expression.(ExpressionHandler)
+
+	err = nn.InitNullOrder(nullorder)
+	if err != nil {
+		return nil, err
 	}
-	if nullorder != nil {
-		if n, ok := nullorder.(NodeHandler); ok {
-			nn.NullOrder = nullorder.(*NullOrder)
-			nn.AddChild(n)
-		} else if w, ok := nullorder.(*Wrapped); ok {
-			nn.NullOrder = w.Value.(*NullOrder)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.NullOrder = nullorder.(*NullOrder)
-		}
+
+	err = nn.InitOrderingSpec(orderingspec)
+	if err != nil {
+		return nil, err
 	}
-	if orderingspec != nil {
-		if n, ok := orderingspec.(NodeHandler); ok {
-			nn.OrderingSpec = orderingspec.(OrderingSpec)
-			nn.AddChild(n)
-		} else if w, ok := orderingspec.(*Wrapped); ok {
-			nn.OrderingSpec = w.Value.(OrderingSpec)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.OrderingSpec = orderingspec.(OrderingSpec)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *OrderingExpression) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("OrderingExpression.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expression = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *OrderingExpression) InitNullOrder(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.NullOrder = d.(*NullOrder)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.NullOrder = w.Value.(*NullOrder)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.NullOrder = d.(*NullOrder)
+		}
+	}
+	return nil
+}
+
+func (n *OrderingExpression) InitOrderingSpec(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.OrderingSpec = d.(OrderingSpec)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.OrderingSpec = w.Value.(OrderingSpec)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.OrderingSpec = d.(OrderingSpec)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewOrderBy(
 	orderingexpression interface{},
 	) (*OrderBy, error) {
-	fmt.Printf("NewOrderBy(%v)\n",orderingexpression,
-		)
+	
 	nn := &OrderBy{}
 	nn.SetKind(OrderByKind)
-	
-	nn.OrderingExpression = make([]*OrderingExpression, 0, defaultCapacity)
-	if n, ok := orderingexpression.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := orderingexpression.(*Wrapped); ok {
-		newElem := w.Value.(*OrderingExpression)
-		nn.OrderingExpression = append(nn.OrderingExpression, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := orderingexpression.(*OrderingExpression)
-		nn.OrderingExpression = append(nn.OrderingExpression, newElem)
+
+	var err error
+
+	err = nn.InitOrderingExpression(orderingexpression)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *OrderBy) InitOrderingExpression(d interface{}) error {
+	if n.OrderingExpression != nil {
+		return fmt.Errorf("OrderBy.OrderingExpression: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.OrderingExpression = make([]*OrderingExpression, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*OrderingExpression)
+		n.OrderingExpression = append(n.OrderingExpression, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*OrderingExpression)
+		n.OrderingExpression = append(n.OrderingExpression, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *OrderBy) AddChild(c NodeHandler) {
@@ -1547,84 +2024,126 @@ func NewLimitOffset(
 	limit interface{},
 	offset interface{},
 	) (*LimitOffset, error) {
-	fmt.Printf("NewLimitOffset(%v, %v)\n",limit,
-		offset,
-		)
+	
 	nn := &LimitOffset{}
 	nn.SetKind(LimitOffsetKind)
-	
-	if limit == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitLimit(limit)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := limit.(NodeHandler); ok {
-		nn.Limit = limit.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := limit.(*Wrapped); ok {
-		nn.Limit = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitOffset(offset)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *LimitOffset) InitLimit(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("LimitOffset.Limit: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Limit = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Limit = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.Limit = limit.(ExpressionHandler)
+		n.Limit = d.(ExpressionHandler)
 	}
-	if offset != nil {
-		if n, ok := offset.(NodeHandler); ok {
-			nn.Offset = offset.(ExpressionHandler)
-			nn.AddChild(n)
-		} else if w, ok := offset.(*Wrapped); ok {
-			nn.Offset = w.Value.(ExpressionHandler)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *LimitOffset) InitOffset(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Offset = d.(ExpressionHandler)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Offset = w.Value.(ExpressionHandler)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Offset = offset.(ExpressionHandler)
+			n.Offset = d.(ExpressionHandler)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewFloatLiteral(
 	) (*FloatLiteral, error) {
-	fmt.Printf("NewFloatLiteral()\n",)
+	
 	nn := &FloatLiteral{}
 	nn.SetKind(FloatLiteralKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
 func NewNullLiteral(
 	) (*NullLiteral, error) {
-	fmt.Printf("NewNullLiteral()\n",)
+	
 	nn := &NullLiteral{}
 	nn.SetKind(NullLiteralKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
 func NewOnClause(
 	expression interface{},
 	) (*OnClause, error) {
-	fmt.Printf("NewOnClause(%v)\n",expression,
-		)
+	
 	nn := &OnClause{}
 	nn.SetKind(OnClauseKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expression = expression.(ExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *OnClause) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("OnClause.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expression = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
@@ -1632,38 +2151,60 @@ func NewWithClauseEntry(
 	alias interface{},
 	query interface{},
 	) (*WithClauseEntry, error) {
-	fmt.Printf("NewWithClauseEntry(%v, %v)\n",alias,
-		query,
-		)
+	
 	nn := &WithClauseEntry{}
 	nn.SetKind(WithClauseEntryKind)
-	
-	if alias == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := alias.(NodeHandler); ok {
-		nn.Alias = alias.(*Identifier)
-		nn.AddChild(n)
-	} else if w, ok := alias.(*Wrapped); ok {
-		nn.Alias = w.Value.(*Identifier)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Alias = alias.(*Identifier)
+
+	err = nn.InitQuery(query)
+	if err != nil {
+		return nil, err
 	}
-	if query == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := query.(NodeHandler); ok {
-		nn.Query = query.(*Query)
-		nn.AddChild(n)
-	} else if w, ok := query.(*Wrapped); ok {
-		nn.Query = w.Value.(*Query)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Query = query.(*Query)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *WithClauseEntry) InitAlias(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WithClauseEntry.Alias: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Alias = d.(*Identifier)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Alias = w.Value.(*Identifier)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Alias = d.(*Identifier)
+	}
+	return nil
+}
+
+func (n *WithClauseEntry) InitQuery(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WithClauseEntry.Query: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Query = d.(*Query)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Query = w.Value.(*Query)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Query = d.(*Query)
+	}
+	return nil
+}
+
+
 
 
 
@@ -1673,86 +2214,211 @@ func NewJoin(
 	clauselist interface{},
 	jointype interface{},
 	) (*Join, error) {
-	fmt.Printf("NewJoin(%v, %v, %v, %v)\n",lhs,
-		rhs,
-		clauselist,
-		jointype,
-		)
+	
 	nn := &Join{}
 	nn.SetKind(JoinKind)
-	
-	if lhs == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitLHS(lhs)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := lhs.(NodeHandler); ok {
-		nn.LHS = lhs.(TableExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := lhs.(*Wrapped); ok {
-		nn.LHS = w.Value.(TableExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitRHS(rhs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitClauseList(clauselist)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitJoinType(jointype)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *Join) InitLHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("Join.LHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.LHS = d.(TableExpressionHandler)
+		n.TableExpression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.LHS = w.Value.(TableExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.LHS = lhs.(TableExpressionHandler)
+		n.LHS = d.(TableExpressionHandler)
 	}
-	if rhs == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *Join) InitRHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("Join.RHS: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := rhs.(NodeHandler); ok {
-		nn.RHS = rhs.(TableExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := rhs.(*Wrapped); ok {
-		nn.RHS = w.Value.(TableExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.RHS = d.(TableExpressionHandler)
+		n.TableExpression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.RHS = w.Value.(TableExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.RHS = rhs.(TableExpressionHandler)
+		n.RHS = d.(TableExpressionHandler)
 	}
-	if clauselist != nil {
-		if n, ok := clauselist.(NodeHandler); ok {
-			nn.ClauseList = clauselist.(*OnOrUsingClauseList)
-			nn.AddChild(n)
-		} else if w, ok := clauselist.(*Wrapped); ok {
-			nn.ClauseList = w.Value.(*OnOrUsingClauseList)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *Join) InitClauseList(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.ClauseList = d.(*OnOrUsingClauseList)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.ClauseList = w.Value.(*OnOrUsingClauseList)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.ClauseList = clauselist.(*OnOrUsingClauseList)
+			n.ClauseList = d.(*OnOrUsingClauseList)
 		}
 	}
-	if jointype != nil {
-		if n, ok := jointype.(NodeHandler); ok {
-			nn.JoinType = jointype.(JoinType)
-			nn.AddChild(n)
-		} else if w, ok := jointype.(*Wrapped); ok {
-			nn.JoinType = w.Value.(JoinType)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *Join) InitJoinType(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.JoinType = d.(JoinType)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.JoinType = w.Value.(JoinType)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.JoinType = jointype.(JoinType)
+			n.JoinType = d.(JoinType)
 		}
 	}
-	return nn, nil
+	return nil
+}
+
+func (n *Join) InitContainsCommaJoin(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.ContainsCommaJoin = d.(bool)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.ContainsCommaJoin = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.ContainsCommaJoin = d.(bool)
+		}
+	}
+	return nil
 }
 
 
+
+
+
+func NewUsingClause(
+	keys interface{},
+	) (*UsingClause, error) {
+	
+	nn := &UsingClause{}
+	nn.SetKind(UsingClauseKind)
+
+	var err error
+
+	err = nn.Initkeys(keys)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *UsingClause) Initkeys(d interface{}) error {
+	if n.keys != nil {
+		return fmt.Errorf("UsingClause.keys: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.keys = make([]*Identifier, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*Identifier)
+		n.keys = append(n.keys, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*Identifier)
+		n.keys = append(n.keys, newElem)
+	}
+	return nil
+}
+
+
+
+
+func (n *UsingClause) AddChild(c NodeHandler) {
+	n.keys = append(n.keys, c.(*Identifier))
+	n.Node.AddChild(c)
+	c.SetParent(n)
+}
+
+func (n *UsingClause) AddChildren(children []NodeHandler) {
+	for _, c := range children {
+		if c == nil {
+			continue
+		}
+		n.keys = append(n.keys, c.(*Identifier))
+		n.Node.AddChild(c)
+		c.SetParent(n)
+	}
+}
 
 func NewWithClause(
 	with interface{},
 	) (*WithClause, error) {
-	fmt.Printf("NewWithClause(%v)\n",with,
-		)
+	
 	nn := &WithClause{}
 	nn.SetKind(WithClauseKind)
-	
-	nn.With = make([]*WithClauseEntry, 0, defaultCapacity)
-	if n, ok := with.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := with.(*Wrapped); ok {
-		newElem := w.Value.(*WithClauseEntry)
-		nn.With = append(nn.With, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := with.(*WithClauseEntry)
-		nn.With = append(nn.With, newElem)
+
+	var err error
+
+	err = nn.InitWith(with)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *WithClause) InitWith(d interface{}) error {
+	if n.With != nil {
+		return fmt.Errorf("WithClause.With: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.With = make([]*WithClauseEntry, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*WithClauseEntry)
+		n.With = append(n.With, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*WithClauseEntry)
+		n.With = append(n.With, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *WithClause) AddChild(c NodeHandler) {
@@ -1774,12 +2440,16 @@ func (n *WithClause) AddChildren(children []NodeHandler) {
 
 func NewHaving(
 	) (*Having, error) {
-	fmt.Printf("NewHaving()\n",)
+	
 	nn := &Having{}
 	nn.SetKind(HavingKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
@@ -1787,37 +2457,58 @@ func NewNamedType(
 	typename interface{},
 	typeparameters interface{},
 	) (*NamedType, error) {
-	fmt.Printf("NewNamedType(%v, %v)\n",typename,
-		typeparameters,
-		)
+	
 	nn := &NamedType{}
 	nn.SetKind(NamedTypeKind)
-	
-	if typename == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitTypeName(typename)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := typename.(NodeHandler); ok {
-		nn.TypeName = typename.(*PathExpression)
-		nn.AddChild(n)
-	} else if w, ok := typename.(*Wrapped); ok {
-		nn.TypeName = w.Value.(*PathExpression)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitTypeParameters(typeparameters)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *NamedType) InitTypeName(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("NamedType.TypeName: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.TypeName = d.(*PathExpression)
+		n.Type.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.TypeName = w.Value.(*PathExpression)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.TypeName = typename.(*PathExpression)
+		n.TypeName = d.(*PathExpression)
 	}
-	if typeparameters != nil {
-		if n, ok := typeparameters.(NodeHandler); ok {
-			nn.TypeParameters = typeparameters.(*TypeParameterList)
-			nn.AddChild(n)
-		} else if w, ok := typeparameters.(*Wrapped); ok {
-			nn.TypeParameters = w.Value.(*TypeParameterList)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *NamedType) InitTypeParameters(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.TypeParameters = d.(*TypeParameterList)
+			n.Type.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.TypeParameters = w.Value.(*TypeParameterList)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.TypeParameters = typeparameters.(*TypeParameterList)
+			n.TypeParameters = d.(*TypeParameterList)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
@@ -1825,61 +2516,94 @@ func NewArrayType(
 	elementtype interface{},
 	typeparameters interface{},
 	) (*ArrayType, error) {
-	fmt.Printf("NewArrayType(%v, %v)\n",elementtype,
-		typeparameters,
-		)
+	
 	nn := &ArrayType{}
 	nn.SetKind(ArrayTypeKind)
-	
-	if elementtype == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitElementType(elementtype)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := elementtype.(NodeHandler); ok {
-		nn.ElementType = elementtype.(TypeHandler)
-		nn.AddChild(n)
-	} else if w, ok := elementtype.(*Wrapped); ok {
-		nn.ElementType = w.Value.(TypeHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitTypeParameters(typeparameters)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *ArrayType) InitElementType(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ArrayType.ElementType: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.ElementType = d.(TypeHandler)
+		n.Type.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.ElementType = w.Value.(TypeHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.ElementType = elementtype.(TypeHandler)
+		n.ElementType = d.(TypeHandler)
 	}
-	if typeparameters != nil {
-		if n, ok := typeparameters.(NodeHandler); ok {
-			nn.TypeParameters = typeparameters.(*TypeParameterList)
-			nn.AddChild(n)
-		} else if w, ok := typeparameters.(*Wrapped); ok {
-			nn.TypeParameters = w.Value.(*TypeParameterList)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *ArrayType) InitTypeParameters(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.TypeParameters = d.(*TypeParameterList)
+			n.Type.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.TypeParameters = w.Value.(*TypeParameterList)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.TypeParameters = typeparameters.(*TypeParameterList)
+			n.TypeParameters = d.(*TypeParameterList)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewStructField(
 	name interface{},
 	) (*StructField, error) {
-	fmt.Printf("NewStructField(%v)\n",name,
-		)
+	
 	nn := &StructField{}
 	nn.SetKind(StructFieldKind)
-	
-	if name != nil {
-		if n, ok := name.(NodeHandler); ok {
-			nn.Name = name.(*Identifier)
-			nn.AddChild(n)
-		} else if w, ok := name.(*Wrapped); ok {
-			nn.Name = w.Value.(*Identifier)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *StructField) InitName(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Name = d.(*Identifier)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Name = w.Value.(*Identifier)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Name = name.(*Identifier)
+			n.Name = d.(*Identifier)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
@@ -1887,37 +2611,58 @@ func NewStructType(
 	structfields interface{},
 	typeparameterlist interface{},
 	) (*StructType, error) {
-	fmt.Printf("NewStructType(%v, %v)\n",structfields,
-		typeparameterlist,
-		)
+	
 	nn := &StructType{}
 	nn.SetKind(StructTypeKind)
-	
-	if structfields == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitStructFields(structfields)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := structfields.(NodeHandler); ok {
-		nn.StructFields = structfields.(*StructField)
-		nn.AddChild(n)
-	} else if w, ok := structfields.(*Wrapped); ok {
-		nn.StructFields = w.Value.(*StructField)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitTypeParameterList(typeparameterlist)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *StructType) InitStructFields(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("StructType.StructFields: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.StructFields = d.(*StructField)
+		n.Type.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.StructFields = w.Value.(*StructField)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.StructFields = structfields.(*StructField)
+		n.StructFields = d.(*StructField)
 	}
-	if typeparameterlist != nil {
-		if n, ok := typeparameterlist.(NodeHandler); ok {
-			nn.TypeParameterList = typeparameterlist.(*TypeParameterList)
-			nn.AddChild(n)
-		} else if w, ok := typeparameterlist.(*Wrapped); ok {
-			nn.TypeParameterList = w.Value.(*TypeParameterList)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *StructType) InitTypeParameterList(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.TypeParameterList = d.(*TypeParameterList)
+			n.Type.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.TypeParameterList = w.Value.(*TypeParameterList)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.TypeParameterList = typeparameterlist.(*TypeParameterList)
+			n.TypeParameterList = d.(*TypeParameterList)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
@@ -1927,62 +2672,100 @@ func NewCastExpression(
 	format interface{},
 	issafecast interface{},
 	) (*CastExpression, error) {
-	fmt.Printf("NewCastExpression(%v, %v, %v, %v)\n",expr,
-		typ,
-		format,
-		issafecast,
-		)
+	
 	nn := &CastExpression{}
 	nn.SetKind(CastExpressionKind)
-	
-	if expr == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpr(expr)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expr.(NodeHandler); ok {
-		nn.Expr = expr.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expr.(*Wrapped); ok {
-		nn.Expr = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expr = expr.(ExpressionHandler)
+
+	err = nn.InitType(typ)
+	if err != nil {
+		return nil, err
 	}
-	if typ == nil {
-		return nil, ErrMissingRequiredField
+
+	err = nn.InitFormat(format)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := typ.(NodeHandler); ok {
-		nn.Type = typ.(TypeHandler)
-		nn.AddChild(n)
-	} else if w, ok := typ.(*Wrapped); ok {
-		nn.Type = w.Value.(TypeHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Type = typ.(TypeHandler)
+
+	err = nn.InitIsSafeCast(issafecast)
+	if err != nil {
+		return nil, err
 	}
-	if format != nil {
-		if n, ok := format.(NodeHandler); ok {
-			nn.Format = format.(*FormatClause)
-			nn.AddChild(n)
-		} else if w, ok := format.(*Wrapped); ok {
-			nn.Format = w.Value.(*FormatClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Format = format.(*FormatClause)
-		}
-	}
-	if issafecast != nil {
-		if n, ok := issafecast.(NodeHandler); ok {
-			nn.IsSafeCast = issafecast.(bool)
-			nn.AddChild(n)
-		} else if w, ok := issafecast.(*Wrapped); ok {
-			nn.IsSafeCast = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.IsSafeCast = issafecast.(bool)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *CastExpression) InitExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("CastExpression.Expr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expr = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expr = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *CastExpression) InitType(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("CastExpression.Type: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Type = d.(TypeHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Type = w.Value.(TypeHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Type = d.(TypeHandler)
+	}
+	return nil
+}
+
+func (n *CastExpression) InitFormat(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Format = d.(*FormatClause)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Format = w.Value.(*FormatClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Format = d.(*FormatClause)
+		}
+	}
+	return nil
+}
+
+func (n *CastExpression) InitIsSafeCast(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IsSafeCast = d.(bool)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IsSafeCast = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.IsSafeCast = d.(bool)
+		}
+	}
+	return nil
+}
+
+
 
 
 
@@ -1990,60 +2773,96 @@ func NewSelectAs(
 	typename interface{},
 	asmode interface{},
 	) (*SelectAs, error) {
-	fmt.Printf("NewSelectAs(%v, %v)\n",typename,
-		asmode,
-		)
+	
 	nn := &SelectAs{}
 	nn.SetKind(SelectAsKind)
-	
-	if typename != nil {
-		if n, ok := typename.(NodeHandler); ok {
-			nn.TypeName = typename.(*PathExpression)
-			nn.AddChild(n)
-		} else if w, ok := typename.(*Wrapped); ok {
-			nn.TypeName = w.Value.(*PathExpression)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.TypeName = typename.(*PathExpression)
-		}
+
+	var err error
+
+	err = nn.InitTypeName(typename)
+	if err != nil {
+		return nil, err
 	}
-	if asmode != nil {
-		if n, ok := asmode.(NodeHandler); ok {
-			nn.AsMode = asmode.(AsMode)
-			nn.AddChild(n)
-		} else if w, ok := asmode.(*Wrapped); ok {
-			nn.AsMode = w.Value.(AsMode)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.AsMode = asmode.(AsMode)
-		}
+
+	err = nn.InitAsMode(asmode)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *SelectAs) InitTypeName(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.TypeName = d.(*PathExpression)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.TypeName = w.Value.(*PathExpression)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.TypeName = d.(*PathExpression)
+		}
+	}
+	return nil
+}
+
+func (n *SelectAs) InitAsMode(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.AsMode = d.(AsMode)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.AsMode = w.Value.(AsMode)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.AsMode = d.(AsMode)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewRollup(
 	expressions interface{},
 	) (*Rollup, error) {
-	fmt.Printf("NewRollup(%v)\n",expressions,
-		)
+	
 	nn := &Rollup{}
 	nn.SetKind(RollupKind)
-	
-	nn.Expressions = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := expressions.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := expressions.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.Expressions = append(nn.Expressions, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := expressions.(ExpressionHandler)
-		nn.Expressions = append(nn.Expressions, newElem)
+
+	var err error
+
+	err = nn.InitExpressions(expressions)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *Rollup) InitExpressions(d interface{}) error {
+	if n.Expressions != nil {
+		return fmt.Errorf("Rollup.Expressions: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Expressions = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.Expressions = append(n.Expressions, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.Expressions = append(n.Expressions, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *Rollup) AddChild(c NodeHandler) {
@@ -2065,91 +2884,124 @@ func (n *Rollup) AddChildren(children []NodeHandler) {
 
 func NewFunctionCall(
 	function interface{},
-	arguments interface{},
-	orderby interface{},
-	limitoffset interface{},
-	nullhandlingmodifier interface{},
 	distinct interface{},
 	) (*FunctionCall, error) {
-	fmt.Printf("NewFunctionCall(%v, %v, %v, %v, %v, %v)\n",function,
-		arguments,
-		orderby,
-		limitoffset,
-		nullhandlingmodifier,
-		distinct,
-		)
+	
 	nn := &FunctionCall{}
 	nn.SetKind(FunctionCallKind)
-	
-	if function == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitFunction(function)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := function.(NodeHandler); ok {
-		nn.Function = function.(*PathExpression)
-		nn.AddChild(n)
-	} else if w, ok := function.(*Wrapped); ok {
-		nn.Function = w.Value.(*PathExpression)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Function = function.(*PathExpression)
+
+	err = nn.InitDistinct(distinct)
+	if err != nil {
+		return nil, err
 	}
-	nn.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := arguments.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := arguments.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.Arguments = append(nn.Arguments, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := arguments.(ExpressionHandler)
-		nn.Arguments = append(nn.Arguments, newElem)
-	}
-	if orderby != nil {
-		if n, ok := orderby.(NodeHandler); ok {
-			nn.OrderBy = orderby.(*OrderBy)
-			nn.AddChild(n)
-		} else if w, ok := orderby.(*Wrapped); ok {
-			nn.OrderBy = w.Value.(*OrderBy)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.OrderBy = orderby.(*OrderBy)
-		}
-	}
-	if limitoffset != nil {
-		if n, ok := limitoffset.(NodeHandler); ok {
-			nn.LimitOffset = limitoffset.(*LimitOffset)
-			nn.AddChild(n)
-		} else if w, ok := limitoffset.(*Wrapped); ok {
-			nn.LimitOffset = w.Value.(*LimitOffset)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.LimitOffset = limitoffset.(*LimitOffset)
-		}
-	}
-	if nullhandlingmodifier != nil {
-		if n, ok := nullhandlingmodifier.(NodeHandler); ok {
-			nn.NullHandlingModifier = nullhandlingmodifier.(NullHandlingModifier)
-			nn.AddChild(n)
-		} else if w, ok := nullhandlingmodifier.(*Wrapped); ok {
-			nn.NullHandlingModifier = w.Value.(NullHandlingModifier)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.NullHandlingModifier = nullhandlingmodifier.(NullHandlingModifier)
-		}
-	}
-	if distinct != nil {
-		if n, ok := distinct.(NodeHandler); ok {
-			nn.Distinct = distinct.(bool)
-			nn.AddChild(n)
-		} else if w, ok := distinct.(*Wrapped); ok {
-			nn.Distinct = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Distinct = distinct.(bool)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *FunctionCall) InitFunction(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("FunctionCall.Function: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Function = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Function = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Function = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *FunctionCall) InitArguments(d interface{}) error {
+	if n.Arguments != nil {
+		return fmt.Errorf("FunctionCall.Arguments: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.Arguments = append(n.Arguments, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.Arguments = append(n.Arguments, newElem)
+	}
+	return nil
+}
+
+func (n *FunctionCall) InitOrderBy(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.OrderBy = d.(*OrderBy)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.OrderBy = w.Value.(*OrderBy)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.OrderBy = d.(*OrderBy)
+		}
+	}
+	return nil
+}
+
+func (n *FunctionCall) InitLimitOffset(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.LimitOffset = d.(*LimitOffset)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.LimitOffset = w.Value.(*LimitOffset)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.LimitOffset = d.(*LimitOffset)
+		}
+	}
+	return nil
+}
+
+func (n *FunctionCall) InitNullHandlingModifier(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.NullHandlingModifier = d.(NullHandlingModifier)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.NullHandlingModifier = w.Value.(NullHandlingModifier)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.NullHandlingModifier = d.(NullHandlingModifier)
+		}
+	}
+	return nil
+}
+
+func (n *FunctionCall) InitDistinct(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Distinct = d.(bool)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Distinct = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Distinct = d.(bool)
+		}
+	}
+	return nil
+}
+
+
 
 
 func (n *FunctionCall) AddChild(c NodeHandler) {
@@ -2173,36 +3025,60 @@ func NewArrayConstructor(
 	typ interface{},
 	elements interface{},
 	) (*ArrayConstructor, error) {
-	fmt.Printf("NewArrayConstructor(%v, %v)\n",typ,
-		elements,
-		)
+	
 	nn := &ArrayConstructor{}
 	nn.SetKind(ArrayConstructorKind)
-	
-	if typ != nil {
-		if n, ok := typ.(NodeHandler); ok {
-			nn.Type = typ.(*ArrayType)
-			nn.AddChild(n)
-		} else if w, ok := typ.(*Wrapped); ok {
-			nn.Type = w.Value.(*ArrayType)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitType(typ)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitElements(elements)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *ArrayConstructor) InitType(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Type = d.(*ArrayType)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Type = w.Value.(*ArrayType)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Type = typ.(*ArrayType)
+			n.Type = d.(*ArrayType)
 		}
 	}
-	nn.Elements = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := elements.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := elements.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.Elements = append(nn.Elements, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := elements.(ExpressionHandler)
-		nn.Elements = append(nn.Elements, newElem)
-	}
-	return nn, nil
+	return nil
 }
+
+func (n *ArrayConstructor) InitElements(d interface{}) error {
+	if n.Elements != nil {
+		return fmt.Errorf("ArrayConstructor.Elements: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Elements = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.Elements = append(n.Elements, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.Elements = append(n.Elements, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *ArrayConstructor) AddChild(c NodeHandler) {
@@ -2226,62 +3102,100 @@ func NewStructConstructorArg(
 	expression interface{},
 	alias interface{},
 	) (*StructConstructorArg, error) {
-	fmt.Printf("NewStructConstructorArg(%v, %v)\n",expression,
-		alias,
-		)
+	
 	nn := &StructConstructorArg{}
 	nn.SetKind(StructConstructorArgKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expression = expression.(ExpressionHandler)
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
 	}
-	if alias == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := alias.(NodeHandler); ok {
-		nn.Alias = alias.(*Alias)
-		nn.AddChild(n)
-	} else if w, ok := alias.(*Wrapped); ok {
-		nn.Alias = w.Value.(*Alias)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Alias = alias.(*Alias)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *StructConstructorArg) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("StructConstructorArg.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expression = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *StructConstructorArg) InitAlias(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("StructConstructorArg.Alias: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Alias = d.(*Alias)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Alias = w.Value.(*Alias)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Alias = d.(*Alias)
+	}
+	return nil
+}
+
+
 
 
 
 func NewStructConstructorWithParens(
 	fieldexpressions interface{},
 	) (*StructConstructorWithParens, error) {
-	fmt.Printf("NewStructConstructorWithParens(%v)\n",fieldexpressions,
-		)
+	
 	nn := &StructConstructorWithParens{}
 	nn.SetKind(StructConstructorWithParensKind)
-	
-	nn.FieldExpressions = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := fieldexpressions.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := fieldexpressions.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.FieldExpressions = append(nn.FieldExpressions, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := fieldexpressions.(ExpressionHandler)
-		nn.FieldExpressions = append(nn.FieldExpressions, newElem)
+
+	var err error
+
+	err = nn.InitFieldExpressions(fieldexpressions)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *StructConstructorWithParens) InitFieldExpressions(d interface{}) error {
+	if n.FieldExpressions != nil {
+		return fmt.Errorf("StructConstructorWithParens.FieldExpressions: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.FieldExpressions = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.FieldExpressions = append(n.FieldExpressions, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.FieldExpressions = append(n.FieldExpressions, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *StructConstructorWithParens) AddChild(c NodeHandler) {
@@ -2305,36 +3219,60 @@ func NewStructConstructorWithKeyword(
 	structtype interface{},
 	fields interface{},
 	) (*StructConstructorWithKeyword, error) {
-	fmt.Printf("NewStructConstructorWithKeyword(%v, %v)\n",structtype,
-		fields,
-		)
+	
 	nn := &StructConstructorWithKeyword{}
 	nn.SetKind(StructConstructorWithKeywordKind)
-	
-	if structtype != nil {
-		if n, ok := structtype.(NodeHandler); ok {
-			nn.StructType = structtype.(*StructType)
-			nn.AddChild(n)
-		} else if w, ok := structtype.(*Wrapped); ok {
-			nn.StructType = w.Value.(*StructType)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitStructType(structtype)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitFields(fields)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *StructConstructorWithKeyword) InitStructType(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.StructType = d.(*StructType)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.StructType = w.Value.(*StructType)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.StructType = structtype.(*StructType)
+			n.StructType = d.(*StructType)
 		}
 	}
-	nn.Fields = make([]*StructConstructorArg, 0, defaultCapacity)
-	if n, ok := fields.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := fields.(*Wrapped); ok {
-		newElem := w.Value.(*StructConstructorArg)
-		nn.Fields = append(nn.Fields, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := fields.(*StructConstructorArg)
-		nn.Fields = append(nn.Fields, newElem)
-	}
-	return nn, nil
+	return nil
 }
+
+func (n *StructConstructorWithKeyword) InitFields(d interface{}) error {
+	if n.Fields != nil {
+		return fmt.Errorf("StructConstructorWithKeyword.Fields: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Fields = make([]*StructConstructorArg, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*StructConstructorArg)
+		n.Fields = append(n.Fields, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*StructConstructorArg)
+		n.Fields = append(n.Fields, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *StructConstructorWithKeyword) AddChild(c NodeHandler) {
@@ -2361,97 +3299,158 @@ func NewInExpression(
 	unnestexpr interface{},
 	isnot interface{},
 	) (*InExpression, error) {
-	fmt.Printf("NewInExpression(%v, %v, %v, %v, %v)\n",lhs,
-		inlist,
-		query,
-		unnestexpr,
-		isnot,
-		)
+	
 	nn := &InExpression{}
 	nn.SetKind(InExpressionKind)
-	
-	if lhs == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitLHS(lhs)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := lhs.(NodeHandler); ok {
-		nn.LHS = lhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := lhs.(*Wrapped); ok {
-		nn.LHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.LHS = lhs.(ExpressionHandler)
+
+	err = nn.InitInList(inlist)
+	if err != nil {
+		return nil, err
 	}
-	if inlist != nil {
-		if n, ok := inlist.(NodeHandler); ok {
-			nn.InList = inlist.(*InList)
-			nn.AddChild(n)
-		} else if w, ok := inlist.(*Wrapped); ok {
-			nn.InList = w.Value.(*InList)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.InList = inlist.(*InList)
-		}
+
+	err = nn.InitQuery(query)
+	if err != nil {
+		return nil, err
 	}
-	if query != nil {
-		if n, ok := query.(NodeHandler); ok {
-			nn.Query = query.(*Query)
-			nn.AddChild(n)
-		} else if w, ok := query.(*Wrapped); ok {
-			nn.Query = w.Value.(*Query)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Query = query.(*Query)
-		}
+
+	err = nn.InitUnnestExpr(unnestexpr)
+	if err != nil {
+		return nil, err
 	}
-	if unnestexpr != nil {
-		if n, ok := unnestexpr.(NodeHandler); ok {
-			nn.UnnestExpr = unnestexpr.(*UnnestExpression)
-			nn.AddChild(n)
-		} else if w, ok := unnestexpr.(*Wrapped); ok {
-			nn.UnnestExpr = w.Value.(*UnnestExpression)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.UnnestExpr = unnestexpr.(*UnnestExpression)
-		}
+
+	err = nn.InitIsNot(isnot)
+	if err != nil {
+		return nil, err
 	}
-	if isnot != nil {
-		if n, ok := isnot.(NodeHandler); ok {
-			nn.IsNot = isnot.(bool)
-			nn.AddChild(n)
-		} else if w, ok := isnot.(*Wrapped); ok {
-			nn.IsNot = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.IsNot = isnot.(bool)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *InExpression) InitLHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("InExpression.LHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.LHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.LHS = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *InExpression) InitInList(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.InList = d.(*InList)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.InList = w.Value.(*InList)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.InList = d.(*InList)
+		}
+	}
+	return nil
+}
+
+func (n *InExpression) InitQuery(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Query = d.(*Query)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Query = w.Value.(*Query)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Query = d.(*Query)
+		}
+	}
+	return nil
+}
+
+func (n *InExpression) InitUnnestExpr(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.UnnestExpr = d.(*UnnestExpression)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.UnnestExpr = w.Value.(*UnnestExpression)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.UnnestExpr = d.(*UnnestExpression)
+		}
+	}
+	return nil
+}
+
+func (n *InExpression) InitIsNot(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IsNot = d.(bool)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IsNot = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.IsNot = d.(bool)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewInList(
 	list interface{},
 	) (*InList, error) {
-	fmt.Printf("NewInList(%v)\n",list,
-		)
+	
 	nn := &InList{}
 	nn.SetKind(InListKind)
-	
-	nn.List = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := list.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := list.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.List = append(nn.List, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := list.(ExpressionHandler)
-		nn.List = append(nn.List, newElem)
+
+	var err error
+
+	err = nn.InitList(list)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *InList) InitList(d interface{}) error {
+	if n.List != nil {
+		return fmt.Errorf("InList.List: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.List = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.List = append(n.List, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.List = append(n.List, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *InList) AddChild(c NodeHandler) {
@@ -2477,96 +3476,147 @@ func NewBetweenExpression(
 	high interface{},
 	isnot interface{},
 	) (*BetweenExpression, error) {
-	fmt.Printf("NewBetweenExpression(%v, %v, %v, %v)\n",lhs,
-		low,
-		high,
-		isnot,
-		)
+	
 	nn := &BetweenExpression{}
 	nn.SetKind(BetweenExpressionKind)
-	
-	if lhs == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitLHS(lhs)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := lhs.(NodeHandler); ok {
-		nn.LHS = lhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := lhs.(*Wrapped); ok {
-		nn.LHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitLow(low)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitHigh(high)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitIsNot(isnot)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *BetweenExpression) InitLHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("BetweenExpression.LHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.LHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.LHS = lhs.(ExpressionHandler)
+		n.LHS = d.(ExpressionHandler)
 	}
-	if low == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *BetweenExpression) InitLow(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("BetweenExpression.Low: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := low.(NodeHandler); ok {
-		nn.Low = low.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := low.(*Wrapped); ok {
-		nn.Low = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.Low = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Low = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.Low = low.(ExpressionHandler)
+		n.Low = d.(ExpressionHandler)
 	}
-	if high == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *BetweenExpression) InitHigh(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("BetweenExpression.High: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := high.(NodeHandler); ok {
-		nn.High = high.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := high.(*Wrapped); ok {
-		nn.High = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.High = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.High = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.High = high.(ExpressionHandler)
+		n.High = d.(ExpressionHandler)
 	}
-	if isnot != nil {
-		if n, ok := isnot.(NodeHandler); ok {
-			nn.IsNot = isnot.(bool)
-			nn.AddChild(n)
-		} else if w, ok := isnot.(*Wrapped); ok {
-			nn.IsNot = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *BetweenExpression) InitIsNot(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IsNot = d.(bool)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IsNot = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.IsNot = isnot.(bool)
+			n.IsNot = d.(bool)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewNumericLiteral(
 	) (*NumericLiteral, error) {
-	fmt.Printf("NewNumericLiteral()\n",)
+	
 	nn := &NumericLiteral{}
 	nn.SetKind(NumericLiteralKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
 func NewBigNumericLiteral(
 	) (*BigNumericLiteral, error) {
-	fmt.Printf("NewBigNumericLiteral()\n",)
+	
 	nn := &BigNumericLiteral{}
 	nn.SetKind(BigNumericLiteralKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
 func NewBytesLiteral(
 	) (*BytesLiteral, error) {
-	fmt.Printf("NewBytesLiteral()\n",)
+	
 	nn := &BytesLiteral{}
 	nn.SetKind(BytesLiteralKind)
-	
-	return nn, nil
+
+	var err error
+
+	return nn, err
 }
+
+
 
 
 
@@ -2574,61 +3624,98 @@ func NewDateOrTimeLiteral(
 	stringliteral interface{},
 	typekind interface{},
 	) (*DateOrTimeLiteral, error) {
-	fmt.Printf("NewDateOrTimeLiteral(%v, %v)\n",stringliteral,
-		typekind,
-		)
+	
 	nn := &DateOrTimeLiteral{}
 	nn.SetKind(DateOrTimeLiteralKind)
-	
-	if stringliteral == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitStringLiteral(stringliteral)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := stringliteral.(NodeHandler); ok {
-		nn.StringLiteral = stringliteral.(*StringLiteral)
-		nn.AddChild(n)
-	} else if w, ok := stringliteral.(*Wrapped); ok {
-		nn.StringLiteral = w.Value.(*StringLiteral)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitTypeKind(typekind)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *DateOrTimeLiteral) InitStringLiteral(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DateOrTimeLiteral.StringLiteral: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.StringLiteral = d.(*StringLiteral)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.StringLiteral = w.Value.(*StringLiteral)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.StringLiteral = stringliteral.(*StringLiteral)
+		n.StringLiteral = d.(*StringLiteral)
 	}
-	if typekind != nil {
-		if n, ok := typekind.(NodeHandler); ok {
-			nn.TypeKind = typekind.(TypeKind)
-			nn.AddChild(n)
-		} else if w, ok := typekind.(*Wrapped); ok {
-			nn.TypeKind = w.Value.(TypeKind)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *DateOrTimeLiteral) InitTypeKind(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.TypeKind = d.(TypeKind)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.TypeKind = w.Value.(TypeKind)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.TypeKind = typekind.(TypeKind)
+			n.TypeKind = d.(TypeKind)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewCaseValueExpression(
 	arguments interface{},
 	) (*CaseValueExpression, error) {
-	fmt.Printf("NewCaseValueExpression(%v)\n",arguments,
-		)
+	
 	nn := &CaseValueExpression{}
 	nn.SetKind(CaseValueExpressionKind)
-	
-	nn.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := arguments.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := arguments.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.Arguments = append(nn.Arguments, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := arguments.(ExpressionHandler)
-		nn.Arguments = append(nn.Arguments, newElem)
+
+	var err error
+
+	err = nn.InitArguments(arguments)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *CaseValueExpression) InitArguments(d interface{}) error {
+	if n.Arguments != nil {
+		return fmt.Errorf("CaseValueExpression.Arguments: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.Arguments = append(n.Arguments, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.Arguments = append(n.Arguments, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *CaseValueExpression) AddChild(c NodeHandler) {
@@ -2651,24 +3738,40 @@ func (n *CaseValueExpression) AddChildren(children []NodeHandler) {
 func NewCaseNoValueExpression(
 	arguments interface{},
 	) (*CaseNoValueExpression, error) {
-	fmt.Printf("NewCaseNoValueExpression(%v)\n",arguments,
-		)
+	
 	nn := &CaseNoValueExpression{}
 	nn.SetKind(CaseNoValueExpressionKind)
-	
-	nn.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := arguments.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := arguments.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.Arguments = append(nn.Arguments, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := arguments.(ExpressionHandler)
-		nn.Arguments = append(nn.Arguments, newElem)
+
+	var err error
+
+	err = nn.InitArguments(arguments)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *CaseNoValueExpression) InitArguments(d interface{}) error {
+	if n.Arguments != nil {
+		return fmt.Errorf("CaseNoValueExpression.Arguments: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.Arguments = append(n.Arguments, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.Arguments = append(n.Arguments, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *CaseNoValueExpression) AddChild(c NodeHandler) {
@@ -2692,38 +3795,60 @@ func NewArrayElement(
 	array interface{},
 	position interface{},
 	) (*ArrayElement, error) {
-	fmt.Printf("NewArrayElement(%v, %v)\n",array,
-		position,
-		)
+	
 	nn := &ArrayElement{}
 	nn.SetKind(ArrayElementKind)
-	
-	if array == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitArray(array)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := array.(NodeHandler); ok {
-		nn.Array = array.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := array.(*Wrapped); ok {
-		nn.Array = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Array = array.(ExpressionHandler)
+
+	err = nn.InitPosition(position)
+	if err != nil {
+		return nil, err
 	}
-	if position == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := position.(NodeHandler); ok {
-		nn.Position = position.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := position.(*Wrapped); ok {
-		nn.Position = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Position = position.(ExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *ArrayElement) InitArray(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ArrayElement.Array: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Array = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Array = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Array = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *ArrayElement) InitPosition(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ArrayElement.Position: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Position = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Position = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Position = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
@@ -2732,50 +3857,80 @@ func NewBitwiseShiftExpression(
 	rhs interface{},
 	isleftshift interface{},
 	) (*BitwiseShiftExpression, error) {
-	fmt.Printf("NewBitwiseShiftExpression(%v, %v, %v)\n",lhs,
-		rhs,
-		isleftshift,
-		)
+	
 	nn := &BitwiseShiftExpression{}
 	nn.SetKind(BitwiseShiftExpressionKind)
-	
-	if lhs == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitLHS(lhs)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := lhs.(NodeHandler); ok {
-		nn.LHS = lhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := lhs.(*Wrapped); ok {
-		nn.LHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitRHS(rhs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitIsLeftShift(isleftshift)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *BitwiseShiftExpression) InitLHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("BitwiseShiftExpression.LHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.LHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.LHS = lhs.(ExpressionHandler)
+		n.LHS = d.(ExpressionHandler)
 	}
-	if rhs == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *BitwiseShiftExpression) InitRHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("BitwiseShiftExpression.RHS: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := rhs.(NodeHandler); ok {
-		nn.RHS = rhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := rhs.(*Wrapped); ok {
-		nn.RHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.RHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.RHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.RHS = rhs.(ExpressionHandler)
+		n.RHS = d.(ExpressionHandler)
 	}
-	if isleftshift != nil {
-		if n, ok := isleftshift.(NodeHandler); ok {
-			nn.IsLeftShift = isleftshift.(bool)
-			nn.AddChild(n)
-		} else if w, ok := isleftshift.(*Wrapped); ok {
-			nn.IsLeftShift = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *BitwiseShiftExpression) InitIsLeftShift(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IsLeftShift = d.(bool)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IsLeftShift = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.IsLeftShift = isleftshift.(bool)
+			n.IsLeftShift = d.(bool)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
@@ -2783,102 +3938,159 @@ func NewDotGeneralizedField(
 	expr interface{},
 	path interface{},
 	) (*DotGeneralizedField, error) {
-	fmt.Printf("NewDotGeneralizedField(%v, %v)\n",expr,
-		path,
-		)
+	
 	nn := &DotGeneralizedField{}
 	nn.SetKind(DotGeneralizedFieldKind)
-	
-	if expr == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpr(expr)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expr.(NodeHandler); ok {
-		nn.Expr = expr.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expr.(*Wrapped); ok {
-		nn.Expr = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expr = expr.(ExpressionHandler)
+
+	err = nn.InitPath(path)
+	if err != nil {
+		return nil, err
 	}
-	if path == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := path.(NodeHandler); ok {
-		nn.Path = path.(*PathExpression)
-		nn.AddChild(n)
-	} else if w, ok := path.(*Wrapped); ok {
-		nn.Path = w.Value.(*PathExpression)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Path = path.(*PathExpression)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *DotGeneralizedField) InitExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DotGeneralizedField.Expr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expr = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expr = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *DotGeneralizedField) InitPath(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DotGeneralizedField.Path: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Path = d.(*PathExpression)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Path = w.Value.(*PathExpression)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Path = d.(*PathExpression)
+	}
+	return nil
+}
+
+
 
 
 
 func NewDotIdentifier(
 	expr interface{},
-	path interface{},
+	name interface{},
 	) (*DotIdentifier, error) {
-	fmt.Printf("NewDotIdentifier(%v, %v)\n",expr,
-		path,
-		)
+	
 	nn := &DotIdentifier{}
 	nn.SetKind(DotIdentifierKind)
-	
-	if expr == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpr(expr)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expr.(NodeHandler); ok {
-		nn.Expr = expr.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expr.(*Wrapped); ok {
-		nn.Expr = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expr = expr.(ExpressionHandler)
+
+	err = nn.InitName(name)
+	if err != nil {
+		return nil, err
 	}
-	if path == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := path.(NodeHandler); ok {
-		nn.Path = path.(*PathExpression)
-		nn.AddChild(n)
-	} else if w, ok := path.(*Wrapped); ok {
-		nn.Path = w.Value.(*PathExpression)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Path = path.(*PathExpression)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *DotIdentifier) InitExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DotIdentifier.Expr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expr = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expr = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *DotIdentifier) InitName(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DotIdentifier.Name: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Name = d.(*Identifier)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Name = w.Value.(*Identifier)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Name = d.(*Identifier)
+	}
+	return nil
+}
+
+
 
 
 
 func NewDotStar(
 	expr interface{},
 	) (*DotStar, error) {
-	fmt.Printf("NewDotStar(%v)\n",expr,
-		)
+	
 	nn := &DotStar{}
 	nn.SetKind(DotStarKind)
-	
-	if expr == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpr(expr)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expr.(NodeHandler); ok {
-		nn.Expr = expr.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expr.(*Wrapped); ok {
-		nn.Expr = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expr = expr.(ExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *DotStar) InitExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DotStar.Expr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expr = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expr = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
@@ -2886,38 +4098,60 @@ func NewDotStarWithModifiers(
 	expr interface{},
 	modifiers interface{},
 	) (*DotStarWithModifiers, error) {
-	fmt.Printf("NewDotStarWithModifiers(%v, %v)\n",expr,
-		modifiers,
-		)
+	
 	nn := &DotStarWithModifiers{}
 	nn.SetKind(DotStarWithModifiersKind)
-	
-	if expr == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpr(expr)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expr.(NodeHandler); ok {
-		nn.Expr = expr.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expr.(*Wrapped); ok {
-		nn.Expr = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expr = expr.(ExpressionHandler)
+
+	err = nn.InitModifiers(modifiers)
+	if err != nil {
+		return nil, err
 	}
-	if modifiers == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := modifiers.(NodeHandler); ok {
-		nn.Modifiers = modifiers.(*StarModifiers)
-		nn.AddChild(n)
-	} else if w, ok := modifiers.(*Wrapped); ok {
-		nn.Modifiers = w.Value.(*StarModifiers)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Modifiers = modifiers.(*StarModifiers)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *DotStarWithModifiers) InitExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DotStarWithModifiers.Expr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expr = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expr = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *DotStarWithModifiers) InitModifiers(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("DotStarWithModifiers.Modifiers: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Modifiers = d.(*StarModifiers)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Modifiers = w.Value.(*StarModifiers)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Modifiers = d.(*StarModifiers)
+	}
+	return nil
+}
+
+
 
 
 
@@ -2925,38 +4159,60 @@ func NewExpressionSubquery(
 	query interface{},
 	modifier interface{},
 	) (*ExpressionSubquery, error) {
-	fmt.Printf("NewExpressionSubquery(%v, %v)\n",query,
-		modifier,
-		)
+	
 	nn := &ExpressionSubquery{}
 	nn.SetKind(ExpressionSubqueryKind)
-	
-	if query == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitQuery(query)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := query.(NodeHandler); ok {
-		nn.Query = query.(*Query)
-		nn.AddChild(n)
-	} else if w, ok := query.(*Wrapped); ok {
-		nn.Query = w.Value.(*Query)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Query = query.(*Query)
+
+	err = nn.InitModifier(modifier)
+	if err != nil {
+		return nil, err
 	}
-	if modifier == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := modifier.(NodeHandler); ok {
-		nn.Modifier = modifier.(SubqueryModifier)
-		nn.AddChild(n)
-	} else if w, ok := modifier.(*Wrapped); ok {
-		nn.Modifier = w.Value.(SubqueryModifier)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Modifier = modifier.(SubqueryModifier)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *ExpressionSubquery) InitQuery(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ExpressionSubquery.Query: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Query = d.(*Query)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Query = w.Value.(*Query)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Query = d.(*Query)
+	}
+	return nil
+}
+
+func (n *ExpressionSubquery) InitModifier(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ExpressionSubquery.Modifier: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Modifier = d.(SubqueryModifier)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Modifier = w.Value.(SubqueryModifier)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Modifier = d.(SubqueryModifier)
+	}
+	return nil
+}
+
+
 
 
 
@@ -2965,150 +4221,238 @@ func NewExtractExpression(
 	rhs interface{},
 	timezone interface{},
 	) (*ExtractExpression, error) {
-	fmt.Printf("NewExtractExpression(%v, %v, %v)\n",lhs,
-		rhs,
-		timezone,
-		)
+	
 	nn := &ExtractExpression{}
 	nn.SetKind(ExtractExpressionKind)
-	
-	if lhs == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitLHS(lhs)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := lhs.(NodeHandler); ok {
-		nn.LHS = lhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := lhs.(*Wrapped); ok {
-		nn.LHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitRHS(rhs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitTimeZone(timezone)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *ExtractExpression) InitLHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ExtractExpression.LHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.LHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.LHS = lhs.(ExpressionHandler)
+		n.LHS = d.(ExpressionHandler)
 	}
-	if rhs == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *ExtractExpression) InitRHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ExtractExpression.RHS: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := rhs.(NodeHandler); ok {
-		nn.RHS = rhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := rhs.(*Wrapped); ok {
-		nn.RHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.RHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.RHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.RHS = rhs.(ExpressionHandler)
+		n.RHS = d.(ExpressionHandler)
 	}
-	if timezone != nil {
-		if n, ok := timezone.(NodeHandler); ok {
-			nn.TimeZone = timezone.(ExpressionHandler)
-			nn.AddChild(n)
-		} else if w, ok := timezone.(*Wrapped); ok {
-			nn.TimeZone = w.Value.(ExpressionHandler)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *ExtractExpression) InitTimeZone(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.TimeZone = d.(ExpressionHandler)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.TimeZone = w.Value.(ExpressionHandler)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.TimeZone = timezone.(ExpressionHandler)
+			n.TimeZone = d.(ExpressionHandler)
 		}
 	}
-	return nn, nil
+	return nil
 }
 
 
 
-func NewIntervalExpression(
+
+
+func NewIntervalExpr(
 	intervalvalue interface{},
 	datepartname interface{},
 	datepartnameto interface{},
-	) (*IntervalExpression, error) {
-	fmt.Printf("NewIntervalExpression(%v, %v, %v)\n",intervalvalue,
-		datepartname,
-		datepartnameto,
-		)
-	nn := &IntervalExpression{}
-	nn.SetKind(IntervalExpressionKind)
+	) (*IntervalExpr, error) {
 	
-	if intervalvalue == nil {
-		return nil, ErrMissingRequiredField
+	nn := &IntervalExpr{}
+	nn.SetKind(IntervalExprKind)
+
+	var err error
+
+	err = nn.InitIntervalValue(intervalvalue)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := intervalvalue.(NodeHandler); ok {
-		nn.IntervalValue = intervalvalue.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := intervalvalue.(*Wrapped); ok {
-		nn.IntervalValue = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitDatePartName(datepartname)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitDatePartNameTo(datepartnameto)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *IntervalExpr) InitIntervalValue(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("IntervalExpr.IntervalValue: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.IntervalValue = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.IntervalValue = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.IntervalValue = intervalvalue.(ExpressionHandler)
+		n.IntervalValue = d.(ExpressionHandler)
 	}
-	if datepartname == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *IntervalExpr) InitDatePartName(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("IntervalExpr.DatePartName: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := datepartname.(NodeHandler); ok {
-		nn.DatePartName = datepartname.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := datepartname.(*Wrapped); ok {
-		nn.DatePartName = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.DatePartName = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.DatePartName = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.DatePartName = datepartname.(ExpressionHandler)
+		n.DatePartName = d.(ExpressionHandler)
 	}
-	if datepartnameto != nil {
-		if n, ok := datepartnameto.(NodeHandler); ok {
-			nn.DatePartNameTo = datepartnameto.(ExpressionHandler)
-			nn.AddChild(n)
-		} else if w, ok := datepartnameto.(*Wrapped); ok {
-			nn.DatePartNameTo = w.Value.(ExpressionHandler)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *IntervalExpr) InitDatePartNameTo(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.DatePartNameTo = d.(ExpressionHandler)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.DatePartNameTo = w.Value.(ExpressionHandler)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.DatePartNameTo = datepartnameto.(ExpressionHandler)
+			n.DatePartNameTo = d.(ExpressionHandler)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewNullOrder(
 	nullsfirst interface{},
 	) (*NullOrder, error) {
-	fmt.Printf("NewNullOrder(%v)\n",nullsfirst,
-		)
+	
 	nn := &NullOrder{}
 	nn.SetKind(NullOrderKind)
-	
-	if nullsfirst != nil {
-		if n, ok := nullsfirst.(NodeHandler); ok {
-			nn.NullsFirst = nullsfirst.(bool)
-			nn.AddChild(n)
-		} else if w, ok := nullsfirst.(*Wrapped); ok {
-			nn.NullsFirst = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitNullsFirst(nullsfirst)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *NullOrder) InitNullsFirst(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.NullsFirst = d.(bool)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.NullsFirst = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.NullsFirst = nullsfirst.(bool)
+			n.NullsFirst = d.(bool)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewOnOrUsingClauseList(
 	list interface{},
 	) (*OnOrUsingClauseList, error) {
-	fmt.Printf("NewOnOrUsingClauseList(%v)\n",list,
-		)
+	
 	nn := &OnOrUsingClauseList{}
 	nn.SetKind(OnOrUsingClauseListKind)
-	
-	nn.List = make([]NodeHandler, 0, defaultCapacity)
-	if n, ok := list.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := list.(*Wrapped); ok {
-		newElem := w.Value.(NodeHandler)
-		nn.List = append(nn.List, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := list.(NodeHandler)
-		nn.List = append(nn.List, newElem)
+
+	var err error
+
+	err = nn.InitList(list)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *OnOrUsingClauseList) InitList(d interface{}) error {
+	if n.List != nil {
+		return fmt.Errorf("OnOrUsingClauseList.List: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.List = make([]NodeHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(NodeHandler)
+		n.List = append(n.List, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(NodeHandler)
+		n.List = append(n.List, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *OnOrUsingClauseList) AddChild(c NodeHandler) {
@@ -3132,61 +4476,98 @@ func NewParenthesizedJoin(
 	join interface{},
 	sampleclause interface{},
 	) (*ParenthesizedJoin, error) {
-	fmt.Printf("NewParenthesizedJoin(%v, %v)\n",join,
-		sampleclause,
-		)
+	
 	nn := &ParenthesizedJoin{}
 	nn.SetKind(ParenthesizedJoinKind)
-	
-	if join == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitJoin(join)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := join.(NodeHandler); ok {
-		nn.Join = join.(*Join)
-		nn.AddChild(n)
-	} else if w, ok := join.(*Wrapped); ok {
-		nn.Join = w.Value.(*Join)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitSampleClause(sampleclause)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *ParenthesizedJoin) InitJoin(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("ParenthesizedJoin.Join: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Join = d.(*Join)
+		n.TableExpression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Join = w.Value.(*Join)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.Join = join.(*Join)
+		n.Join = d.(*Join)
 	}
-	if sampleclause != nil {
-		if n, ok := sampleclause.(NodeHandler); ok {
-			nn.SampleClause = sampleclause.(SampleClause)
-			nn.AddChild(n)
-		} else if w, ok := sampleclause.(*Wrapped); ok {
-			nn.SampleClause = w.Value.(SampleClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *ParenthesizedJoin) InitSampleClause(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.SampleClause = d.(SampleClause)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.SampleClause = w.Value.(SampleClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.SampleClause = sampleclause.(SampleClause)
+			n.SampleClause = d.(SampleClause)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewPartitionBy(
 	partitioningexpressions interface{},
 	) (*PartitionBy, error) {
-	fmt.Printf("NewPartitionBy(%v)\n",partitioningexpressions,
-		)
+	
 	nn := &PartitionBy{}
 	nn.SetKind(PartitionByKind)
-	
-	nn.PartitioningExpressions = make([]ExpressionHandler, 0, defaultCapacity)
-	if n, ok := partitioningexpressions.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := partitioningexpressions.(*Wrapped); ok {
-		newElem := w.Value.(ExpressionHandler)
-		nn.PartitioningExpressions = append(nn.PartitioningExpressions, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := partitioningexpressions.(ExpressionHandler)
-		nn.PartitioningExpressions = append(nn.PartitioningExpressions, newElem)
+
+	var err error
+
+	err = nn.InitPartitioningExpressions(partitioningexpressions)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *PartitionBy) InitPartitioningExpressions(d interface{}) error {
+	if n.PartitioningExpressions != nil {
+		return fmt.Errorf("PartitionBy.PartitioningExpressions: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.PartitioningExpressions = make([]ExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(ExpressionHandler)
+		n.PartitioningExpressions = append(n.PartitioningExpressions, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(ExpressionHandler)
+		n.PartitioningExpressions = append(n.PartitioningExpressions, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *PartitionBy) AddChild(c NodeHandler) {
@@ -3211,48 +4592,80 @@ func NewSetOperation(
 	optype interface{},
 	distinct interface{},
 	) (*SetOperation, error) {
-	fmt.Printf("NewSetOperation(%v, %v, %v)\n",inputs,
-		optype,
-		distinct,
-		)
+	
 	nn := &SetOperation{}
 	nn.SetKind(SetOperationKind)
-	
-	nn.Inputs = make([]QueryExpressionHandler, 0, defaultCapacity)
-	if n, ok := inputs.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := inputs.(*Wrapped); ok {
-		newElem := w.Value.(QueryExpressionHandler)
-		nn.Inputs = append(nn.Inputs, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := inputs.(QueryExpressionHandler)
-		nn.Inputs = append(nn.Inputs, newElem)
+
+	var err error
+
+	err = nn.InitInputs(inputs)
+	if err != nil {
+		return nil, err
 	}
-	if optype != nil {
-		if n, ok := optype.(NodeHandler); ok {
-			nn.OpType = optype.(SetOp)
-			nn.AddChild(n)
-		} else if w, ok := optype.(*Wrapped); ok {
-			nn.OpType = w.Value.(SetOp)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.OpType = optype.(SetOp)
-		}
+
+	err = nn.InitOpType(optype)
+	if err != nil {
+		return nil, err
 	}
-	if distinct != nil {
-		if n, ok := distinct.(NodeHandler); ok {
-			nn.Distinct = distinct.(bool)
-			nn.AddChild(n)
-		} else if w, ok := distinct.(*Wrapped); ok {
-			nn.Distinct = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Distinct = distinct.(bool)
-		}
+
+	err = nn.InitDistinct(distinct)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *SetOperation) InitInputs(d interface{}) error {
+	if n.Inputs != nil {
+		return fmt.Errorf("SetOperation.Inputs: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Inputs = make([]QueryExpressionHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(QueryExpressionHandler)
+		n.Inputs = append(n.Inputs, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(QueryExpressionHandler)
+		n.Inputs = append(n.Inputs, newElem)
+	}
+	return nil
+}
+
+func (n *SetOperation) InitOpType(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.OpType = d.(SetOp)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.OpType = w.Value.(SetOp)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.OpType = d.(SetOp)
+		}
+	}
+	return nil
+}
+
+func (n *SetOperation) InitDistinct(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Distinct = d.(bool)
+			n.QueryExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Distinct = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Distinct = d.(bool)
+		}
+	}
+	return nil
+}
+
+
 
 
 func (n *SetOperation) AddChild(c NodeHandler) {
@@ -3275,24 +4688,40 @@ func (n *SetOperation) AddChildren(children []NodeHandler) {
 func NewStarExceptList(
 	identifiers interface{},
 	) (*StarExceptList, error) {
-	fmt.Printf("NewStarExceptList(%v)\n",identifiers,
-		)
+	
 	nn := &StarExceptList{}
 	nn.SetKind(StarExceptListKind)
-	
-	nn.Identifiers = make([]*Identifier, 0, defaultCapacity)
-	if n, ok := identifiers.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := identifiers.(*Wrapped); ok {
-		newElem := w.Value.(*Identifier)
-		nn.Identifiers = append(nn.Identifiers, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := identifiers.(*Identifier)
-		nn.Identifiers = append(nn.Identifiers, newElem)
+
+	var err error
+
+	err = nn.InitIdentifiers(identifiers)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *StarExceptList) InitIdentifiers(d interface{}) error {
+	if n.Identifiers != nil {
+		return fmt.Errorf("StarExceptList.Identifiers: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Identifiers = make([]*Identifier, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*Identifier)
+		n.Identifiers = append(n.Identifiers, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*Identifier)
+		n.Identifiers = append(n.Identifiers, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *StarExceptList) AddChild(c NodeHandler) {
@@ -3316,36 +4745,60 @@ func NewStarModifiers(
 	exceptlist interface{},
 	replaceitems interface{},
 	) (*StarModifiers, error) {
-	fmt.Printf("NewStarModifiers(%v, %v)\n",exceptlist,
-		replaceitems,
-		)
+	
 	nn := &StarModifiers{}
 	nn.SetKind(StarModifiersKind)
-	
-	if exceptlist != nil {
-		if n, ok := exceptlist.(NodeHandler); ok {
-			nn.ExceptList = exceptlist.(*StarExceptList)
-			nn.AddChild(n)
-		} else if w, ok := exceptlist.(*Wrapped); ok {
-			nn.ExceptList = w.Value.(*StarExceptList)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitExceptList(exceptlist)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitReplaceItems(replaceitems)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *StarModifiers) InitExceptList(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.ExceptList = d.(*StarExceptList)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.ExceptList = w.Value.(*StarExceptList)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.ExceptList = exceptlist.(*StarExceptList)
+			n.ExceptList = d.(*StarExceptList)
 		}
 	}
-	nn.ReplaceItems = make([]*StarReplaceItem, 0, defaultCapacity)
-	if n, ok := replaceitems.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := replaceitems.(*Wrapped); ok {
-		newElem := w.Value.(*StarReplaceItem)
-		nn.ReplaceItems = append(nn.ReplaceItems, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := replaceitems.(*StarReplaceItem)
-		nn.ReplaceItems = append(nn.ReplaceItems, newElem)
-	}
-	return nn, nil
+	return nil
 }
+
+func (n *StarModifiers) InitReplaceItems(d interface{}) error {
+	if n.ReplaceItems != nil {
+		return fmt.Errorf("StarModifiers.ReplaceItems: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.ReplaceItems = make([]*StarReplaceItem, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*StarReplaceItem)
+		n.ReplaceItems = append(n.ReplaceItems, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*StarReplaceItem)
+		n.ReplaceItems = append(n.ReplaceItems, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *StarModifiers) AddChild(c NodeHandler) {
@@ -3369,63 +4822,98 @@ func NewStarReplaceItem(
 	expression interface{},
 	alias interface{},
 	) (*StarReplaceItem, error) {
-	fmt.Printf("NewStarReplaceItem(%v, %v)\n",expression,
-		alias,
-		)
+	
 	nn := &StarReplaceItem{}
 	nn.SetKind(StarReplaceItemKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expression = expression.(ExpressionHandler)
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
 	}
-	if alias == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := alias.(NodeHandler); ok {
-		nn.Alias = alias.(*Identifier)
-		nn.AddChild(n)
-	} else if w, ok := alias.(*Wrapped); ok {
-		nn.Alias = w.Value.(*Identifier)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Alias = alias.(*Identifier)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *StarReplaceItem) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("StarReplaceItem.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expression = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *StarReplaceItem) InitAlias(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("StarReplaceItem.Alias: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Alias = d.(*Identifier)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Alias = w.Value.(*Identifier)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Alias = d.(*Identifier)
+	}
+	return nil
+}
+
+
 
 
 
 func NewStarWithModifiers(
 	modifiers interface{},
 	) (*StarWithModifiers, error) {
-	fmt.Printf("NewStarWithModifiers(%v)\n",modifiers,
-		)
+	
 	nn := &StarWithModifiers{}
 	nn.SetKind(StarWithModifiersKind)
-	
-	if modifiers == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitModifiers(modifiers)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := modifiers.(NodeHandler); ok {
-		nn.Modifiers = modifiers.(*StarModifiers)
-		nn.AddChild(n)
-	} else if w, ok := modifiers.(*Wrapped); ok {
-		nn.Modifiers = w.Value.(*StarModifiers)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Modifiers = modifiers.(*StarModifiers)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *StarWithModifiers) InitModifiers(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("StarWithModifiers.Modifiers: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Modifiers = d.(*StarModifiers)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Modifiers = w.Value.(*StarModifiers)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Modifiers = d.(*StarModifiers)
+	}
+	return nil
+}
+
+
 
 
 
@@ -3434,49 +4922,78 @@ func NewTableSubquery(
 	alias interface{},
 	sampleclause interface{},
 	) (*TableSubquery, error) {
-	fmt.Printf("NewTableSubquery(%v, %v, %v)\n",subquery,
-		alias,
-		sampleclause,
-		)
+	
 	nn := &TableSubquery{}
 	nn.SetKind(TableSubqueryKind)
-	
-	if subquery == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitSubquery(subquery)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := subquery.(NodeHandler); ok {
-		nn.Subquery = subquery.(*Query)
-		nn.AddChild(n)
-	} else if w, ok := subquery.(*Wrapped); ok {
-		nn.Subquery = w.Value.(*Query)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Subquery = subquery.(*Query)
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
 	}
-	if alias != nil {
-		if n, ok := alias.(NodeHandler); ok {
-			nn.Alias = alias.(*Alias)
-			nn.AddChild(n)
-		} else if w, ok := alias.(*Wrapped); ok {
-			nn.Alias = w.Value.(*Alias)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Alias = alias.(*Alias)
-		}
+
+	err = nn.InitSampleClause(sampleclause)
+	if err != nil {
+		return nil, err
 	}
-	if sampleclause != nil {
-		if n, ok := sampleclause.(NodeHandler); ok {
-			nn.SampleClause = sampleclause.(*SampleClause)
-			nn.AddChild(n)
-		} else if w, ok := sampleclause.(*Wrapped); ok {
-			nn.SampleClause = w.Value.(*SampleClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.SampleClause = sampleclause.(*SampleClause)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *TableSubquery) InitSubquery(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("TableSubquery.Subquery: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Subquery = d.(*Query)
+		n.TableExpression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Subquery = w.Value.(*Query)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Subquery = d.(*Query)
+	}
+	return nil
+}
+
+func (n *TableSubquery) InitAlias(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Alias = d.(*Alias)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Alias = w.Value.(*Alias)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Alias = d.(*Alias)
+		}
+	}
+	return nil
+}
+
+func (n *TableSubquery) InitSampleClause(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.SampleClause = d.(*SampleClause)
+			n.TableExpression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.SampleClause = w.Value.(*SampleClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.SampleClause = d.(*SampleClause)
+		}
+	}
+	return nil
+}
+
+
 
 
 
@@ -3484,86 +5001,136 @@ func NewUnaryExpression(
 	operand interface{},
 	op interface{},
 	) (*UnaryExpression, error) {
-	fmt.Printf("NewUnaryExpression(%v, %v)\n",operand,
-		op,
-		)
+	
 	nn := &UnaryExpression{}
 	nn.SetKind(UnaryExpressionKind)
-	
-	if operand == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitOperand(operand)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := operand.(NodeHandler); ok {
-		nn.Operand = operand.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := operand.(*Wrapped); ok {
-		nn.Operand = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitOp(op)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *UnaryExpression) InitOperand(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("UnaryExpression.Operand: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Operand = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Operand = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.Operand = operand.(ExpressionHandler)
+		n.Operand = d.(ExpressionHandler)
 	}
-	if op != nil {
-		if n, ok := op.(NodeHandler); ok {
-			nn.Op = op.(UnaryOp)
-			nn.AddChild(n)
-		} else if w, ok := op.(*Wrapped); ok {
-			nn.Op = w.Value.(UnaryOp)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *UnaryExpression) InitOp(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Op = d.(UnaryOp)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Op = w.Value.(UnaryOp)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Op = op.(UnaryOp)
+			n.Op = d.(UnaryOp)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewUnnestExpression(
 	expression interface{},
 	) (*UnnestExpression, error) {
-	fmt.Printf("NewUnnestExpression(%v)\n",expression,
-		)
+	
 	nn := &UnnestExpression{}
 	nn.SetKind(UnnestExpressionKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expression = expression.(ExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *UnnestExpression) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("UnnestExpression.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expression = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
 func NewWindowClause(
 	windows interface{},
 	) (*WindowClause, error) {
-	fmt.Printf("NewWindowClause(%v)\n",windows,
-		)
+	
 	nn := &WindowClause{}
 	nn.SetKind(WindowClauseKind)
-	
-	nn.Windows = make([]*WindowDefinition, 0, defaultCapacity)
-	if n, ok := windows.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := windows.(*Wrapped); ok {
-		newElem := w.Value.(*WindowDefinition)
-		nn.Windows = append(nn.Windows, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := windows.(*WindowDefinition)
-		nn.Windows = append(nn.Windows, newElem)
+
+	var err error
+
+	err = nn.InitWindows(windows)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *WindowClause) InitWindows(d interface{}) error {
+	if n.Windows != nil {
+		return fmt.Errorf("WindowClause.Windows: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Windows = make([]*WindowDefinition, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(*WindowDefinition)
+		n.Windows = append(n.Windows, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(*WindowDefinition)
+		n.Windows = append(n.Windows, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *WindowClause) AddChild(c NodeHandler) {
@@ -3587,38 +5154,60 @@ func NewWindowDefinition(
 	name interface{},
 	windowspec interface{},
 	) (*WindowDefinition, error) {
-	fmt.Printf("NewWindowDefinition(%v, %v)\n",name,
-		windowspec,
-		)
+	
 	nn := &WindowDefinition{}
 	nn.SetKind(WindowDefinitionKind)
-	
-	if name == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitName(name)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := name.(NodeHandler); ok {
-		nn.Name = name.(*Identifier)
-		nn.AddChild(n)
-	} else if w, ok := name.(*Wrapped); ok {
-		nn.Name = w.Value.(*Identifier)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Name = name.(*Identifier)
+
+	err = nn.InitWindowSpec(windowspec)
+	if err != nil {
+		return nil, err
 	}
-	if windowspec == nil {
-		return nil, ErrMissingRequiredField
-	}
-	if n, ok := windowspec.(NodeHandler); ok {
-		nn.WindowSpec = windowspec.(*WindowSpecification)
-		nn.AddChild(n)
-	} else if w, ok := windowspec.(*Wrapped); ok {
-		nn.WindowSpec = w.Value.(*WindowSpecification)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.WindowSpec = windowspec.(*WindowSpecification)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *WindowDefinition) InitName(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WindowDefinition.Name: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Name = d.(*Identifier)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Name = w.Value.(*Identifier)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Name = d.(*Identifier)
+	}
+	return nil
+}
+
+func (n *WindowDefinition) InitWindowSpec(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WindowDefinition.WindowSpec: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.WindowSpec = d.(*WindowSpecification)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.WindowSpec = w.Value.(*WindowSpecification)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.WindowSpec = d.(*WindowSpecification)
+	}
+	return nil
+}
+
+
 
 
 
@@ -3627,89 +5216,141 @@ func NewWindowFrame(
 	endexpr interface{},
 	frameunit interface{},
 	) (*WindowFrame, error) {
-	fmt.Printf("NewWindowFrame(%v, %v, %v)\n",startexpr,
-		endexpr,
-		frameunit,
-		)
+	
 	nn := &WindowFrame{}
 	nn.SetKind(WindowFrameKind)
-	
-	if startexpr == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitStartExpr(startexpr)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := startexpr.(NodeHandler); ok {
-		nn.StartExpr = startexpr.(*WindowFrameExpression)
-		nn.AddChild(n)
-	} else if w, ok := startexpr.(*Wrapped); ok {
-		nn.StartExpr = w.Value.(*WindowFrameExpression)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitEndExpr(endexpr)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitFrameUnit(frameunit)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *WindowFrame) InitStartExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WindowFrame.StartExpr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.StartExpr = d.(*WindowFrameExpr)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.StartExpr = w.Value.(*WindowFrameExpr)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.StartExpr = startexpr.(*WindowFrameExpression)
+		n.StartExpr = d.(*WindowFrameExpr)
 	}
-	if endexpr == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *WindowFrame) InitEndExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WindowFrame.EndExpr: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := endexpr.(NodeHandler); ok {
-		nn.EndExpr = endexpr.(*WindowFrameExpression)
-		nn.AddChild(n)
-	} else if w, ok := endexpr.(*Wrapped); ok {
-		nn.EndExpr = w.Value.(*WindowFrameExpression)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.EndExpr = d.(*WindowFrameExpr)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.EndExpr = w.Value.(*WindowFrameExpr)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.EndExpr = endexpr.(*WindowFrameExpression)
+		n.EndExpr = d.(*WindowFrameExpr)
 	}
-	if frameunit == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *WindowFrame) InitFrameUnit(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WindowFrame.FrameUnit: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := frameunit.(NodeHandler); ok {
-		nn.FrameUnit = frameunit.(FrameUnit)
-		nn.AddChild(n)
-	} else if w, ok := frameunit.(*Wrapped); ok {
-		nn.FrameUnit = w.Value.(FrameUnit)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.FrameUnit = d.(FrameUnit)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.FrameUnit = w.Value.(FrameUnit)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.FrameUnit = frameunit.(FrameUnit)
+		n.FrameUnit = d.(FrameUnit)
 	}
-	return nn, nil
+	return nil
 }
 
 
 
-func NewWindowFrameExpression(
+
+
+func NewWindowFrameExpr(
 	expression interface{},
 	boundarytype interface{},
-	) (*WindowFrameExpression, error) {
-	fmt.Printf("NewWindowFrameExpression(%v, %v)\n",expression,
-		boundarytype,
-		)
-	nn := &WindowFrameExpression{}
-	nn.SetKind(WindowFrameExpressionKind)
+	) (*WindowFrameExpr, error) {
 	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+	nn := &WindowFrameExpr{}
+	nn.SetKind(WindowFrameExprKind)
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitBoundaryType(boundarytype)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *WindowFrameExpr) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("WindowFrameExpr.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.Expression = expression.(ExpressionHandler)
+		n.Expression = d.(ExpressionHandler)
 	}
-	if boundarytype != nil {
-		if n, ok := boundarytype.(NodeHandler); ok {
-			nn.BoundaryType = boundarytype.(BoundaryType)
-			nn.AddChild(n)
-		} else if w, ok := boundarytype.(*Wrapped); ok {
-			nn.BoundaryType = w.Value.(BoundaryType)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *WindowFrameExpr) InitBoundaryType(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.BoundaryType = d.(BoundaryType)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.BoundaryType = w.Value.(BoundaryType)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.BoundaryType = boundarytype.(BoundaryType)
+			n.BoundaryType = d.(BoundaryType)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
@@ -3718,50 +5359,80 @@ func NewLikeExpression(
 	inlist interface{},
 	isnot interface{},
 	) (*LikeExpression, error) {
-	fmt.Printf("NewLikeExpression(%v, %v, %v)\n",lhs,
-		inlist,
-		isnot,
-		)
+	
 	nn := &LikeExpression{}
 	nn.SetKind(LikeExpressionKind)
-	
-	if lhs == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitLHS(lhs)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := lhs.(NodeHandler); ok {
-		nn.LHS = lhs.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := lhs.(*Wrapped); ok {
-		nn.LHS = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitInList(inlist)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitIsNot(isnot)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *LikeExpression) InitLHS(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("LikeExpression.LHS: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.LHS = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.LHS = lhs.(ExpressionHandler)
+		n.LHS = d.(ExpressionHandler)
 	}
-	if inlist == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *LikeExpression) InitInList(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("LikeExpression.InList: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := inlist.(NodeHandler); ok {
-		nn.InList = inlist.(*InList)
-		nn.AddChild(n)
-	} else if w, ok := inlist.(*Wrapped); ok {
-		nn.InList = w.Value.(*InList)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.InList = d.(*InList)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.InList = w.Value.(*InList)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.InList = inlist.(*InList)
+		n.InList = d.(*InList)
 	}
-	if isnot != nil {
-		if n, ok := isnot.(NodeHandler); ok {
-			nn.IsNot = isnot.(bool)
-			nn.AddChild(n)
-		} else if w, ok := isnot.(*Wrapped); ok {
-			nn.IsNot = w.Value.(bool)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *LikeExpression) InitIsNot(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.IsNot = d.(bool)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.IsNot = w.Value.(bool)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.IsNot = isnot.(bool)
+			n.IsNot = d.(bool)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
@@ -3771,108 +5442,172 @@ func NewWindowSpecification(
 	orderby interface{},
 	windowframe interface{},
 	) (*WindowSpecification, error) {
-	fmt.Printf("NewWindowSpecification(%v, %v, %v, %v)\n",basewindowname,
-		partitionby,
-		orderby,
-		windowframe,
-		)
+	
 	nn := &WindowSpecification{}
 	nn.SetKind(WindowSpecificationKind)
-	
-	if basewindowname != nil {
-		if n, ok := basewindowname.(NodeHandler); ok {
-			nn.BaseWindowName = basewindowname.(*Identifier)
-			nn.AddChild(n)
-		} else if w, ok := basewindowname.(*Wrapped); ok {
-			nn.BaseWindowName = w.Value.(*Identifier)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.BaseWindowName = basewindowname.(*Identifier)
-		}
+
+	var err error
+
+	err = nn.InitBaseWindowName(basewindowname)
+	if err != nil {
+		return nil, err
 	}
-	if partitionby != nil {
-		if n, ok := partitionby.(NodeHandler); ok {
-			nn.PartitionBy = partitionby.(*PartitionBy)
-			nn.AddChild(n)
-		} else if w, ok := partitionby.(*Wrapped); ok {
-			nn.PartitionBy = w.Value.(*PartitionBy)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.PartitionBy = partitionby.(*PartitionBy)
-		}
+
+	err = nn.InitPartitionBy(partitionby)
+	if err != nil {
+		return nil, err
 	}
-	if orderby != nil {
-		if n, ok := orderby.(NodeHandler); ok {
-			nn.OrderBy = orderby.(*OrderBy)
-			nn.AddChild(n)
-		} else if w, ok := orderby.(*Wrapped); ok {
-			nn.OrderBy = w.Value.(*OrderBy)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.OrderBy = orderby.(*OrderBy)
-		}
+
+	err = nn.InitOrderBy(orderby)
+	if err != nil {
+		return nil, err
 	}
-	if windowframe != nil {
-		if n, ok := windowframe.(NodeHandler); ok {
-			nn.WindowFrame = windowframe.(*WindowFrame)
-			nn.AddChild(n)
-		} else if w, ok := windowframe.(*Wrapped); ok {
-			nn.WindowFrame = w.Value.(*WindowFrame)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.WindowFrame = windowframe.(*WindowFrame)
-		}
+
+	err = nn.InitWindowFrame(windowframe)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *WindowSpecification) InitBaseWindowName(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.BaseWindowName = d.(*Identifier)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.BaseWindowName = w.Value.(*Identifier)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.BaseWindowName = d.(*Identifier)
+		}
+	}
+	return nil
+}
+
+func (n *WindowSpecification) InitPartitionBy(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.PartitionBy = d.(*PartitionBy)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.PartitionBy = w.Value.(*PartitionBy)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.PartitionBy = d.(*PartitionBy)
+		}
+	}
+	return nil
+}
+
+func (n *WindowSpecification) InitOrderBy(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.OrderBy = d.(*OrderBy)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.OrderBy = w.Value.(*OrderBy)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.OrderBy = d.(*OrderBy)
+		}
+	}
+	return nil
+}
+
+func (n *WindowSpecification) InitWindowFrame(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.WindowFrame = d.(*WindowFrame)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.WindowFrame = w.Value.(*WindowFrame)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.WindowFrame = d.(*WindowFrame)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewWithOffset(
 	alias interface{},
 	) (*WithOffset, error) {
-	fmt.Printf("NewWithOffset(%v)\n",alias,
-		)
+	
 	nn := &WithOffset{}
 	nn.SetKind(WithOffsetKind)
-	
-	if alias != nil {
-		if n, ok := alias.(NodeHandler); ok {
-			nn.Alias = alias.(*Alias)
-			nn.AddChild(n)
-		} else if w, ok := alias.(*Wrapped); ok {
-			nn.Alias = w.Value.(*Alias)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *WithOffset) InitAlias(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Alias = d.(*Alias)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Alias = w.Value.(*Alias)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Alias = alias.(*Alias)
+			n.Alias = d.(*Alias)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewTypeParameterList(
 	parameters interface{},
 	) (*TypeParameterList, error) {
-	fmt.Printf("NewTypeParameterList(%v)\n",parameters,
-		)
+	
 	nn := &TypeParameterList{}
 	nn.SetKind(TypeParameterListKind)
-	
-	nn.Parameters = make([]LeafHandler, 0, defaultCapacity)
-	if n, ok := parameters.(NodeHandler); ok {
-		nn.AddChild(n)
-	} else if w, ok := parameters.(*Wrapped); ok {
-		newElem := w.Value.(LeafHandler)
-		nn.Parameters = append(nn.Parameters, newElem)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		newElem := parameters.(LeafHandler)
-		nn.Parameters = append(nn.Parameters, newElem)
+
+	var err error
+
+	err = nn.InitParameters(parameters)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *TypeParameterList) InitParameters(d interface{}) error {
+	if n.Parameters != nil {
+		return fmt.Errorf("TypeParameterList.Parameters: %w",
+			ErrFieldAlreadyInitialized)
+	}
+	n.Parameters = make([]LeafHandler, 0, defaultCapacity)
+	if c, ok := d.(NodeHandler); ok {
+		n.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		newElem := w.Value.(LeafHandler)
+		n.Parameters = append(n.Parameters, newElem)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		newElem := d.(LeafHandler)
+		n.Parameters = append(n.Parameters, newElem)
+	}
+	return nil
+}
+
+
 
 
 func (n *TypeParameterList) AddChild(c NodeHandler) {
@@ -3897,50 +5632,80 @@ func NewSampleClause(
 	samplesize interface{},
 	samplesuffix interface{},
 	) (*SampleClause, error) {
-	fmt.Printf("NewSampleClause(%v, %v, %v)\n",samplemethod,
-		samplesize,
-		samplesuffix,
-		)
+	
 	nn := &SampleClause{}
 	nn.SetKind(SampleClauseKind)
-	
-	if samplemethod == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitSampleMethod(samplemethod)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := samplemethod.(NodeHandler); ok {
-		nn.SampleMethod = samplemethod.(*Identifier)
-		nn.AddChild(n)
-	} else if w, ok := samplemethod.(*Wrapped); ok {
-		nn.SampleMethod = w.Value.(*Identifier)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitSampleSize(samplesize)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitSampleSuffix(samplesuffix)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *SampleClause) InitSampleMethod(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("SampleClause.SampleMethod: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.SampleMethod = d.(*Identifier)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.SampleMethod = w.Value.(*Identifier)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.SampleMethod = samplemethod.(*Identifier)
+		n.SampleMethod = d.(*Identifier)
 	}
-	if samplesize == nil {
-		return nil, ErrMissingRequiredField
+	return nil
+}
+
+func (n *SampleClause) InitSampleSize(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("SampleClause.SampleSize: %w",
+			ErrMissingRequiredField)
 	}
-	if n, ok := samplesize.(NodeHandler); ok {
-		nn.SampleSize = samplesize.(*SampleSize)
-		nn.AddChild(n)
-	} else if w, ok := samplesize.(*Wrapped); ok {
-		nn.SampleSize = w.Value.(*SampleSize)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	if c, ok := d.(NodeHandler); ok {
+		n.SampleSize = d.(*SampleSize)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.SampleSize = w.Value.(*SampleSize)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.SampleSize = samplesize.(*SampleSize)
+		n.SampleSize = d.(*SampleSize)
 	}
-	if samplesuffix != nil {
-		if n, ok := samplesuffix.(NodeHandler); ok {
-			nn.SampleSuffix = samplesuffix.(*SampleSuffix)
-			nn.AddChild(n)
-		} else if w, ok := samplesuffix.(*Wrapped); ok {
-			nn.SampleSuffix = w.Value.(*SampleSuffix)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *SampleClause) InitSampleSuffix(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.SampleSuffix = d.(*SampleSuffix)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.SampleSuffix = w.Value.(*SampleSuffix)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.SampleSuffix = samplesuffix.(*SampleSuffix)
+			n.SampleSuffix = d.(*SampleSuffix)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
@@ -3949,49 +5714,78 @@ func NewSampleSize(
 	partitionby interface{},
 	unit interface{},
 	) (*SampleSize, error) {
-	fmt.Printf("NewSampleSize(%v, %v, %v)\n",size,
-		partitionby,
-		unit,
-		)
+	
 	nn := &SampleSize{}
 	nn.SetKind(SampleSizeKind)
-	
-	if size == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitSize(size)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := size.(NodeHandler); ok {
-		nn.Size = size.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := size.(*Wrapped); ok {
-		nn.Size = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Size = size.(ExpressionHandler)
+
+	err = nn.InitPartitionBy(partitionby)
+	if err != nil {
+		return nil, err
 	}
-	if partitionby != nil {
-		if n, ok := partitionby.(NodeHandler); ok {
-			nn.PartitionBy = partitionby.(*PartitionBy)
-			nn.AddChild(n)
-		} else if w, ok := partitionby.(*Wrapped); ok {
-			nn.PartitionBy = w.Value.(*PartitionBy)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.PartitionBy = partitionby.(*PartitionBy)
-		}
+
+	err = nn.InitUnit(unit)
+	if err != nil {
+		return nil, err
 	}
-	if unit != nil {
-		if n, ok := unit.(NodeHandler); ok {
-			nn.Unit = unit.(SampleSizeUnit)
-			nn.AddChild(n)
-		} else if w, ok := unit.(*Wrapped); ok {
-			nn.Unit = w.Value.(SampleSizeUnit)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Unit = unit.(SampleSizeUnit)
-		}
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *SampleSize) InitSize(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("SampleSize.Size: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Size = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Size = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Size = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *SampleSize) InitPartitionBy(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.PartitionBy = d.(*PartitionBy)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.PartitionBy = w.Value.(*PartitionBy)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.PartitionBy = d.(*PartitionBy)
+		}
+	}
+	return nil
+}
+
+func (n *SampleSize) InitUnit(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Unit = d.(SampleSizeUnit)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Unit = w.Value.(SampleSizeUnit)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Unit = d.(SampleSizeUnit)
+		}
+	}
+	return nil
+}
+
+
 
 
 
@@ -3999,110 +5793,168 @@ func NewSampleSuffix(
 	weight interface{},
 	repeat interface{},
 	) (*SampleSuffix, error) {
-	fmt.Printf("NewSampleSuffix(%v, %v)\n",weight,
-		repeat,
-		)
+	
 	nn := &SampleSuffix{}
 	nn.SetKind(SampleSuffixKind)
-	
-	if weight != nil {
-		if n, ok := weight.(NodeHandler); ok {
-			nn.Weight = weight.(*WithWeight)
-			nn.AddChild(n)
-		} else if w, ok := weight.(*Wrapped); ok {
-			nn.Weight = w.Value.(*WithWeight)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Weight = weight.(*WithWeight)
-		}
+
+	var err error
+
+	err = nn.InitWeight(weight)
+	if err != nil {
+		return nil, err
 	}
-	if repeat != nil {
-		if n, ok := repeat.(NodeHandler); ok {
-			nn.Repeat = repeat.(*RepeatableClause)
-			nn.AddChild(n)
-		} else if w, ok := repeat.(*Wrapped); ok {
-			nn.Repeat = w.Value.(*RepeatableClause)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-		} else {
-			nn.Repeat = repeat.(*RepeatableClause)
-		}
+
+	err = nn.InitRepeat(repeat)
+	if err != nil {
+		return nil, err
 	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *SampleSuffix) InitWeight(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Weight = d.(*WithWeight)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Weight = w.Value.(*WithWeight)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Weight = d.(*WithWeight)
+		}
+	}
+	return nil
+}
+
+func (n *SampleSuffix) InitRepeat(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Repeat = d.(*RepeatableClause)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Repeat = w.Value.(*RepeatableClause)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Repeat = d.(*RepeatableClause)
+		}
+	}
+	return nil
+}
+
+
 
 
 
 func NewWithWeight(
 	alias interface{},
 	) (*WithWeight, error) {
-	fmt.Printf("NewWithWeight(%v)\n",alias,
-		)
+	
 	nn := &WithWeight{}
 	nn.SetKind(WithWeightKind)
-	
-	if alias != nil {
-		if n, ok := alias.(NodeHandler); ok {
-			nn.Alias = alias.(*Alias)
-			nn.AddChild(n)
-		} else if w, ok := alias.(*Wrapped); ok {
-			nn.Alias = w.Value.(*Alias)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	var err error
+
+	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *WithWeight) InitAlias(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Alias = d.(*Alias)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Alias = w.Value.(*Alias)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.Alias = alias.(*Alias)
+			n.Alias = d.(*Alias)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
 
 
 
 func NewRepeatableClause(
 	argument interface{},
 	) (*RepeatableClause, error) {
-	fmt.Printf("NewRepeatableClause(%v)\n",argument,
-		)
+	
 	nn := &RepeatableClause{}
 	nn.SetKind(RepeatableClauseKind)
-	
-	if argument == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitArgument(argument)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := argument.(NodeHandler); ok {
-		nn.Argument = argument.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := argument.(*Wrapped); ok {
-		nn.Argument = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Argument = argument.(ExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *RepeatableClause) InitArgument(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("RepeatableClause.Argument: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Argument = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Argument = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Argument = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
 func NewQualify(
 	expression interface{},
 	) (*Qualify, error) {
-	fmt.Printf("NewQualify(%v)\n",expression,
-		)
+	
 	nn := &Qualify{}
 	nn.SetKind(QualifyKind)
-	
-	if expression == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitExpression(expression)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := expression.(NodeHandler); ok {
-		nn.Expression = expression.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := expression.(*Wrapped); ok {
-		nn.Expression = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
-	} else {
-		nn.Expression = expression.(ExpressionHandler)
-	}
-	return nn, nil
+
+	return nn, err
 }
+
+func (n *Qualify) InitExpression(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("Qualify.Expression: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expression = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expression = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+
 
 
 
@@ -4110,37 +5962,155 @@ func NewFormatClause(
 	format interface{},
 	timezoneexpr interface{},
 	) (*FormatClause, error) {
-	fmt.Printf("NewFormatClause(%v, %v)\n",format,
-		timezoneexpr,
-		)
+	
 	nn := &FormatClause{}
 	nn.SetKind(FormatClauseKind)
-	
-	if format == nil {
-		return nil, ErrMissingRequiredField
+
+	var err error
+
+	err = nn.InitFormat(format)
+	if err != nil {
+		return nil, err
 	}
-	if n, ok := format.(NodeHandler); ok {
-		nn.Format = format.(ExpressionHandler)
-		nn.AddChild(n)
-	} else if w, ok := format.(*Wrapped); ok {
-		nn.Format = w.Value.(ExpressionHandler)
-		nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+
+	err = nn.InitTimeZoneExpr(timezoneexpr)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *FormatClause) InitFormat(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("FormatClause.Format: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Format = d.(ExpressionHandler)
+		n.Node.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Format = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
 	} else {
-		nn.Format = format.(ExpressionHandler)
+		n.Format = d.(ExpressionHandler)
 	}
-	if timezoneexpr != nil {
-		if n, ok := timezoneexpr.(NodeHandler); ok {
-			nn.TimeZoneExpr = timezoneexpr.(ExpressionHandler)
-			nn.AddChild(n)
-		} else if w, ok := timezoneexpr.(*Wrapped); ok {
-			nn.TimeZoneExpr = w.Value.(ExpressionHandler)
-			nn.ExpandLoc(w.Loc.Start, w.Loc.End)
+	return nil
+}
+
+func (n *FormatClause) InitTimeZoneExpr(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.TimeZoneExpr = d.(ExpressionHandler)
+			n.Node.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.TimeZoneExpr = w.Value.(ExpressionHandler)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
 		} else {
-			nn.TimeZoneExpr = timezoneexpr.(ExpressionHandler)
+			n.TimeZoneExpr = d.(ExpressionHandler)
 		}
 	}
-	return nn, nil
+	return nil
 }
+
+
+
+
+
+func NewParameterExpr(
+	name interface{},
+	) (*ParameterExpr, error) {
+	
+	nn := &ParameterExpr{}
+	nn.SetKind(ParameterExprKind)
+
+	var err error
+
+	err = nn.InitName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *ParameterExpr) InitName(d interface{}) error {
+	if d != nil {
+		if c, ok := d.(NodeHandler); ok {
+			n.Name = d.(*Identifier)
+			n.Expression.AddChild(c)
+		} else if w, ok := d.(*Wrapped); ok {
+			n.Name = w.Value.(*Identifier)
+			n.ExpandLoc(w.Loc.Start, w.Loc.End)
+		} else {
+			n.Name = d.(*Identifier)
+		}
+	}
+	return nil
+}
+
+
+
+
+
+func NewAnalyticFunctionCall(
+	expr interface{},
+	windowspec interface{},
+	) (*AnalyticFunctionCall, error) {
+	
+	nn := &AnalyticFunctionCall{}
+	nn.SetKind(AnalyticFunctionCallKind)
+
+	var err error
+
+	err = nn.InitExpr(expr)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitWindowSpec(windowspec)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *AnalyticFunctionCall) InitExpr(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("AnalyticFunctionCall.Expr: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.Expr = w.Value.(ExpressionHandler)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.Expr = d.(ExpressionHandler)
+	}
+	return nil
+}
+
+func (n *AnalyticFunctionCall) InitWindowSpec(d interface{}) error {
+	if d == nil {
+		return fmt.Errorf("AnalyticFunctionCall.WindowSpec: %w",
+			ErrMissingRequiredField)
+	}
+	if c, ok := d.(NodeHandler); ok {
+		n.WindowSpec = d.(*WindowSpecification)
+		n.Expression.AddChild(c)
+	} else if w, ok := d.(*Wrapped); ok {
+		n.WindowSpec = w.Value.(*WindowSpecification)
+		n.ExpandLoc(w.Loc.Start, w.Loc.End)
+	} else {
+		n.WindowSpec = d.(*WindowSpecification)
+	}
+	return nil
+}
+
+
 
 
 
@@ -4173,6 +6143,7 @@ type Visitor interface {
 	VisitOnClause(*OnClause, interface{})
 	VisitWithClauseEntry(*WithClauseEntry, interface{})
 	VisitJoin(*Join, interface{})
+	VisitUsingClause(*UsingClause, interface{})
 	VisitWithClause(*WithClause, interface{})
 	VisitHaving(*Having, interface{})
 	VisitNamedType(*NamedType, interface{})
@@ -4204,7 +6175,7 @@ type Visitor interface {
 	VisitDotStarWithModifiers(*DotStarWithModifiers, interface{})
 	VisitExpressionSubquery(*ExpressionSubquery, interface{})
 	VisitExtractExpression(*ExtractExpression, interface{})
-	VisitIntervalExpression(*IntervalExpression, interface{})
+	VisitIntervalExpr(*IntervalExpr, interface{})
 	VisitNullOrder(*NullOrder, interface{})
 	VisitOnOrUsingClauseList(*OnOrUsingClauseList, interface{})
 	VisitParenthesizedJoin(*ParenthesizedJoin, interface{})
@@ -4220,7 +6191,7 @@ type Visitor interface {
 	VisitWindowClause(*WindowClause, interface{})
 	VisitWindowDefinition(*WindowDefinition, interface{})
 	VisitWindowFrame(*WindowFrame, interface{})
-	VisitWindowFrameExpression(*WindowFrameExpression, interface{})
+	VisitWindowFrameExpr(*WindowFrameExpr, interface{})
 	VisitLikeExpression(*LikeExpression, interface{})
 	VisitWindowSpecification(*WindowSpecification, interface{})
 	VisitWithOffset(*WithOffset, interface{})
@@ -4232,616 +6203,369 @@ type Visitor interface {
 	VisitRepeatableClause(*RepeatableClause, interface{})
 	VisitQualify(*Qualify, interface{})
 	VisitFormatClause(*FormatClause, interface{})
+	VisitParameterExpr(*ParameterExpr, interface{})
+	VisitAnalyticFunctionCall(*AnalyticFunctionCall, interface{})
 	
 }
 
 func (n *QueryStatement) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitQueryStatement %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitQueryStatement(n, d)
 }
 
 func (n *Query) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitQuery %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitQuery(n, d)
 }
 
 func (n *Select) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSelect %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSelect(n, d)
 }
 
 func (n *SelectList) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSelectList %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSelectList(n, d)
 }
 
 func (n *SelectColumn) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSelectColumn %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSelectColumn(n, d)
 }
 
 func (n *IntLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitIntLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitIntLiteral(n, d)
 }
 
 func (n *Identifier) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitIdentifier %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitIdentifier(n, d)
 }
 
 func (n *Alias) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitAlias %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitAlias(n, d)
 }
 
 func (n *PathExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitPathExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitPathExpression(n, d)
 }
 
 func (n *TablePathExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitTablePathExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitTablePathExpression(n, d)
 }
 
 func (n *FromClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitFromClause %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitFromClause(n, d)
 }
 
 func (n *WhereClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWhereClause %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWhereClause(n, d)
 }
 
 func (n *BooleanLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitBooleanLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitBooleanLiteral(n, d)
 }
 
 func (n *AndExpr) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitAndExpr %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitAndExpr(n, d)
 }
 
 func (n *BinaryExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitBinaryExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitBinaryExpression(n, d)
 }
 
 func (n *StringLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStringLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStringLiteral(n, d)
 }
 
 func (n *Star) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStar %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStar(n, d)
 }
 
 func (n *OrExpr) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitOrExpr %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitOrExpr(n, d)
 }
 
 func (n *GroupingItem) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitGroupingItem %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitGroupingItem(n, d)
 }
 
 func (n *GroupBy) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitGroupBy %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitGroupBy(n, d)
 }
 
 func (n *OrderingExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitOrderingExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitOrderingExpression(n, d)
 }
 
 func (n *OrderBy) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitOrderBy %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitOrderBy(n, d)
 }
 
 func (n *LimitOffset) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitLimitOffset %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitLimitOffset(n, d)
 }
 
 func (n *FloatLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitFloatLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitFloatLiteral(n, d)
 }
 
 func (n *NullLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitNullLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitNullLiteral(n, d)
 }
 
 func (n *OnClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitOnClause %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitOnClause(n, d)
 }
 
 func (n *WithClauseEntry) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWithClauseEntry %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWithClauseEntry(n, d)
 }
 
 func (n *Join) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitJoin %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitJoin(n, d)
 }
 
-func (n *WithClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWithClause %s\n",
-		n.SingleNodeDebugString())
+func (n *UsingClause) Accept(v Visitor, d interface{}) {
+	v.VisitUsingClause(n, d)
+}
 
+func (n *WithClause) Accept(v Visitor, d interface{}) {
 	v.VisitWithClause(n, d)
 }
 
 func (n *Having) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitHaving %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitHaving(n, d)
 }
 
 func (n *NamedType) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitNamedType %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitNamedType(n, d)
 }
 
 func (n *ArrayType) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitArrayType %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitArrayType(n, d)
 }
 
 func (n *StructField) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStructField %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStructField(n, d)
 }
 
 func (n *StructType) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStructType %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStructType(n, d)
 }
 
 func (n *CastExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitCastExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitCastExpression(n, d)
 }
 
 func (n *SelectAs) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSelectAs %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSelectAs(n, d)
 }
 
 func (n *Rollup) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitRollup %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitRollup(n, d)
 }
 
 func (n *FunctionCall) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitFunctionCall %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitFunctionCall(n, d)
 }
 
 func (n *ArrayConstructor) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitArrayConstructor %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitArrayConstructor(n, d)
 }
 
 func (n *StructConstructorArg) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStructConstructorArg %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStructConstructorArg(n, d)
 }
 
 func (n *StructConstructorWithParens) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStructConstructorWithParens %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStructConstructorWithParens(n, d)
 }
 
 func (n *StructConstructorWithKeyword) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStructConstructorWithKeyword %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStructConstructorWithKeyword(n, d)
 }
 
 func (n *InExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitInExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitInExpression(n, d)
 }
 
 func (n *InList) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitInList %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitInList(n, d)
 }
 
 func (n *BetweenExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitBetweenExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitBetweenExpression(n, d)
 }
 
 func (n *NumericLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitNumericLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitNumericLiteral(n, d)
 }
 
 func (n *BigNumericLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitBigNumericLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitBigNumericLiteral(n, d)
 }
 
 func (n *BytesLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitBytesLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitBytesLiteral(n, d)
 }
 
 func (n *DateOrTimeLiteral) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitDateOrTimeLiteral %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitDateOrTimeLiteral(n, d)
 }
 
 func (n *CaseValueExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitCaseValueExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitCaseValueExpression(n, d)
 }
 
 func (n *CaseNoValueExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitCaseNoValueExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitCaseNoValueExpression(n, d)
 }
 
 func (n *ArrayElement) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitArrayElement %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitArrayElement(n, d)
 }
 
 func (n *BitwiseShiftExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitBitwiseShiftExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitBitwiseShiftExpression(n, d)
 }
 
 func (n *DotGeneralizedField) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitDotGeneralizedField %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitDotGeneralizedField(n, d)
 }
 
 func (n *DotIdentifier) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitDotIdentifier %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitDotIdentifier(n, d)
 }
 
 func (n *DotStar) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitDotStar %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitDotStar(n, d)
 }
 
 func (n *DotStarWithModifiers) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitDotStarWithModifiers %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitDotStarWithModifiers(n, d)
 }
 
 func (n *ExpressionSubquery) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitExpressionSubquery %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitExpressionSubquery(n, d)
 }
 
 func (n *ExtractExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitExtractExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitExtractExpression(n, d)
 }
 
-func (n *IntervalExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitIntervalExpression %s\n",
-		n.SingleNodeDebugString())
-
-	v.VisitIntervalExpression(n, d)
+func (n *IntervalExpr) Accept(v Visitor, d interface{}) {
+	v.VisitIntervalExpr(n, d)
 }
 
 func (n *NullOrder) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitNullOrder %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitNullOrder(n, d)
 }
 
 func (n *OnOrUsingClauseList) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitOnOrUsingClauseList %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitOnOrUsingClauseList(n, d)
 }
 
 func (n *ParenthesizedJoin) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitParenthesizedJoin %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitParenthesizedJoin(n, d)
 }
 
 func (n *PartitionBy) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitPartitionBy %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitPartitionBy(n, d)
 }
 
 func (n *SetOperation) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSetOperation %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSetOperation(n, d)
 }
 
 func (n *StarExceptList) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStarExceptList %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStarExceptList(n, d)
 }
 
 func (n *StarModifiers) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStarModifiers %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStarModifiers(n, d)
 }
 
 func (n *StarReplaceItem) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStarReplaceItem %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStarReplaceItem(n, d)
 }
 
 func (n *StarWithModifiers) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitStarWithModifiers %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitStarWithModifiers(n, d)
 }
 
 func (n *TableSubquery) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitTableSubquery %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitTableSubquery(n, d)
 }
 
 func (n *UnaryExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitUnaryExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitUnaryExpression(n, d)
 }
 
 func (n *UnnestExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitUnnestExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitUnnestExpression(n, d)
 }
 
 func (n *WindowClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWindowClause %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWindowClause(n, d)
 }
 
 func (n *WindowDefinition) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWindowDefinition %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWindowDefinition(n, d)
 }
 
 func (n *WindowFrame) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWindowFrame %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWindowFrame(n, d)
 }
 
-func (n *WindowFrameExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWindowFrameExpression %s\n",
-		n.SingleNodeDebugString())
-
-	v.VisitWindowFrameExpression(n, d)
+func (n *WindowFrameExpr) Accept(v Visitor, d interface{}) {
+	v.VisitWindowFrameExpr(n, d)
 }
 
 func (n *LikeExpression) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitLikeExpression %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitLikeExpression(n, d)
 }
 
 func (n *WindowSpecification) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWindowSpecification %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWindowSpecification(n, d)
 }
 
 func (n *WithOffset) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWithOffset %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWithOffset(n, d)
 }
 
 func (n *TypeParameterList) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitTypeParameterList %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitTypeParameterList(n, d)
 }
 
 func (n *SampleClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSampleClause %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSampleClause(n, d)
 }
 
 func (n *SampleSize) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSampleSize %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSampleSize(n, d)
 }
 
 func (n *SampleSuffix) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitSampleSuffix %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitSampleSuffix(n, d)
 }
 
 func (n *WithWeight) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitWithWeight %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitWithWeight(n, d)
 }
 
 func (n *RepeatableClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitRepeatableClause %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitRepeatableClause(n, d)
 }
 
 func (n *Qualify) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitQualify %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitQualify(n, d)
 }
 
 func (n *FormatClause) Accept(v Visitor, d interface{}) {
-	fmt.Printf("VisitFormatClause %s\n",
-		n.SingleNodeDebugString())
-
 	v.VisitFormatClause(n, d)
+}
+
+func (n *ParameterExpr) Accept(v Visitor, d interface{}) {
+	v.VisitParameterExpr(n, d)
+}
+
+func (n *AnalyticFunctionCall) Accept(v Visitor, d interface{}) {
+	v.VisitAnalyticFunctionCall(n, d)
 }
 
 
@@ -4854,697 +6578,451 @@ type Operation struct {
 
 func (o *Operation) VisitQueryStatement(n *QueryStatement, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitQuery(n *Query, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSelect(n *Select, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSelectList(n *SelectList, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSelectColumn(n *SelectColumn, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitIntLiteral(n *IntLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitIdentifier(n *Identifier, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitAlias(n *Alias, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitPathExpression(n *PathExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitTablePathExpression(n *TablePathExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitFromClause(n *FromClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWhereClause(n *WhereClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitBooleanLiteral(n *BooleanLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitAndExpr(n *AndExpr, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitBinaryExpression(n *BinaryExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStringLiteral(n *StringLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStar(n *Star, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitOrExpr(n *OrExpr, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitGroupingItem(n *GroupingItem, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitGroupBy(n *GroupBy, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitOrderingExpression(n *OrderingExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitOrderBy(n *OrderBy, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitLimitOffset(n *LimitOffset, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitFloatLiteral(n *FloatLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitNullLiteral(n *NullLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitOnClause(n *OnClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWithClauseEntry(n *WithClauseEntry, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitJoin(n *Join, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
+		c.Accept(o.visitor, d)
+	}
+}
+func (o *Operation) VisitUsingClause(n *UsingClause, d interface{}) {
+	for _, c := range n.Children() {
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWithClause(n *WithClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitHaving(n *Having, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitNamedType(n *NamedType, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitArrayType(n *ArrayType, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStructField(n *StructField, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStructType(n *StructType, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitCastExpression(n *CastExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSelectAs(n *SelectAs, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitRollup(n *Rollup, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitFunctionCall(n *FunctionCall, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitArrayConstructor(n *ArrayConstructor, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStructConstructorArg(n *StructConstructorArg, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStructConstructorWithParens(n *StructConstructorWithParens, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStructConstructorWithKeyword(n *StructConstructorWithKeyword, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitInExpression(n *InExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitInList(n *InList, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitBetweenExpression(n *BetweenExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitNumericLiteral(n *NumericLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitBigNumericLiteral(n *BigNumericLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitBytesLiteral(n *BytesLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitDateOrTimeLiteral(n *DateOrTimeLiteral, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitCaseValueExpression(n *CaseValueExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitCaseNoValueExpression(n *CaseNoValueExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitArrayElement(n *ArrayElement, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitBitwiseShiftExpression(n *BitwiseShiftExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitDotGeneralizedField(n *DotGeneralizedField, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitDotIdentifier(n *DotIdentifier, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitDotStar(n *DotStar, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitDotStarWithModifiers(n *DotStarWithModifiers, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitExpressionSubquery(n *ExpressionSubquery, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitExtractExpression(n *ExtractExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
-func (o *Operation) VisitIntervalExpression(n *IntervalExpression, d interface{}) {
+func (o *Operation) VisitIntervalExpr(n *IntervalExpr, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitNullOrder(n *NullOrder, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitOnOrUsingClauseList(n *OnOrUsingClauseList, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitParenthesizedJoin(n *ParenthesizedJoin, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitPartitionBy(n *PartitionBy, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSetOperation(n *SetOperation, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStarExceptList(n *StarExceptList, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStarModifiers(n *StarModifiers, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStarReplaceItem(n *StarReplaceItem, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitStarWithModifiers(n *StarWithModifiers, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitTableSubquery(n *TableSubquery, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitUnaryExpression(n *UnaryExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitUnnestExpression(n *UnnestExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWindowClause(n *WindowClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWindowDefinition(n *WindowDefinition, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWindowFrame(n *WindowFrame, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
-func (o *Operation) VisitWindowFrameExpression(n *WindowFrameExpression, d interface{}) {
+func (o *Operation) VisitWindowFrameExpr(n *WindowFrameExpr, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitLikeExpression(n *LikeExpression, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWindowSpecification(n *WindowSpecification, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWithOffset(n *WithOffset, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitTypeParameterList(n *TypeParameterList, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSampleClause(n *SampleClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSampleSize(n *SampleSize, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitSampleSuffix(n *SampleSuffix, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitWithWeight(n *WithWeight, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitRepeatableClause(n *RepeatableClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitQualify(n *Qualify, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
 		c.Accept(o.visitor, d)
 	}
 }
 func (o *Operation) VisitFormatClause(n *FormatClause, d interface{}) {
 	for _, c := range n.Children() {
-		fmt.Printf("%s -> %s\n",
-			n.SingleNodeDebugString(),
-			c.(NodeStringer).SingleNodeDebugString())
+		c.Accept(o.visitor, d)
+	}
+}
+func (o *Operation) VisitParameterExpr(n *ParameterExpr, d interface{}) {
+	for _, c := range n.Children() {
+		c.Accept(o.visitor, d)
+	}
+}
+func (o *Operation) VisitAnalyticFunctionCall(n *AnalyticFunctionCall, d interface{}) {
+	for _, c := range n.Children() {
 		c.Accept(o.visitor, d)
 	}
 }
@@ -5581,6 +7059,7 @@ const (
 	OnClauseKind
 	WithClauseEntryKind
 	JoinKind
+	UsingClauseKind
 	WithClauseKind
 	HavingKind
 	NamedTypeKind
@@ -5612,7 +7091,7 @@ const (
 	DotStarWithModifiersKind
 	ExpressionSubqueryKind
 	ExtractExpressionKind
-	IntervalExpressionKind
+	IntervalExprKind
 	NullOrderKind
 	OnOrUsingClauseListKind
 	ParenthesizedJoinKind
@@ -5628,7 +7107,7 @@ const (
 	WindowClauseKind
 	WindowDefinitionKind
 	WindowFrameKind
-	WindowFrameExpressionKind
+	WindowFrameExprKind
 	LikeExpressionKind
 	WindowSpecificationKind
 	WithOffsetKind
@@ -5639,7 +7118,9 @@ const (
 	WithWeightKind
 	RepeatableClauseKind
 	QualifyKind
-	FormatClauseKind)
+	FormatClauseKind
+	ParameterExprKind
+	AnalyticFunctionCallKind)
 
 func (k NodeKind) String() string {
 	switch k {
@@ -5699,6 +7180,8 @@ func (k NodeKind) String() string {
 		return "WithClauseEntry"
 	case JoinKind:
 		return "Join"
+	case UsingClauseKind:
+		return "UsingClause"
 	case WithClauseKind:
 		return "WithClause"
 	case HavingKind:
@@ -5761,8 +7244,8 @@ func (k NodeKind) String() string {
 		return "ExpressionSubquery"
 	case ExtractExpressionKind:
 		return "ExtractExpression"
-	case IntervalExpressionKind:
-		return "IntervalExpression"
+	case IntervalExprKind:
+		return "IntervalExpr"
 	case NullOrderKind:
 		return "NullOrder"
 	case OnOrUsingClauseListKind:
@@ -5793,8 +7276,8 @@ func (k NodeKind) String() string {
 		return "WindowDefinition"
 	case WindowFrameKind:
 		return "WindowFrame"
-	case WindowFrameExpressionKind:
-		return "WindowFrameExpression"
+	case WindowFrameExprKind:
+		return "WindowFrameExpr"
 	case LikeExpressionKind:
 		return "LikeExpression"
 	case WindowSpecificationKind:
@@ -5817,6 +7300,10 @@ func (k NodeKind) String() string {
 		return "Qualify"
 	case FormatClauseKind:
 		return "FormatClause"
+	case ParameterExprKind:
+		return "ParameterExpr"
+	case AnalyticFunctionCallKind:
+		return "AnalyticFunctionCall"
  	}
 	panic("unexpected kind")
  }

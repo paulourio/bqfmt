@@ -7,9 +7,47 @@ string_literal:
     | _raw_string
     ;
 
+bytes_literal:
+      _bytes_prefix _triple_quoted_string
+    | _bytes_prefix _quoted_string
+    | _raw_bytes
+    ;
+
+/* Boolean literals */
+boolean_literal:
+      ( 'f' | 'F' ) ( 'a' | 'A' ) ( 'l' | 'L' ) ( 's' | 'S' ) ( 'e' | 'E' )
+    | ( 't' | 'T' ) ( 'r' | 'R' ) ( 'u' | 'U' ) ( 'e' | 'E' )
+    ;
+
+/* Integer literals */
+integer_literal:
+      ( _decimal_literal | _hex_literal )
+    ;
+
+/* Floating-point literals */
+floating_point_literal:
+      _decimals '.' [ _decimals ] [ _exponent ]
+    | _decimals _exponent
+    | '.' _decimals [ _exponent ]
+    ;
+
 /* Date or time literals */
 date:
       ( 'd' | 'D' ) ( 'a' | 'A' ) ( 't' | 'T' ) ( 'e' | 'E' )
+    ;
+
+datetime:
+      ( 'd' | 'D' ) ( 'a' | 'A' ) ( 't' | 'T' ) ( 'e' | 'E' )
+      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'e' | 'E' )
+    ;
+
+time:
+      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'e' | 'E' )
+    ;
+
+timestamp:
+      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'e' | 'E' )
+      ( 's' | 'S' ) ( 't' | 'T' ) ( 'a' | 'A' ) ( 'm' | 'M' ) ( 'p' | 'P' )
     ;
 
 /* Numeric and decimal prefixes */
@@ -20,26 +58,329 @@ numeric_or_decimal:
       ( 'm' | 'M' ) ( 'a' | 'A' ) ( 'l' | 'L' )
     ;
 
-select:
-      ( 's' | 'S' ) ( 'e' | 'E' ) ( 'l' | 'L' ) ( 'e' | 'E' )
+bignumeric_or_bigdecimal:
+      ( 'b' | 'B' ) ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'n' | 'N' ) ( 'u' | 'U' )
+      ( 'm' | 'M' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'i' | 'I' ) ( 'c' | 'C' )
+    | ( 'b' | 'B' ) ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'd' | 'D' ) ( 'e' | 'E' )
+      ( 'c' | 'C' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'a' | 'A' ) ( 'l' | 'L' )
+    ;
+
+/* Array and struct literals prefix */
+array:
+      ( 'a' | 'A' ) ( 'r' | 'R' ) ( 'r' | 'R' ) ( 'a' | 'A' ) ( 'y' | 'Y' )
+    ;
+
+struct:
+      ( 's' | 'S' ) ( 't' | 'T' ) ( 'r' | 'R' ) ( 'u' | 'U' )
       ( 'c' | 'C' ) ( 't' | 'T' )
     ;
 
-not:
-      ( 'n' | 'N' ) ( 'o' | 'O' ) ( 't' | 'T' )
+/* Case-insensitive words */
+null:
+      ( 'n' | 'N' ) ( 'u' | 'U' ) ( 'l' | 'L' ) ( 'l' | 'L' )
+    ;
+
+format:
+      ( 'f' | 'F' ) ( 'o' | 'O' ) ( 'r' | 'R' )
+      ( 'm' | 'M' ) ( 'a' | 'A' ) ( 't' | 'T' )
+    ;
+
+select:
+      ( 's' | 'S' ) ( 'e' | 'E' ) ( 'l' | 'L' ) ( 'e' | 'E' )
+      ( 'c' | 'C' ) ( 't' | 'T' )
     ;
 
 from:
       ( 'f' | 'F' ) ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'm' | 'M' )
     ;
 
+with:
+      ( 'w' | 'W' ) ( 'i' | 'I' ) ( 't' | 'T' ) ( 'h' | 'H' )
+    ;
+
+as:
+      ( 'a' | 'A' ) ( 's' | 'S' )
+    ;
+
+to:
+      ( 't' | 'T' ) ( 'o' | 'O' )
+    ;
+
+and:
+      ( 'a' | 'A' ) ( 'n' | 'N' ) ( 'd' | 'D' )
+    ;
+
+or:
+      ( 'o' | 'O' ) ( 'r' | 'R' )
+    ;
+
+is:
+      ( 'i' | 'I' ) ( 's' | 'S' )
+    ;
+
+in:
+      ( 'i' | 'I' ) ( 'n' | 'N' )
+    ;
+
+intersect:
+      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 't' | 'T' ) ( 'e' | 'E' ) ( 'r' | 'R' )
+      ( 's' | 'S' ) ( 'e' | 'E' ) ( 'c' | 'C' ) ( 't' | 'T' )
+    ;
+
+union:
+      ( 'u' | 'U' ) ( 'n' | 'N' ) ( 'i' | 'I' ) ( 'o' | 'O' ) ( 'n' | 'N' )
+    ;
+
+like:
+      ( 'u' | 'U' ) ( 'n' | 'N' ) ( 'i' | 'I' ) ( 'o' | 'O' ) ( 'n' | 'N' )
+    ;
+
+not:
+      ( 'n' | 'N' ) ( 'o' | 'O' ) ( 't' | 'T' )
+    ;
+
+row:
+      ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'w' | 'W' )
+    ;
+
+rows:
+      ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'w' | 'W' ) ( 's' | 'S' )
+    ;
+
+range:
+      ( 'r' | 'R' ) ( 'a' | 'A' ) ( 'n' | 'N' ) ( 'g' | 'G' ) ( 'e' | 'E' )
+    ;
+
+following:
+      ( 'f' | 'F' ) ( 'o' | 'O' ) ( 'l' | 'L' ) ( 'l' | 'L' )
+      ( 'o' | 'O' ) ( 'w' | 'W' ) ( 'i' | 'I' ) ( 'n' | 'N' )
+      ( 'g' | 'G' )
+    ;
+
+preceding:
+      ( 'p' | 'P' ) ( 'r' | 'R' ) ( 'e' | 'E' ) ( 'c' | 'C' )
+      ( 'e' | 'E' ) ( 'd' | 'D' ) ( 'i' | 'I' ) ( 'n' | 'N' )
+      ( 'g' | 'G' )
+    ;
+
+current:
+      ( 'c' | 'C' ) ( 'u' | 'U' ) ( 'r' | 'R' ) ( 'r' | 'R' )
+      ( 'e' | 'E' ) ( 'n' | 'N' ) ( 't' | 'T' )
+    ;
+
+partition:
+      ( 'p' | 'P' ) ( 'a' | 'A' ) ( 'r' | 'R' ) ( 't' | 'T' ) ( 'i' | 'I' )
+      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'o' | 'O' ) ( 'n' | 'N' )
+    ;
+
+between:
+      ( 'b' | 'B' ) ( 'e' | 'E' ) ( 't' | 'T' ) ( 'w' | 'W' )
+      ( 'e' | 'E' ) ( 'e' | 'E' ) ( 'n' | 'N' )
+    ;
+
+respect:
+      ( 'r' | 'R' ) ( 'e' | 'E' ) ( 's' | 'S' ) ( 'p' | 'P' )
+      ( 'e' | 'E' ) ( 'c' | 'C' ) ( 't' | 'T' )
+    ;
+
+ignore:
+      ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'n' | 'N' ) ( 'o' | 'O' )
+      ( 'r' | 'R' ) ( 'e' | 'E' )
+    ;
+
+nulls:
+      ( 'n' | 'N' ) ( 'u' | 'U' ) ( 'l' | 'L' ) ( 'l' | 'L' )
+      ( 's' | 'S' )
+    ;
+
+unbounded:
+      ( 'u' | 'U' ) ( 'n' | 'N' ) ( 'b' | 'B' ) ( 'o' | 'O' ) ( 'u' | 'U' )
+      ( 'n' | 'N' ) ( 'd' | 'D' ) ( 'e' | 'E' ) ( 'd' | 'D' )
+    ;
+
+all:
+      ( 'a' | 'A' ) ( 'l' | 'L' ) ( 'l' | 'L' )
+    ;
+
+distinct:
+      ( 'd' | 'D' ) ( 'i' | 'I' ) ( 's' | 'S' )
+      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'n' | 'N' )
+      ( 'c' | 'C' ) ( 't' | 'T' )
+    ;
+
+except:
+      ( 'e' | 'E' ) ( 'x' | 'X' ) ( 'c' | 'C' ) ( 'e' | 'E' )
+      ( 'p' | 'P' ) ( 't' | 'T' )
+    ;
+
+first:
+      ( 'f' | 'F' ) ( 'i' | 'I' ) ( 'r' | 'R' ) ( 's' | 'S' ) ( 't' | 'T' )
+    ;
+
+last:
+      ( 'l' | 'L' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 't' | 'T' )
+    ;
+
+replace:
+      ( 'r' | 'R' ) ( 'e' | 'E' ) ( 'p' | 'P' ) ( 'l' | 'L' ) ( 'a' | 'A' )
+      ( 'c' | 'C' ) ( 'e' | 'E' )
+    ;
+
+cast:
+      ( 'c' | 'C' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 't' | 'T' )
+    ;
+
+group:
+      ( 'g' | 'G' ) ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'u' | 'U' ) ( 'p' | 'P' )
+    ;
+
+having:
+      ( 'h' | 'H' ) ( 'a' | 'A' ) ( 'v' | 'V' )
+      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 'g' | 'G' )
+    ;
+
+order:
+      ( 'o' | 'O' ) ( 'r' | 'R' ) ( 'd' | 'D' ) ( 'e' | 'E' ) ( 'r' | 'R' )
+    ;
+
+by:
+      ( 'b' | 'B' ) ( 'y' | 'Y' )
+    ;
+
+asc:
+      ( 'a' | 'A' ) ( 's' | 'S' ) ( 'c' | 'C' )
+    ;
+
+desc:
+      ( 'd' | 'D' ) ( 'e' | 'E' ) ( 's' | 'S' ) ( 'c' | 'C' )
+    ;
+
+limit:
+      ( 'l' | 'L' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'i' | 'I' ) ( 't' | 'T' )
+    ;
+
+offset:
+      ( 'o' | 'O' ) ( 'f' | 'F' ) ( 'f' | 'F' )
+      ( 's' | 'S' ) ( 'e' | 'E' ) ( 't' | 'T' )
+    ;
+
+at:
+      ( 'a' | 'A' ) ( 't' | 'T' )
+    ;
+
+zone:
+      ( 'z' | 'Z' ) ( 'o' | 'O' ) ( 'n' | 'N' ) ( 'e' | 'E' )
+    ;
+
+case:
+      ( 'c' | 'C' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 'e' | 'E' )
+    ;
+
+when:
+      ( 'w' | 'W' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'n' | 'N' )
+    ;
+
+then:
+      ( 't' | 'T' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'n' | 'N' )
+    ;
+
+else:
+      ( 'e' | 'E' ) ( 'l' | 'L' ) ( 's' | 'S' ) ( 'e' | 'E' )
+    ;
+
+end:
+      ( 'e' | 'E' ) ( 'n' | 'N' ) ( 'd' | 'D' )
+    ;
+
+unnest:
+      ( 'u' | 'U' ) ( 'n' | 'N' )
+      ( 'n' | 'N' ) ( 'e' | 'E' ) ( 's' | 'S' ) ( 't' | 'T' )
+    ;
+
+join:
+      ( 'j' | 'J' ) ( 'o' | 'O' ) ( 'i' | 'I' ) ( 'n' | 'N' )
+    ;
+
+cross:
+      ( 'c' | 'C' ) ( 'r' | 'R' ) ( 'o' | 'O' ) ( 's' | 'S' ) ( 's' | 'S' )
+    ;
+
+tablesample:
+      ( 't' | 'T' ) ( 'a' | 'A' ) ( 'b' | 'B' ) ( 'l' | 'L' ) ( 'e' | 'E' )
+      ( 's' | 'S' ) ( 'a' | 'A' ) ( 'm' | 'M' ) ( 'p' | 'P' ) ( 'l' | 'L' )
+      ( 'e' | 'E' )
+    ;
+
+percent:
+      ( 'p' | 'P' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'c' | 'C' ) ( 'e' | 'E' )
+      ( 'n' | 'N' ) ( 't' | 'T' )
+    ;
+
+repeatable:
+      ( 'r' | 'R' ) ( 'e' | 'E' ) ( 'p' | 'P' ) ( 'e' | 'E' ) ( 'a' | 'A' )
+      ( 't' | 'T' ) ( 'a' | 'A' ) ( 'b' | 'B' ) ( 'l' | 'L' ) ( 'e' | 'E' )
+    ;
+
+
+full:
+      ( 'f' | 'F' ) ( 'u' | 'U' ) ( 'l' | 'L' ) ( 'l' | 'L' )
+    ;
+
+outer:
+      ( 'o' | 'O' ) ( 'u' | 'U' ) ( 't' | 'T' ) ( 'e' | 'E' ) ( 'r' | 'R' )
+    ;
+
+left:
+      ( 'l' | 'L' ) ( 'e' | 'E' ) ( 'f' | 'F' ) ( 't' | 'T' )
+    ;
+
+right:
+      ( 'r' | 'R' ) ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'h' | 'H' ) ( 't' | 'T' )
+    ;
+
+inner:
+      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 'n' | 'N' ) ( 'e' | 'E' ) ( 'r' | 'R' )
+    ;
+
+using:
+      ( 'u' | 'U' ) ( 's' | 'S' ) ( 'i' | 'I' ) ( 'n' | 'N' ) ( 'g' | 'G' )
+    ;
+
+on:
+      ( 'o' | 'O' ) ( 'n' | 'N' )
+    ;
+
 where:
       ( 'w' | 'W' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'e' | 'E' )
     ;
 
-/* Integer literals */
-integer_literal:
-      ( _decimal_literal | _hex_literal )
+weight:
+      ( 'w' | 'W' ) ( 'e' | 'E' ) ( 'i' | 'I' )
+      ( 'g' | 'G' ) ( 'h' | 'H' ) ( 't' | 'T' )
+    ;
+
+window:
+      ( 'w' | 'W' ) ( 'i' | 'I' ) ( 'n' | 'N' )
+      ( 'd' | 'D' ) ( 'o' | 'O' ) ( 'w' | 'W' )
+    ;
+
+extract:
+      ( 'e' | 'E' ) ( 'x' | 'X' ) ( 't' | 'T' ) ( 'r' | 'R' )
+      ( 'a' | 'A' ) ( 'c' | 'C' ) ( 't' | 'T' )
+    ;
+
+over:
+      ( 'o' | 'O' ) ( 'v' | 'V' ) ( 'e' | 'E' ) ( 'r' | 'R' )
+    ;
+
+interval:
+      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 't' | 'T' ) ( 'e' | 'E' ) ( 'r' | 'R' )
+      ( 'v' | 'V' ) ( 'a' | 'A' ) ( 'l' | 'L' )
+    ;
+
+qualify:
+      ( 'q' | 'Q' ) ( 'u' | 'U' ) ( 'a' | 'A' ) ( 'l' | 'L' ) ( 'i' | 'I' )
+      ( 'f' | 'F' ) ( 'y' | 'Y' )
     ;
 
 _decimal_literal:
@@ -200,6 +541,28 @@ _symbol:
     | '/' | '~' | '<' | '>' | '"' | '\\' | '\''
     ;
 
+
+_raw_bytes:
+      _raw_bytes_prefix _raw_string_value
+    ;
+
+_bytes_prefix:
+      ( 'b' | 'B' )
+    ;
+
+_raw_bytes_prefix:
+      ( 'r' | 'R' ) ( 'b' | 'B' )
+    | ( 'b' | 'B' ) ( 'r' | 'R' )
+    ;
+
+_decimals:
+      _decimal_digit { _decimal_digit }
+    ;
+
+_exponent:
+      ( 'e' | 'E' ) [ '+' | '-' ] _decimals
+    ;
+
 !whitespace:
       ' ' | '\t' | '\n' | '\r' | '\u00a0'
     ;
@@ -208,13 +571,22 @@ _symbol:
 
 <<
 import (
+    "math"
+
     "github.com/paulourio/bqfmt/zetasql/ast"
 	"github.com/paulourio/bqfmt/zetasql/token"
 )
 
-func UpdateLoc(n ast.NodeHandler, a Attrib) {
-    tok := a.(*token.Token)
-    n.ExpandLoc(tok.Pos.Offset, tok.Pos.Offset + len(tok.Lit))
+func UpdateLoc(node Attrib, tokens ...Attrib) (Attrib, error) {
+    n := node.(ast.NodeHandler)
+    for _, t := range tokens {
+        if t == nil {
+            continue
+        }
+        tok := t.(*token.Token)
+        n.ExpandLoc(tok.Pos.Offset, tok.Pos.Offset + len(tok.Lit))
+    }
+    return n, nil
 }
 
 func WithExtraChild(a Attrib, c Attrib) (Attrib, error) {
@@ -224,10 +596,24 @@ func WithExtraChild(a Attrib, c Attrib) (Attrib, error) {
     return a, nil
 }
 
-func WrapWithLoc(a Attrib, t Attrib) (Attrib, error) {
-    tok := t.(*token.Token)
-    start := tok.Pos.Offset
-    end := tok.Pos.Offset + len(tok.Lit)
+func WrapWithLoc(a Attrib, tokens ...Attrib) (Attrib, error) {
+    start := math.MaxInt
+    end := 0
+
+    for _, t := range tokens {
+        if t == nil {
+            continue
+        }
+        tok := t.(*token.Token)
+        s := tok.Pos.Offset
+        e := s + len(tok.Lit)
+        if s < start {
+            start = s
+        }
+        if e > end {
+            end = e
+        }
+    }
     return ast.WrapWithLoc(a, start, end)
 }
 
@@ -237,22 +623,6 @@ func InitLiteral(lit ast.LeafHandler, t Attrib) (Attrib, error) {
     lit.SetStartLoc(tok.Pos.Offset)
     lit.SetEndLoc(tok.Pos.Offset + len(tok.Lit))
     return lit, nil
-}
-
-func InitIntLiteral(t Attrib) (Attrib, error) {
-    lit, err := ast.NewIntLiteral()
-    if err != nil {
-        return nil, err
-    }
-    return InitLiteral(lit, t)
-}
-
-func InitStringLiteral(t Attrib) (Attrib, error) {
-    lit, err := ast.NewStringLiteral()
-    if err != nil {
-        return nil, err
-    }
-    return InitLiteral(lit, t)
 }
 
 func NewDashedIdentifier(lhs Attrib, rhs Attrib) (*ast.Identifier, error) {
@@ -353,6 +723,14 @@ SelectListPrefix:
 SelectColumn:
       Expression
       << ast.NewSelectColumn($0, nil) >>
+    | Expression as Alias
+      << ast.NewSelectColumn($0, $2) >>
+    | Expression Alias
+      << ast.NewSelectColumn($0, $1) >>
+    ;
+
+Alias:
+      Identifier << ast.NewAlias($0) >>
     ;
 
 OptFromClause:
@@ -363,8 +741,7 @@ OptFromClause:
           if err != nil {
               return nil, err
           }
-          UpdateLoc(f, $0)
-          return f, nil
+          return UpdateLoc(f, $0)
       }()
       >>
     | empty
@@ -391,10 +768,27 @@ WhereClause:
 
 FromClauseContents:
       TablePrimary
+    | FromClauseContents "," TablePrimary
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewJoin($0, $2, nil, ast.CommaJoin)
+          if err != nil {
+              return nil, err
+          }
+          c.ContainsCommaJoin = true
+          // Not sure why, but reference implementation sets start
+          // location at the comma token.
+          c.SetStartLoc($1.(*token.Token).Offset)
+          return c, nil
+      }()
+      >>
+    | FromClauseContents JoinType join TablePrimary OptOnOrUsingClauseList
+      << ast.NewJoin($0, $3, $4, $1) >>
     ;
 
 TablePrimary:
       TablePathExpression
+    | TableSubquery
     ;
 
 TablePathExpression:
@@ -406,11 +800,277 @@ TablePathExpressionBase:
       MaybeDashedPathExpression
     ;
 
+TableSubquery:
+      "(" Query ")" OptPivotOrUnpivotClauseAndAlias OptSampleClause
+      <<
+      func() (Attrib, error) {
+        t, err := ast.NewTableSubquery($1, $3, $4)
+        if err != nil {
+            return nil, err
+        }
+        t.Subquery.IsNested = true
+        UpdateLoc(t, $0)
+        UpdateLoc(t, $2)
+        return t, nil
+      }()
+      >>
+    ;
+
+OptPivotOrUnpivotClauseAndAlias:
+      as Alias << UpdateLoc($1, $0) >>
+    | Alias
+    | empty
+    ;
+
+OptOrderByClause:
+      OrderByClausePrefix
+    | empty
+    ;
+
+OrderByClausePrefix:
+      order by OrderingExpression
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewOrderBy($2)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $0)
+      }()
+      >>
+    | OrderByClausePrefix "," OrderingExpression
+      << WithExtraChild($0, $2) >>
+    ;
+
+OrderingExpression:
+      Expression OptAscOrDesc OptNullOrder
+      << ast.NewOrderingExpression($0, $1, $3) >>
+    ;
+
+OptAscOrDesc:
+      asc   << WrapWithLoc(ast.AscendingOrder, $0) >>
+    | desc  << WrapWithLoc(ast.DescendingOrder, $0) >>
+    | empty << WrapWithLoc(ast.NoOrderingSpec, $0) >>
+    ;
+
+OptNullOrder:
+      nulls first
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewNullOrder(true)
+          if err != nil {
+            return nil, err
+          }
+          return UpdateLoc(e, $0, $1)
+      }()
+      >>
+    | nulls last
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewNullOrder(false)
+          if err != nil {
+            return nil, err
+          }
+          return UpdateLoc(e, $0, $1)
+      }()
+      >>
+    | empty
+    ;
+
+OptLimitOffsetClause:
+      limit PossiblyCastIntLiteralOrParameter
+      offset PossiblyCastIntLiteralOrParameter
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewLimitOffset($1, $3)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $0)
+      }()
+      >>
+    | limit PossiblyCastIntLiteralOrParameter
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewLimitOffset($1, nil)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $0)
+      }()
+      >>
+    | empty
+    ;
+
+WindowSpecification:
+      Identifier
+      << ast.NewWindowSpecification($0, nil, nil, nil) >>
+    | "("
+      OptIdentifier
+      OptPartitionByClause
+      OptOrderByClause
+      OptWindowFrameClause
+      ")"
+      <<
+      func() (Attrib, error) {
+          w, err := ast.NewWindowSpecification($1, $2, $3, $4)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(w, $0, $5)
+      }()
+      >>
+    ;
+
+OptIdentifier:
+      Identifier
+    | empty
+    ;
+
+OptPartitionByClause:
+      PartitionByClause
+    | empty
+    ;
+
+PartitionByClause:
+      PartitionByClausePrefix
+    ;
+
+PartitionByClausePrefix:
+      partition by Expression
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewPartitionBy($2)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $0)
+      }()
+      >>
+    | PartitionByClausePrefix "," Expression
+      << WithExtraChild($0, $2) >>
+    ;
+
+OptWindowFrameClause:
+      FrameUnit between WindowFrameBound and WindowFrameBound
+    | FrameUnit WindowFrameBound
+    | empty
+    ;
+
+FrameUnit:
+      rows   << WrapWithLoc(ast.Rows, $0) >>
+    | range  << WrapWithLoc(ast.Range, $0) >>
+    ;
+
+WindowFrameBound:
+      unbounded preceding
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewWindowFrameExpr(nil, ast.UnboundedPreceding)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0, $1)
+      }()
+      >>
+    | unbounded following
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewWindowFrameExpr(nil, ast.UnboundedFollowing)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0, $1)
+      }()
+      >>
+    | current row
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewWindowFrameExpr(nil, ast.CurrentRow)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0, $1)
+      }()
+      >>
+    | Expression PrecedingOrFollowing
+      << ast.NewWindowFrameExpr($0, $1) >>
+    ;
+
+PrecedingOrFollowing:
+      preceding  << WrapWithLoc(ast.OffsetPreceding, $0) >>
+    | following  << WrapWithLoc(ast.OffsetFollowing, $0) >>
+    ;
+
+IntervalExpression:
+      interval Expression Identifier
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewIntervalExpr($1, $2, nil)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    | interval Expression Identifier to Identifier
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewIntervalExpr($1, $2, $3)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    ;
+
+LikeOperator:
+      like     << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
+    | not like << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
+    ;
+
+InOperator:
+      in      << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
+    | not in  << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
+    ;
+
+IsOperator:
+      is      << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
+    | is not  << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
+    ;
+
+Type:
+      RawType OptTypeParameters
+    ;
+
+RawType:
+      TypeName
+    ;
+
+TypeName:
+      PathExpression
+      << ast.NewNamedType($0, nil) >>
+    ;
+
 Expression:
       IntegerLiteral
     | StringLiteral
+    | FunctionCallExpressionWithClauses
     | Identifier
       << ast.NewPathExpression($0) >>
+    | Expression "." Identifier
+      <<
+      func() (Attrib, error) {
+          e := $0.(ast.ExpressionHandler)
+          if e.Kind() == ast.PathExpressionKind && !e.IsParenthesized() {
+              e.AddChild($2.(ast.NodeHandler))
+              return e, nil
+          }
+          return ast.NewDotIdentifier($0, $2)
+      }()
+      >>
+    | ParenthesizedExpression
     | Expression AdditiveOperator Expression2
       << ast.NewBinaryExpression($1, $0, $2, false) >>
     | Expression2
@@ -447,13 +1107,69 @@ AdditiveOperator:
     ;
 
 IntegerLiteral:
-      integer_literal << InitIntLiteral($0) >>
+      integer_literal
+      <<
+      func () (Attrib, error) {
+          lit, err := ast.NewIntLiteral()
+          if err != nil {
+              return nil, err
+          }
+          return InitLiteral(lit, $0)
+      }()
+      >>
     ;
 
 StringLiteral:
-      string_literal << InitStringLiteral($0) >>
+      string_literal
+      <<
+      func () (Attrib, error) {
+          lit, err := ast.NewStringLiteral()
+          if err != nil {
+              return nil, err
+          }
+          return InitLiteral(lit, $0)
+      }()
+      >>
     ;
 
+FloatingPointLiteral:
+      floating_point_literal
+      <<
+      func () (Attrib, error) {
+          lit, err := ast.NewFloatLiteral()
+          if err != nil {
+              return nil, err
+          }
+          return InitLiteral(lit, $0)
+      }()
+      >>
+    ;
+
+BytesLiteral:
+      bytes_literal
+      <<
+      func () (Attrib, error) {
+          lit, err := ast.NewBytesLiteral()
+          if err != nil {
+              return nil, err
+          }
+          return InitLiteral(lit, $0)
+      }()
+      >>
+    ;
+
+BooleanLiteral:
+      boolean_literal
+      <<
+      func () (Attrib, error) {
+          lit, err := ast.NewBooleanLiteral()
+          if err != nil {
+              return nil, err
+          }
+          return InitLiteral(lit, $0)
+      }()
+      >>
+    ;
 
 MaybeDashedPathExpression:
       PathExpression
@@ -487,4 +1203,372 @@ Identifier:
 KeywordAsIdentifier:
       date
     | numeric_or_decimal
+    | extract
     ;
+
+ParenthesizedExpression:
+      "(" Expression ")"
+      <<
+      func() (Attrib, error) {
+          e := $1.(ast.ExpressionHandler)
+          e.SetParenthesized(true)
+          UpdateLoc(e, $0)
+          UpdateLoc(e, $2)
+          return e, nil
+       }() >>
+    ;
+
+OptSampleClause:
+      SampleClause
+    | empty
+    ;
+
+SampleClause:
+      tablesample Identifier "(" SampleSize ")" OptSampleClauseSuffix
+      <<
+      func() (Attrib, error) {
+        s, err := ast.NewSampleClause($1, $2, $3)
+        if err != nil { return nil, err }
+        UpdateLoc(s, $0)
+        UpdateLoc(s, $4)
+        return s, nil
+      }()
+      >>
+    ;
+
+SampleSize:
+      SampleSizeValue SampleSizeUnit OptPartitionByClause
+      << ast.NewSampleSize($0, $1, $2) >>
+    ;
+
+SampleSizeValue:
+      PossiblyCastIntLiteralOrParameter
+    | FloatingPointLiteral
+    ;
+
+SampleSizeUnit:
+      rows     << WrapWithLoc(ast.RowsSampling, $0) >>
+    | percent  << WrapWithLoc(ast.PercentSampling, $0) >>
+    ;
+
+OptSampleClauseSuffix:
+      RepeatableClause
+      << ast.NewSampleSuffix(nil, $0) >>
+    | with weight OptRepeatableClause
+      <<
+      func() (Attrib, error) {
+          s, err := ast.NewSampleSuffix(nil, $2)
+          if err != nil { return nil, err }
+          return UpdateLoc(s, $0)
+      }()
+      >>
+    | with weight Alias OptRepeatableClause
+      <<
+      func() (Attrib, error) {
+          s, err := ast.NewSampleSuffix($2, $3)
+          if err != nil { return nil, err }
+          return UpdateLoc(s, $0)
+      }()
+      >>
+    | with weight as Alias OptRepeatableClause
+      <<
+      func() (Attrib, error) {
+          s, err := ast.NewSampleSuffix($3, $4)
+          if err != nil { return nil, err }
+          return UpdateLoc(s, $0)
+      }()
+      >>
+    | empty
+    ;
+
+OptRepeatableClause:
+      RepeatableClause
+    | empty
+    ;
+
+RepeatableClause:
+      repeatable "(" PossiblyCastIntLiteralOrParameter ")"
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewRepeatableClause($2)
+          if err != nil { return nil, err }
+          UpdateLoc(c, $0, $3)
+          return c, nil
+      }()
+      >>
+    ;
+
+PossiblyCastIntLiteralOrParameter:
+      CastIntLiteralOrParameter
+    | IntLiteralOrParameter
+    ;
+
+CastIntLiteralOrParameter:
+      cast "(" IntLiteralOrParameter as Type OptFormat ")"
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewCastExpression($2, $4, $5, false)
+          if err != nil { return nil, err }
+          UpdateLoc(e, $0, $6)
+          return e, nil
+      }()
+      >>
+    ;
+
+IntLiteralOrParameter:
+      IntegerLiteral
+    | ParameterExpression
+    ;
+
+ParameterExpression:
+      NamedParameterExpression
+    ;
+
+NamedParameterExpression:
+      "@" Identifier
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewParameterExpr($0)
+          if err != nil { return nil, err }
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    | "@" KeywordAsIdentifier
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewParameterExpr($0)
+          if err != nil { return nil, err }
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    ;
+
+OptFormat:
+      format Expression OptAtTimeZone
+      <<
+      func() (Attrib, error) {
+          f, err := ast.NewFormatClause($1, $2)
+          if err != nil { return nil, err }
+          return UpdateLoc(f, $0)
+      }()
+      >>
+    | empty
+    ;
+
+OptAtTimeZone:
+      at time zone Expression << $3, nil >>
+    | empty
+    ;
+
+OptPartitionByClause:
+      PartitionByClause
+    | empty
+    ;
+
+PartitionByClause:
+      PartitionByClausePrefix
+    ;
+
+PartitionByClausePrefix:
+      partition by Expression
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewPartitionBy($2)
+          if err != nil { return nil, err }
+          return UpdateLoc(c, $0)
+      }()
+      >>
+    | PartitionByClausePrefix "," Expression
+      << WithExtraChild($0, $2) >>
+    ;
+
+OptTypeParameters:
+      empty
+    | TypeParametersPrefix ")"
+    | TypeParametersPrefix "," ")"
+    ;
+
+TypeParametersPrefix:
+      "(" TypeParameter
+      << UpdateLoc($1.(ast.NodeHandler), $0) >>
+    | TypeParametersPrefix "," TypeParameter
+    ;
+
+TypeParameter:
+      IntegerLiteral
+    | BooleanLiteral
+    | StringLiteral
+    | BytesLiteral
+    | FloatingPointLiteral
+    ;
+
+OptOnOrUsingClauseList:
+      OnOrUsingClause
+      << ast.NewOnOrUsingClauseList($0) >>
+    | OptOnOrUsingClauseList OnOrUsingClause
+      << WithExtraChild($0, $1) >>
+    ;
+
+OnOrUsingClause:
+      OnClause
+    | UsingClause
+    ;
+
+OnClause:
+      on Expression << $1, nil >>
+    ;
+
+UsingClause:
+      UsingClausePrefix ")"
+    ;
+
+UsingClausePrefix:
+      using "(" Identifier
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewUsingClause($2)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $0)
+      }()
+      >>
+    | UsingClausePrefix "," Identifier
+      << WithExtraChild($0, $2) >>
+    ;
+
+JoinType:
+      cross           << WrapWithLoc(ast.CrossJoin, $0) >>
+    | full OptOuter   << WrapWithLoc(ast.FullJoin, $0, $1) >>
+    | inner           << WrapWithLoc(ast.InnerJoin, $0) >>
+    | left OptOuter   << WrapWithLoc(ast.LeftJoin, $0, $1) >>
+    | right OptOuter  << WrapWithLoc(ast.RightJoin, $0, $1) >>
+    | empty OptOuter  << WrapWithLoc(ast.DefaultJoin, $0, $1) >>
+    ;
+
+OptOuter:
+      outer
+    | empty
+    ;
+
+FunctionCallExpressionWithClauses:
+      FunctionCallExpression OptOverClause
+      <<
+      func() (Attrib, error) {
+          if $1 != nil {
+              return ast.NewAnalyticFunctionCall($0, $1)
+          }
+          return $0, nil
+      }()
+      >>
+    ;
+
+FunctionCallExpression:
+      /* Empty argument list */
+      FunctionCallExpressionBase
+      OptOrderByClause
+      OptLimitOffsetClause
+      ")"
+      <<
+      func() (Attrib, error) {
+          f := $0.(*ast.FunctionCall)
+          if $1 != nil {
+              err := f.InitOrderBy($1)
+              if err != nil {
+                  return nil, err
+              }
+          }
+          if $2 != nil {
+              err := f.InitLimitOffset($2)
+              if err != nil {
+                  return nil, err
+              }
+          }
+          return UpdateLoc(f, $3)
+      }()
+      >>
+      /* Non-empty argument list. */
+    | FunctionCallExpressionWithArgsPrefix
+      OptNullHandlingModifier
+      OptOrderByClause
+      OptLimitOffsetClause
+      ")"
+      <<
+      func() (Attrib, error) {
+          f := $0.(*ast.FunctionCall)
+          if $1 != nil {
+              err := f.InitNullHandlingModifier($1)
+              if err != nil {
+                  return nil, err
+              }
+          }
+          if $2 != nil {
+              err := f.InitOrderBy($2)
+              if err != nil {
+                  return nil, err
+              }
+          }
+          if $3 != nil {
+              err := f.InitLimitOffset($3)
+              if err != nil {
+                  return nil, err
+              }
+          }
+          return UpdateLoc(f, $4)
+      }()
+      >>
+    ;
+
+FunctionCallExpressionWithArgsPrefix:
+      FunctionCallExpressionBase FunctionCallArgument
+      << WithExtraChild($0, $1) >>
+    | FunctionCallExpressionWithArgsPrefix "," FunctionCallArgument
+      << WithExtraChild($0, $2) >>
+    ;
+
+FunctionCallExpressionBase:
+      Expression "(" distinct
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewFunctionCall($0, true)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $2)
+      }()
+      >>
+    | Expression "("
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewFunctionCall($0, false)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $1)
+      }()
+      >>
+    ;
+
+FunctionCallArgument:
+      Expression
+    ;
+
+OptNullHandlingModifier:
+      ignore nulls
+      << WrapWithLoc(ast.IgnoreNulls, $0, $1) >>
+    | respect nulls
+      << WrapWithLoc(ast.RespectNulls, $0, $1) >>
+    | empty
+      << ast.DefaultNullHandling, nil >>
+    ;
+
+OptOverClause:
+      OverClause
+    | empty
+    ;
+
+OverClause:
+      over WindowSpecification
+      << UpdateLoc($1, $0) >>
+    ;
+

@@ -23,6 +23,10 @@ class Field:
     comment: Optional[str] = None
     init: bool = True  # Whether the field should be required in New()
 
+    def __post_init__(self):
+        if self.field_loader == FieldLoader.REQUIRED:
+            assert self.init, 'required fields must be present in the init'
+
     @property
     def arg_name(self):
         arg_name = self.name.lower()
@@ -94,7 +98,7 @@ class TreeGenerator:
 
 def make_comment(text: str, indent: int, width: int) -> str:
     assert isinstance(text, str)
-    prefix = '\n' + ' '*indent + '// '
+    prefix = '\n' + '\t'*(indent//4) + '// '
     return prefix.join(textwrap.wrap('// ' + text, width - 3))
 
 
@@ -138,7 +142,8 @@ def main():
                 comment=(
                     'LimitOffset applies, if present, after the result '
                     'of QueryExpr and OrderBy.'
-                ))
+                )),
+            Field('IsNested', 'bool', init=False),
         ])
 
     gen.add_node(
@@ -241,7 +246,7 @@ def main():
         name='BooleanLiteral',
         composition='Leaf',
         fields=[
-            Field('Value', 'bool')
+            Field('Value', 'bool', init=False)
         ])
 
     gen.add_node(
@@ -372,6 +377,14 @@ def main():
             Field('RHS', 'TableExpressionHandler', FieldLoader.REQUIRED),
             Field('ClauseList', '*OnOrUsingClauseList'),
             Field('JoinType', 'JoinType'),
+            Field('ContainsCommaJoin', 'bool', init=False),
+        ])
+
+    gen.add_node(
+        name='UsingClause',
+        composition='Node',
+        fields=[
+            Field('keys', '*Identifier', FieldLoader.REPEATED),
         ])
 
     gen.add_node(
@@ -454,26 +467,30 @@ def main():
         name='FunctionCall',
         composition='Expression',
         fields=[
-            Field('Function', '*PathExpression', FieldLoader.REQUIRED),
-            Field('Arguments', 'ExpressionHandler', FieldLoader.REPEATED),
+            Field('Function', 'ExpressionHandler', FieldLoader.REQUIRED),
+            Field('Arguments', 'ExpressionHandler', FieldLoader.REPEATED,
+                  init=False),
             Field(
                 'OrderBy',
                 '*OrderBy',
                 comment=(
                     'OrderBy is set when the function is called with '
-                    'FUNC(args ORDER BY cols).')),
+                    'FUNC(args ORDER BY cols).'),
+                init=False),
             Field(
                 'LimitOffset',
                 '*LimitOffset',
                 comment=(
                     'LimitOffset is set when the function is called '
-                    'with FUNC(args LIMIT n).')),
+                    'with FUNC(args LIMIT n).'),
+                init=False),
             Field(
                 'NullHandlingModifier',
                 'NullHandlingModifier',
                 comment=(
                     'NullHandlingModifier is set when the function is '
-                    'called with FUNC(args {IGNORE|RESPECT} NULLS).')),
+                    'called with FUNC(args {IGNORE|RESPECT} NULLS).'),
+                init=False),
             Field(
                 'Distinct',
                 'bool',
@@ -664,7 +681,7 @@ def main():
             'PathExpression instead.'),
         fields=[
             Field('Expr', 'ExpressionHandler', FieldLoader.REQUIRED),
-            Field('Path', '*PathExpression', FieldLoader.REQUIRED),
+            Field('Name', '*Identifier', FieldLoader.REQUIRED),
         ])
 
     gen.add_node(
@@ -716,7 +733,7 @@ def main():
         ])
 
     gen.add_node(
-        name='IntervalExpression',
+        name='IntervalExpr',
         composition='Expression',
         fields=[
             Field('IntervalValue', 'ExpressionHandler', FieldLoader.REQUIRED),
@@ -856,13 +873,13 @@ def main():
         name='WindowFrame',
         composition='Node',
         fields=[
-            Field('StartExpr', '*WindowFrameExpression', FieldLoader.REQUIRED),
-            Field('EndExpr', '*WindowFrameExpression', FieldLoader.REQUIRED),
+            Field('StartExpr', '*WindowFrameExpr', FieldLoader.REQUIRED),
+            Field('EndExpr', '*WindowFrameExpr', FieldLoader.REQUIRED),
             Field('FrameUnit', 'FrameUnit', FieldLoader.REQUIRED),
         ])
 
     gen.add_node(
-        name='WindowFrameExpression',
+        name='WindowFrameExpr',
         composition='Node',
         fields=[
             Field(
@@ -964,6 +981,20 @@ def main():
             Field('TimeZoneExpr', 'ExpressionHandler'),
         ])
 
+    gen.add_node(
+        name='ParameterExpr',
+        composition='Expression',
+        fields=[
+            Field('Name', '*Identifier'),
+        ])
+
+    gen.add_node(
+        name='AnalyticFunctionCall',
+        composition='Expression',
+        fields=[
+            Field('Expr', 'ExpressionHandler', FieldLoader.REQUIRED),
+            Field('WindowSpec', '*WindowSpecification', FieldLoader.REQUIRED),
+        ])
 
     gen.generate('.')
 
