@@ -1,0 +1,49 @@
+run:
+  skip-files:
+    - zetasql/lexer/acttab.go
+    - zetasql/lexer/lexer.go
+    - zetasql/lexer/transitiontable.go
+    - zetasql/parser/action.go
+    - zetasql/parser/actiontable.go
+    - zetasql/parser/context.go
+    - zetasql/parser/gototable.go
+    - zetasql/parser/productionstable.go
+
+linters:
+  enable:
+    - asciicheck
+    - bidichk
+    - cyclop
+    - deadcode
+    - dogsled
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - exhaustivestruct
+    - exportloopref
+    - forbidigo
+    - gci
+    - goconst
+    - gocritic
+    - godox
+    - gomnd
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - paralleltest
+    - staticcheck
+    - structcheck
+    - testpackage
+    - typecheck
+    - unused
+    - varcheck
+    - wsl
+
+linters-settings:
+
+  lll:
+    line-length: 80

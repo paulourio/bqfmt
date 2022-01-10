@@ -29,17 +29,10 @@ func New{{ node.name }}(
 	{% for field in node.fields if field.init -%}
 	{{ field.arg_name }} interface{},
 	{% endfor -%}) (*{{ node.name }}, error) {
-	{# fmt.Printf("New{{ node.name }}(
-		{%- for field in node.fields if field.init -%}
-		  %v{{ ', ' if not loop.last -}}
-		{%- endfor %})\n",
-		{%- for field in node.fields if field.init -%}
-		{{ field.arg_name }},
-		{% endfor -%}) #}
+	var err error
+
 	nn := &{{ node.name }}{}
 	nn.SetKind({{ node.name }}Kind)
-
-	var err error
 
 	{% for field in node.fields if field.init -%}
 	err = nn.Init{{ field.name }}({{ field.arg_name }})
@@ -47,25 +40,41 @@ func New{{ node.name }}(
 		return nil, err
 	}
 
-	{% endfor -%}
+	{% endfor %}
 	return nn, err
 }
 
 {% for field in node.fields -%}
 func (n *{{ node.name }}) Init{{ field.name }}(d interface{}) error {
+	{% if field.field_loader == FieldLoader.REPEATED -%}
+	if n.{{ field.name }} != nil {
+		return fmt.Errorf("{{ node.name }}.{{ field.name}}: %w",
+			ErrFieldAlreadyInitialized)
+	}
+
+	n.{{ field.name }} = make([]{{ field.type }}, 0, defaultCapacity)
+
+	{% endif -%}
+	return n.init{{ field.name }}(d)
+}
+
+func (n *{{ node.name }}) init{{ field.name }}(d interface{}) error {
 	{% if field.field_loader == FieldLoader.OPTIONAL -%}
 	switch t := d.(type) {
 	case nil:
 	{% if not field.scalar -%}
 	case NodeHandler:
-		n.{{ field.name }} = d.({{ field.type }}) {# Cannot cast t here #}
+		n.{{ field.name }} = d.({{ field.type }}) {# Cannot cast `t` here #}
 		n.{{ node.composition }}.AddChild(t)
 	{% endif -%}
 	case *Wrapped:
-		n.{{ field.name }} = t.Value.({{ field.type }})
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.init{{ field.name }}(t.Value)
 	default:
 		n.{{ field.name }} = d.({{ field.type }})
+		{% if not field.scalar -%}
+		n.{{ node.composition }}.AddChild(d.(NodeHandler))
+		{% endif -%}
 	}
 	{%- elif field.field_loader == FieldLoader.REQUIRED -%}
 	switch t := d.(type) {
@@ -73,29 +82,29 @@ func (n *{{ node.name }}) Init{{ field.name }}(d interface{}) error {
 	case nil:
 		return fmt.Errorf("{{ node.name }}.{{ field.name}}: %w",
 			ErrMissingRequiredField)
-	case NodeHandler:
-		n.{{ field.name }} = d.({{ field.type }}) {# Cannot cast t here #}
-		n.{{ node.composition }}.AddChild(t)
 	{% endif -%}
 	case *Wrapped:
-		n.{{ field.name }} = t.Value.({{ field.type }})
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.init{{ field.name }}(t.Value)
+	{% if not field.scalar -%}
+	case NodeHandler:
+		n.{{ field.name }} = d.({{ field.type }}) {# Cannot cast `t` here #}
+		n.{{ node.composition }}.AddChild(t)
+	{% endif -%}
 	default:
 		n.{{ field.name }} = d.({{ field.type }})
+		{% if not field.scalar -%}
+		n.{{ node.composition }}.AddChild(d.(NodeHandler))
+		{% endif -%}
 	}
 	{%- elif field.field_loader == FieldLoader.REPEATED -%}
-	if n.{{ field.name }} != nil {
-		return fmt.Errorf("{{ node.name }}.{{ field.name}}: %w",
-			ErrFieldAlreadyInitialized)
-	}
-	n.{{ field.name }} = make([]{{ field.type }}, 0, defaultCapacity)
+
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.init{{ field.name }}(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.({{ field.type }})
-		n.{{ field.name }} = append(n.{{ field.name }}, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -105,6 +114,7 @@ func (n *{{ node.name }}) Init{{ field.name }}(d interface{}) error {
 		n.{{ field.name }} = append(n.{{ field.name }}, newElem)
 	}
 	{%- endif %}
+
 	return nil
 }
 
@@ -113,7 +123,12 @@ func (n *{{ node.name }}) Init{{ field.name }}(d interface{}) error {
 {% for field in node.fields -%}
 {%- if field.field_loader == FieldLoader.REPEATED %}
 func (n *{{ node.name }}) AddChild(c NodeHandler) {
+	{% if field.type == 'NodeHandler' -%}
+	n.{{ field.name }} = append(n.{{ field.name }}, c)
+	{% else -%}
 	n.{{ field.name }} = append(n.{{ field.name }}, c.({{ field.type }}))
+	{%- endif %}
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -123,7 +138,13 @@ func (n *{{ node.name }}) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
+		{% if field.type == 'NodeHandler' -%}
+		n.{{ field.name }} = append(n.{{ field.name }}, c)
+		{% else -%}
 		n.{{ field.name }} = append(n.{{ field.name }}, c.({{ field.type }}))
+		{%- endif %}
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -207,6 +228,7 @@ func (k NodeKind) String() string {
 		return "{{ node.name }}"
 	{%- endfor %}
  	}
+
 	panic("unexpected kind")
  }
 

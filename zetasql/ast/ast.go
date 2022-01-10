@@ -26,6 +26,7 @@ type NodeHandler interface {
 	IsSQLStatement() bool
 
 	// Location range of the parsed SQL.
+	GetLoc() Loc
 	StartLoc() int
 	EndLoc() int
 	SetStartLoc(int)
@@ -186,9 +187,14 @@ func (n *Node) AddChild(c NodeHandler) {
 	n.ExpandLoc(c.StartLoc(), c.EndLoc())
 }
 
+func (n *Node) GetLoc() Loc {
+	return n.Loc
+}
+
 func (n *Node) ExpandLoc(start int, end int) {
 	s := n.StartLoc()
 	e := n.EndLoc()
+
 	if s == 0 && e == 0 {
 		n.SetStartLoc(start)
 		n.SetEndLoc(end)
@@ -221,6 +227,7 @@ func (n *Node) SingleNodeDebugString() string {
 func (n *Node) DebugString(sql string) string {
 	d := newDumper(n, "\n", 256, sql)
 	d.Dump()
+
 	return d.String()
 }
 
@@ -276,20 +283,44 @@ func (e *LikeExpression) IsAllowedInComparison() bool {
 }
 
 func (n *BinaryExpression) SingleNodeDebugString() string {
-	return fmt.Sprintf("%s(%v)", n.kind.String(), n.Op)
+	var kind string = n.Op.String()
+
+	if n.IsNot {
+		switch n.Op {
+		case BinaryIs:
+			kind = "IS NOT"
+		case BinaryLike:
+			kind = "NOT LIKE"
+		}
+	}
+
+	return fmt.Sprintf("%s(%s)", n.kind.String(), kind)
 }
 
 func (n *UnaryExpression) SingleNodeDebugString() string {
 	return fmt.Sprintf("%s(%v)", n.kind.String(), n.Op)
 }
 
+func (n *BetweenExpression) SingleNodeDebugString() string {
+	return fmt.Sprintf("%s(BETWEEN)", n.kind.String())
+}
+
 func (n *Identifier) SingleNodeDebugString() string {
 	return fmt.Sprintf("%s(%s)", n.kind.String(),
-		toIdentifierLiteral(n.IDString))
+		ToIdentifierLiteral(n.IDString))
 }
 
 func (n *Join) SingleNodeDebugString() string {
 	return fmt.Sprintf("%s(%v)", n.kind.String(), n.JoinType)
+}
+
+func (n *FunctionCall) SingleNodeDebugString() string {
+	var opts string
+	if n.Distinct {
+		opts = "(distinct=true)"
+	}
+
+	return fmt.Sprintf("%s%s", n.kind.String(), opts)
 }
 
 func (n *CastExpression) SingleNodeDebugString() string {
@@ -297,6 +328,7 @@ func (n *CastExpression) SingleNodeDebugString() string {
 	if n.IsSafeCast {
 		opts = "(return_null_on_error=true)"
 	}
+
 	return fmt.Sprintf("%s%s", n.kind.String(), opts)
 }
 
@@ -308,6 +340,7 @@ func (n *BooleanLiteral) SetImage(v string) {
 	} else {
 		n.Value = false
 	}
+
 	n.image = v
 }
 

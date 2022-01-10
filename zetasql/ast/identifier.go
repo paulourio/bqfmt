@@ -1,6 +1,6 @@
 package ast
 
-func toIdentifierLiteral(id string) string {
+func ToIdentifierLiteral(id string) string {
 	if len(id) > 0 && id[0] == '`' {
 		return id
 	}
@@ -9,7 +9,7 @@ func toIdentifierLiteral(id string) string {
 		return id
 	}
 
-	// TODO: need to escape string?
+	// TODO: escape quoted identifier
 	return "`" + id + "`"
 }
 
@@ -29,7 +29,6 @@ func IsValidUnquotedIdentifier(id string) bool {
 	}
 
 	return !IsReservedKeyword(id)
-
 }
 
 func isLetter(c byte) bool {

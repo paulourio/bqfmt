@@ -59,6 +59,7 @@ func (o BinaryOp) String() string {
 	case BinaryLike:
 		return "LIKE"
 	}
+
 	panic("unknown binary op")
 }
 
@@ -85,6 +86,7 @@ func (o UnaryOp) String() string {
 	case UnaryPlus:
 		return "+"
 	}
+
 	panic("unknown unary op")
 }
 
@@ -125,6 +127,7 @@ func (t JoinType) String() string {
 	case RightJoin:
 		return "RIGHT"
 	}
+
 	panic("unknown join type")
 }
 
@@ -199,4 +202,11 @@ type NotKeyword bool
 const (
 	NotKeywordAbsent  NotKeyword = false
 	NotKeywordPresent NotKeyword = true
+)
+
+type ShiftOp int
+
+const (
+	LeftShift ShiftOp = iota
+	RightShift
 )

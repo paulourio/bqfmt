@@ -132,7 +132,7 @@ union:
     ;
 
 like:
-      ( 'u' | 'U' ) ( 'n' | 'N' ) ( 'i' | 'I' ) ( 'o' | 'O' ) ( 'n' | 'N' )
+      ( 'l' | 'L' ) ( 'i' | 'I' ) ( 'k' | 'K' ) ( 'e' | 'E' )
     ;
 
 not:
@@ -576,104 +576,10 @@ _exponent:
 
 <<
 import (
-    "math"
-
     "github.com/paulourio/bqfmt/zetasql/ast"
-	"github.com/paulourio/bqfmt/zetasql/token"
+	  "github.com/paulourio/bqfmt/zetasql/errors"
+	  "github.com/paulourio/bqfmt/zetasql/token"
 )
-
-func UpdateLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
-    n := node.(ast.NodeHandler)
-    for _, t := range tokens {
-        if t == nil {
-            continue
-        }
-        tok := t.(*token.Token)
-        n.ExpandLoc(tok.Pos.Offset, tok.Pos.Offset + len(tok.Lit))
-    }
-
-    return n, nil
-}
-
-func WithExtraChild(a Attrib, c Attrib) (Attrib, error) {
-    node := a.(ast.NodeHandler)
-    child := c.(ast.NodeHandler)
-
-    node.AddChild(child)
-
-    return a, nil
-}
-
-func WrapWithLoc(a Attrib, tokens ...Attrib) (Attrib, error) {
-    start := math.MaxInt
-    end := 0
-
-    for _, t := range tokens {
-        if t == nil {
-            continue
-        }
-        tok := t.(*token.Token)
-        s := tok.Pos.Offset
-        e := s + len(tok.Lit)
-        if s < start {
-            start = s
-        }
-        if e > end {
-            end = e
-        }
-    }
-
-    return ast.WrapWithLoc(a, start, end)
-}
-
-func List(a ...Attrib) []interface{} {
-    r := make([]interface{}, 0, len(a))
-    for _, e := range a {
-       r = append(r, e.(interface{}))
-    }
-
-    return r
-}
-
-func InitLiteral(lit ast.LeafHandler, t Attrib) (Attrib, error) {
-    tok := t.(*token.Token)
-    lit.SetImage(string(tok.Lit))
-    lit.SetStartLoc(tok.Pos.Offset)
-    lit.SetEndLoc(tok.Pos.Offset + len(tok.Lit))
-    return lit, nil
-}
-
-func NewDashedIdentifier(lhs Attrib, rhs Attrib) (*ast.Identifier, error) {
-    a := lhs.(*token.Token)
-    b := rhs.(*token.Token)
-    expected := len(a.Lit) + 1
-    actual := b.Offset - a.Offset + 1
-
-    if expected != actual {
-      return nil, ast.ErrInvalidDashedIdentifier
-    }
-
-    if a.Lit[0] == '`' || b.Lit[0] == '`' {
-      return nil, ast.ErrInvalidDashedIdentifier
-    }
-
-    r := append(a.Lit, '-')
-    r = append(r, b.Lit...)
-
-    value := string(r)
-    return ast.NewIdentifier(value)
-}
-
-func NewIdentifier(a Attrib) (Attrib, error) {
-    tok := a.(*token.Token)
-    wrapped, err := WrapWithLoc(string(tok.Lit), tok)
-
-    if err != nil {
-        return nil, err
-    }
-
-    return ast.NewIdentifier(wrapped)
-}
 >>
 
 StartMode:
@@ -726,6 +632,7 @@ Select:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(s, $0)
       }()
       >>
@@ -753,6 +660,7 @@ SelectColumn:
           if err != nil {
               return nil, err
           }
+
           return ast.NewSelectColumn($0, a)
       }()
       >>
@@ -765,11 +673,14 @@ SelectColumn:
           if err != nil {
               return nil, err
           }
+
           s.SetImage("*")
+
           c, err := UpdateLoc(s, $0)
           if err != nil {
               return nil, err
           }
+
           return ast.NewSelectColumn(c, nil)
       }()
       >>
@@ -787,6 +698,7 @@ OptFromClause:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(f, $0)
       }()
       >>
@@ -806,6 +718,7 @@ WhereClause:
           if err != nil {
               return nil, err
           }
+
           UpdateLoc(f, $0)
           return f, nil
       }()
@@ -821,10 +734,13 @@ FromClauseContents:
           if err != nil {
               return nil, err
           }
+
           c.ContainsCommaJoin = true
+
           // Not sure why, but reference implementation sets start
           // location at the comma token.
           c.SetStartLoc($1.(*token.Token).Offset)
+
           return c, nil
       }()
       >>
@@ -839,32 +755,95 @@ TablePrimary:
 
 TablePathExpression:
       TablePathExpressionBase
-      << ast.NewTablePathExpression($0, nil, nil) >>
+      OptPivotOrUnpivotClauseAndAlias
+      OptWithOffsetAndAlias
+      OptSampleClause
+      << NewTablePathExpression($0, $1, $2, $3) >>
     ;
 
 TablePathExpressionBase:
-      MaybeDashedPathExpression
+      UnnestExpression
+    | MaybeDashedPathExpression
+    ;
+
+
+UnnestExpression:
+      unnest "(" Expression ")"
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewUnnestExpression($2)
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(e, $0, $3)
+      }()
+      >>
     ;
 
 TableSubquery:
       "(" Query ")" OptPivotOrUnpivotClauseAndAlias OptSampleClause
       <<
       func() (Attrib, error) {
-        t, err := ast.NewTableSubquery($1, $3, $4)
-        if err != nil {
-            return nil, err
-        }
-        t.Subquery.IsNested = true
-        UpdateLoc(t, $0)
-        UpdateLoc(t, $2)
-        return t, nil
+          p := $3.(*pivotOrUnpivotAndAlias)
+
+          t, err := ast.NewTableSubquery(
+              $1, p.Alias, p.PivotClause, p.UnpivotClause, $4)
+          if err != nil {
+              return nil, err
+          }
+
+          t.Subquery.IsNested = true
+
+          UpdateLoc(t, $0)
+          UpdateLoc(t, $2)
+
+          return t, nil
       }()
       >>
     ;
 
 OptPivotOrUnpivotClauseAndAlias:
-      as Alias << UpdateLoc($1, $0) >>
+      as Alias
+      <<
+      func() (Attrib, error) {
+          a, err := UpdateLoc($1, $0)
+          if err != nil {
+              return nil, err
+          }
+
+          return &pivotOrUnpivotAndAlias{Alias: a}, nil
+      }()
+      >>
     | Alias
+      << &pivotOrUnpivotAndAlias{Alias: $0}, nil >>
+    | empty
+      << &pivotOrUnpivotAndAlias{}, nil >>
+    ;
+
+OptWithOffsetAndAlias:
+      with offset OptAsAlias
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewWithOffset($2)
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    | empty
+    ;
+
+OptAsAlias:
+      OptAs Alias
+      << UpdateLoc($1, $0) >>
+    | empty
+    ;
+
+OptAs:
+      as
     | empty
     ;
 
@@ -881,6 +860,7 @@ OrderByClausePrefix:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(c, $0)
       }()
       >>
@@ -907,6 +887,7 @@ OptNullOrder:
           if err != nil {
             return nil, err
           }
+
           return UpdateLoc(e, $0, $1)
       }()
       >>
@@ -917,6 +898,7 @@ OptNullOrder:
           if err != nil {
             return nil, err
           }
+
           return UpdateLoc(e, $0, $1)
       }()
       >>
@@ -932,6 +914,7 @@ OptLimitOffsetClause:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(c, $0)
       }()
       >>
@@ -942,6 +925,7 @@ OptLimitOffsetClause:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(c, $0)
       }()
       >>
@@ -963,6 +947,7 @@ WindowSpecification:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(w, $0, $5)
       }()
       >>
@@ -990,6 +975,7 @@ PartitionByClausePrefix:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(c, $0)
       }()
       >>
@@ -1016,6 +1002,7 @@ WindowFrameBound:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(e, $0, $1)
       }()
       >>
@@ -1026,6 +1013,7 @@ WindowFrameBound:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(e, $0, $1)
       }()
       >>
@@ -1036,6 +1024,7 @@ WindowFrameBound:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(e, $0, $1)
       }()
       >>
@@ -1056,6 +1045,7 @@ IntervalExpression:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(e, $0)
       }()
       >>
@@ -1066,24 +1056,10 @@ IntervalExpression:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(e, $0)
       }()
       >>
-    ;
-
-LikeOperator:
-      like     << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
-    | not like << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
-    ;
-
-InOperator:
-      in      << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
-    | not in  << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
-    ;
-
-IsOperator:
-      is      << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
-    | is not  << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
     ;
 
 Type:
@@ -1099,7 +1075,8 @@ Type:
             n.AddChild(t)
             return n, nil
           }
-          return nil, ast.ErrMalformedParser
+
+          return nil, errors.ErrMalformedParser
       }()
       >>
     ;
@@ -1111,57 +1088,230 @@ RawType:
 TypeName:
       PathExpression
       << ast.NewNamedType($0) >>
+    | ArrayType
+    | StructType
     ;
 
+ArrayType:
+      array "<" Type ">"
+      <<
+      func() (Attrib, error) {
+          t, err := ast.NewArrayType($2)
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(t, $0, $3)
+      }()
+      >>
+    ;
+
+StructType:
+      struct "<" ">"
+      <<
+      func() (Attrib, error) {
+          t, err := ast.NewStructType(nil)
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(t, $0, $2)
+      }()
+      >>
+    | StructTypePrefix ">"
+      << UpdateLoc($0, $1) >>
+    ;
+
+StructTypePrefix:
+      struct "<" StructField
+      <<
+      func() (Attrib, error) {
+          t, err := ast.NewStructType($2)
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(t, $0)
+      }()
+      >>
+    | StructTypePrefix "," StructField
+      << WithExtraChild($0, $2) >>
+    ;
+
+StructField:
+      Identifier Type
+      << ast.NewStructField($0, $1) >>
+    | Type
+      << ast.NewStructField(nil, $0) >>
+    ;
+
+/* Expressions are organized by precedence order. */
 Expression:
-      ParenthesizedExpression
-    | Expression or Expression2
+      Expression12
+    ;
+
+/* Binary OR operator */
+Expression12:
+      Expression12 or Expression11
       << ast.NewOrExpr(List($0, $2)) >>
-    | Expression LikeOperator Expression2
-      << ast.NewBinaryExpression(ast.BinaryLike, $0, $2, $1) >>
-    | Expression AdditiveOperator Expression2
+    | Expression11
+    ;
+
+/* Binary AND operator */
+Expression11:
+      Expression11 and Expression10
+      << ast.NewAndExpr(List($0, $2)) >>
+    | Expression10
+    ;
+
+/* Unary NOT operator */
+Expression10:
+      not Expression9
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewUnaryExpression(ast.UnaryNot, $1)
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    | Expression9
+    ;
+
+/* Comparison operators: eq, lt, le, gt, ge, ne, like, is */
+Expression9:
+      Expression9 ComparativeOperator Expression8
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression9 LikeOperator Expression8
+      << NewLikeBinaryExpression($1, $0, $2) >>
+    | Expression9 InOperator Expression8
+      << NewInBinaryExpression($1, $0, $2) >>
+    | Expression9 BetweenOperator Expression8 and Expression8
+      <<
+      func() (Attrib, error) {
+          b, err := NewBetweenExpression($0, $2, $4, $1)
+          if err != nil {
+              return nil, err
+          }
+
+          return OverrideLoc(b, $1, $4)
+      }()
+      >>
+    | Expression9 IsOperator InExpressionRHS
+      << NewIsBinaryExpression($1, $0, $2) >>
+    | Expression8
+    ;
+
+InExpressionRHS:
+      NullLiteral
+    | BooleanLiteral
+    ;
+
+/* Bitwise OR operator */
+Expression8:
+      Expression8 "|" Expression7
+      << ast.NewBinaryExpression(ast.BinaryBitwiseOr, $0, $2, false) >>
+    | Expression7
+    ;
+
+/* Bitwise XOR operator */
+Expression7:
+      Expression7 "^" Expression6
+      << ast.NewBinaryExpression(ast.BinaryBitwiseXor, $0, $2, false) >>
+    | Expression6
+    ;
+
+/* Bitwise AND operator */
+Expression6:
+      Expression6 "&" Expression5
+      << ast.NewBinaryExpression(ast.BinaryBitwiseAnd, $0, $2, false) >>
+    | Expression5
+    ;
+
+/* Bitwise left and right shift operators. */
+Expression5:
+      Expression5 ShiftOperator Expression4
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression4
+    ;
+
+/* Addition and subtraction operators */
+Expression4:
+      Expression4 AdditiveOperator Expression3
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression3
+    ;
+
+/* Multiplication, division, and concatenation operators. */
+Expression3:
+      Expression3 MultiplicativeOperator Expression2
+      << ast.NewBinaryExpression($1, $0, $2, false) >>
+    | Expression3 ConcatOp Expression2
       << ast.NewBinaryExpression($1, $0, $2, false) >>
     | Expression2
     ;
 
+/* Unary operators */
 Expression2:
-      Expression2 MultiplicativeOperator Expression3
-      << ast.NewBinaryExpression($1, $0, $2, false) >>
-    | Expression2 and Expression3
-      << ast.NewAndExpr(List($0, $2)) >>
-    | Expression3
+      UnaryOperator Expression
+      << ast.NewUnaryExpression($0, $1) >>
+    | Expression1
     ;
 
-Expression3:
-      "(" Expression ")"
-      << UpdateLoc($1, $0, $2) >>
+/* Field access operator, array subscript operator */
+Expression1:
+      NullLiteral
     | IntegerLiteral
     | BooleanLiteral
     | StringLiteral
+    | ParenthesizedExpression
+    | ArrayConstructor
+    | StructConstructor
     | CastExpression
     | FunctionCallExpressionWithClauses
     | Identifier
       << ast.NewPathExpression($0) >>
-    | Expression "." Identifier
+    | Expression1 "[" Expression1 "]"
       <<
       func() (Attrib, error) {
-          e := $0.(ast.ExpressionHandler)
-          if e.Kind() == ast.PathExpressionKind && !e.IsParenthesized() {
-              e.AddChild($2.(ast.NodeHandler))
-              return e, nil
+          e, err := ast.NewArrayElement($0, $2)
+          if err != nil {
+              return nil, err
           }
-          return ast.NewDotIdentifier($0, $2)
+
+          return OverrideLoc(e, $1, $3)
       }()
       >>
-    | UnaryOperator Expression2
-      << ast.NewUnaryExpression($1, $0) >>
+    | Expression1 "." Identifier
+      << ExpandPathExpressionOrNewDotIdentifier($0, $1, $2) >>
+    ;
+
+LikeOperator:
+      like     << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
+    | not like << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
+    ;
+
+InOperator:
+      in      << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
+    | not in  << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
+    ;
+
+BetweenOperator:
+      between     << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
+    | not between << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
+    ;
+
+IsOperator:
+      is      << WrapWithLoc(ast.NotKeywordAbsent, $0) >>
+    | is not  << WrapWithLoc(ast.NotKeywordPresent, $0, $1) >>
     ;
 
 UnaryOperator:
       "+"  << WrapWithLoc(ast.UnaryPlus, $0) >>
     | "-"  << WrapWithLoc(ast.UnaryMinus, $0) >>
     | "~"  << WrapWithLoc(ast.UnaryBitwiseNot, $0) >>
-    | not  << WrapWithLoc(ast.UnaryNot, $0) >>
     ;
 
 MultiplicativeOperator:
@@ -1174,14 +1324,24 @@ AdditiveOperator:
     | "-"  << WrapWithLoc(ast.BinaryMinus, $0) >>
     ;
 
+ConcatOp:
+      "||" << WrapWithLoc(ast.BinaryConcat, $0) >>
+    ;
+
+ShiftOperator:
+      "<<"  << WrapWithLoc(ast.LeftShift, $0) >>
+    | ">>"  << WrapWithLoc(ast.RightShift, $0) >>
+    ;
+
 IntegerLiteral:
       integer_literal
       <<
-      func () (Attrib, error) {
+      func() (Attrib, error) {
           lit, err := ast.NewIntLiteral()
           if err != nil {
               return nil, err
           }
+
           return InitLiteral(lit, $0)
       }()
       >>
@@ -1190,11 +1350,12 @@ IntegerLiteral:
 StringLiteral:
       string_literal
       <<
-      func () (Attrib, error) {
+      func() (Attrib, error) {
           lit, err := ast.NewStringLiteral()
           if err != nil {
               return nil, err
           }
+
           return InitLiteral(lit, $0)
       }()
       >>
@@ -1203,11 +1364,12 @@ StringLiteral:
 FloatingPointLiteral:
       floating_point_literal
       <<
-      func () (Attrib, error) {
+      func() (Attrib, error) {
           lit, err := ast.NewFloatLiteral()
           if err != nil {
               return nil, err
           }
+
           return InitLiteral(lit, $0)
       }()
       >>
@@ -1216,11 +1378,12 @@ FloatingPointLiteral:
 BytesLiteral:
       bytes_literal
       <<
-      func () (Attrib, error) {
+      func() (Attrib, error) {
           lit, err := ast.NewBytesLiteral()
           if err != nil {
               return nil, err
           }
+
           return InitLiteral(lit, $0)
       }()
       >>
@@ -1229,11 +1392,26 @@ BytesLiteral:
 BooleanLiteral:
       boolean_literal
       <<
-      func () (Attrib, error) {
+      func() (Attrib, error) {
           lit, err := ast.NewBooleanLiteral()
           if err != nil {
               return nil, err
           }
+
+          return InitLiteral(lit, $0)
+      }()
+      >>
+    ;
+
+NullLiteral:
+      null
+      <<
+      func() (Attrib, error) {
+          lit, err := ast.NewNullLiteral()
+          if err != nil {
+              return nil, err
+          }
+
           return InitLiteral(lit, $0)
       }()
       >>
@@ -1263,15 +1441,16 @@ DashedIdentifier:
 
 Identifier:
       identifier
-      << NewIdentifier($0) >>
+      << NewIdentifier($0, true) >>
     | KeywordAsIdentifier
-      << NewIdentifier($0) >>
+      << NewIdentifier($0, true) >>
     ;
 
 KeywordAsIdentifier:
       date
     | numeric_or_decimal
     | extract
+    | with
     ;
 
 ParenthesizedExpression:
@@ -1280,10 +1459,13 @@ ParenthesizedExpression:
       func() (Attrib, error) {
           e := $1.(ast.ExpressionHandler)
           e.SetParenthesized(true)
-          UpdateLoc(e, $0)
-          UpdateLoc(e, $2)
-          return e, nil
-       }() >>
+
+          // Do not include the location in the parentheses. Semantic
+          // error messages about this expression should point at the
+          // start of the expression, not at the opening parentheses.
+          return WrapWithLoc(e, $0, $2)
+      }()
+      >>
     ;
 
 OptSampleClause:
@@ -1295,11 +1477,15 @@ SampleClause:
       tablesample Identifier "(" SampleSize ")" OptSampleClauseSuffix
       <<
       func() (Attrib, error) {
-        s, err := ast.NewSampleClause($1, $2, $3)
-        if err != nil { return nil, err }
-        UpdateLoc(s, $0)
-        UpdateLoc(s, $4)
-        return s, nil
+          s, err := ast.NewSampleClause($1, $2, $3)
+          if err != nil {
+              return nil, err
+          }
+
+          UpdateLoc(s, $0)
+          UpdateLoc(s, $4)
+
+          return s, nil
       }()
       >>
     ;
@@ -1326,7 +1512,10 @@ OptSampleClauseSuffix:
       <<
       func() (Attrib, error) {
           s, err := ast.NewSampleSuffix(nil, $2)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           return UpdateLoc(s, $0)
       }()
       >>
@@ -1334,7 +1523,10 @@ OptSampleClauseSuffix:
       <<
       func() (Attrib, error) {
           s, err := ast.NewSampleSuffix($2, $3)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           return UpdateLoc(s, $0)
       }()
       >>
@@ -1342,7 +1534,10 @@ OptSampleClauseSuffix:
       <<
       func() (Attrib, error) {
           s, err := ast.NewSampleSuffix($3, $4)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           return UpdateLoc(s, $0)
       }()
       >>
@@ -1359,7 +1554,10 @@ RepeatableClause:
       <<
       func() (Attrib, error) {
           c, err := ast.NewRepeatableClause($2)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           UpdateLoc(c, $0, $3)
           return c, nil
       }()
@@ -1376,7 +1574,10 @@ CastIntLiteralOrParameter:
       <<
       func() (Attrib, error) {
           e, err := ast.NewCastExpression($2, $4, $5, false)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           UpdateLoc(e, $0, $6)
           return e, nil
       }()
@@ -1397,7 +1598,10 @@ NamedParameterExpression:
       <<
       func() (Attrib, error) {
           e, err := ast.NewParameterExpr($0)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           return UpdateLoc(e, $0)
       }()
       >>
@@ -1405,7 +1609,10 @@ NamedParameterExpression:
       <<
       func() (Attrib, error) {
           e, err := ast.NewParameterExpr($0)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           return UpdateLoc(e, $0)
       }()
       >>
@@ -1416,7 +1623,10 @@ OptFormat:
       <<
       func() (Attrib, error) {
           f, err := ast.NewFormatClause($1, $2)
-          if err != nil { return nil, err }
+          if err != nil {
+              return nil, err
+          }
+
           return UpdateLoc(f, $0)
       }()
       >>
@@ -1464,6 +1674,7 @@ TypeParametersPrefix:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(e, $0)
       }()
       >>
@@ -1507,6 +1718,7 @@ UsingClausePrefix:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(c, $0)
       }()
       >>
@@ -1535,6 +1747,7 @@ FunctionCallExpressionWithClauses:
           if $1 != nil {
               return ast.NewAnalyticFunctionCall($0, $1)
           }
+
           return $0, nil
       }()
       >>
@@ -1549,18 +1762,21 @@ FunctionCallExpression:
       <<
       func() (Attrib, error) {
           f := $0.(*ast.FunctionCall)
+
           if $1 != nil {
               err := f.InitOrderBy($1)
               if err != nil {
                   return nil, err
               }
           }
+
           if $2 != nil {
               err := f.InitLimitOffset($2)
               if err != nil {
                   return nil, err
               }
           }
+
           return UpdateLoc(f, $3)
       }()
       >>
@@ -1573,24 +1789,28 @@ FunctionCallExpression:
       <<
       func() (Attrib, error) {
           f := $0.(*ast.FunctionCall)
+
           if $1 != nil {
               err := f.InitNullHandlingModifier($1)
               if err != nil {
                   return nil, err
               }
           }
+
           if $2 != nil {
               err := f.InitOrderBy($2)
               if err != nil {
                   return nil, err
               }
           }
+
           if $3 != nil {
               err := f.InitLimitOffset($3)
               if err != nil {
                   return nil, err
               }
           }
+
           return UpdateLoc(f, $4)
       }()
       >>
@@ -1606,11 +1826,14 @@ FunctionCallExpressionWithArgsPrefix:
           if err != nil {
               return nil, err
           }
+
           s.SetImage("*")
+
           l, err := UpdateLoc(s, $1)
           if err != nil {
               return nil, err
           }
+
           return WithExtraChild($0, l)
       }()
       >>
@@ -1626,6 +1849,7 @@ FunctionCallExpressionBase:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(c, $2)
       }()
       >>
@@ -1636,6 +1860,7 @@ FunctionCallExpressionBase:
           if err != nil {
               return nil, err
           }
+
           return UpdateLoc(c, $1)
       }()
       >>
@@ -1685,4 +1910,129 @@ CastExpression:
           return UpdateLoc(e, $0, $6)
       }()
       >>
+    ;
+
+ArrayConstructor:
+      ArrayConstructorPrefixNoExpressions "]"
+      << UpdateLoc($0, $1) >>
+    | ArrayConstructorPrefix "]"
+      << UpdateLoc($0, $1) >>
+    ;
+
+ArrayConstructorPrefixNoExpressions:
+      array "["
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewArrayConstructor(nil)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $0, $1)
+      }()
+      >>
+    | "["
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewArrayConstructor(nil)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $0)
+      }()
+      >>
+    | ArrayType "["
+      <<
+      func() (Attrib, error) {
+          c, err := ast.NewArrayConstructor($0)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(c, $1)
+      }()
+      >>
+    ;
+
+ArrayConstructorPrefix:
+      ArrayConstructorPrefixNoExpressions Expression
+      << WithExtraChild($0, $1) >>
+    | ArrayConstructorPrefix "," Expression
+      << WithExtraChild($0, $2) >>
+    ;
+
+StructConstructor:
+      StructConstructorPrefix ")"
+      << UpdateLoc($0, $1) >>
+    | StructConstructorPrefixWithKeywordNoArg ")"
+      << UpdateLoc($0, $1) >>
+    | StructConstructorPrefixWithoutKeyword ")"
+      << UpdateLoc($0, $1) >>
+    ;
+
+StructConstructorPrefix:
+      StructConstructorPrefixWithKeyword
+    | StructConstructorPrefixWithKeywordNoArg
+    | StructConstructorPrefixWithoutKeyword
+    ;
+
+StructConstructorPrefixWithKeyword:
+      StructConstructorPrefixWithKeywordNoArg StructConstructorArg
+    ;
+
+StructConstructorPrefixWithKeywordNoArg:
+      StructType "("
+      << ast.NewStructConstructorWithKeyword($0) >>
+    | struct "("
+      <<
+      func() (Attrib, error) {
+          t, err := ast.NewStructConstructorWithKeyword(nil)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(t, $0)
+      }()
+      >>
+    ;
+
+StructConstructorPrefixWithoutKeyword:
+      "(" Expression "," Expression
+      <<
+      func() (Attrib, error) {
+          t, err := ast.NewStructConstructorWithParens(List($1, $3))
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(t, $0)
+      }()
+      >>
+    | StructConstructorPrefixWithoutKeyword "," Expression
+      << WithExtraChild($0, $2) >>
+    ;
+
+StructConstructorArg:
+      Expression OptAsAliasWithRequiredAs
+      << ast.NewStructConstructorArg($0, $1) >>
+    ;
+
+OptAsAliasWithRequiredAs:
+      as Identifier
+      <<
+      func() (Attrib, error) {
+          a, err := ast.NewAlias($1)
+          if err != nil {
+              return nil, err
+          }
+          return UpdateLoc(a, $0)
+      }()
+      >>
+    | empty
+    ;
+
+ComparativeOperator:
+      "="   << WrapWithLoc(ast.BinaryEq, $0) >>
+    | "!="  << WrapWithLoc(ast.BinaryNE, $0) >>
+    | "<>"  << WrapWithLoc(ast.BinaryNE2, $0) >>
+    | "<"   << WrapWithLoc(ast.BinaryLT, $0) >>
+    | "<="  << WrapWithLoc(ast.BinaryLE, $0) >>
+    | ">"   << WrapWithLoc(ast.BinaryGT, $0) >>
+    | ">="  << WrapWithLoc(ast.BinaryGE, $0) >>
     ;

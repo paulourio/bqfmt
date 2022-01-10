@@ -16,6 +16,7 @@ func Unparse(n NodeHandler) string {
 	u.Operation.visitor = u
 	n.Accept(u, nil)
 	u.out.WriteString("\n")
+
 	return u.out.String()
 }
 
@@ -24,6 +25,7 @@ func (u *unparser) VisitSelect(n *Select, d interface{}) {
 	u.depth++
 	n.SelectList.Accept(u, d)
 	u.depth--
+
 	if n.FromClause != nil {
 		u.indentedNewline()
 		u.out.WriteString("FROM")
@@ -32,6 +34,7 @@ func (u *unparser) VisitSelect(n *Select, d interface{}) {
 		n.FromClause.Accept(u, d)
 		u.depth--
 	}
+
 	if n.WhereClause != nil {
 		u.indentedNewline()
 		u.out.WriteString("WHERE")
@@ -47,6 +50,7 @@ func (u *unparser) VisitSelectList(n *SelectList, d interface{}) {
 		if i > 0 {
 			u.out.WriteString(",")
 		}
+
 		u.indentedNewline()
 		col.Accept(u, d)
 	}
@@ -54,9 +58,10 @@ func (u *unparser) VisitSelectList(n *SelectList, d interface{}) {
 
 func (u *unparser) VisitSelectColumn(n *SelectColumn, d interface{}) {
 	n.Expression.Accept(u, d)
+
 	if n.Alias != nil {
 		u.out.WriteString(" AS ")
-		u.out.WriteString(n.Alias.Identifier.IDString)
+		u.out.WriteString(ToIdentifierLiteral(n.Alias.Identifier.IDString))
 	}
 }
 
@@ -72,9 +77,24 @@ func (u *unparser) VisitBinaryExpression(n *BinaryExpression, d interface{}) {
 	if n.IsParenthesized() {
 		u.out.WriteString("(")
 	}
+
 	n.LHS.Accept(u, d)
-	u.out.WriteString(" " + n.Op.String() + " ")
+	u.out.WriteRune(' ')
+
+	if n.IsNot {
+		switch n.Op {
+		case BinaryIs:
+			u.out.WriteString("IS NOT ")
+		case BinaryLike:
+			u.out.WriteString("NOT LIKE ")
+		}
+	} else {
+		u.out.WriteString(n.Op.String())
+		u.out.WriteRune(' ')
+	}
+
 	n.RHS.Accept(u, d)
+
 	if n.IsParenthesized() {
 		u.out.WriteString(")")
 	}
@@ -84,10 +104,13 @@ func (u *unparser) VisitUnaryExpression(n *UnaryExpression, d interface{}) {
 	if n.IsParenthesized() {
 		u.out.WriteString("(")
 	}
+
 	u.out.WriteString(n.Op.String())
+
 	if n.Op == UnaryNot {
 		u.out.WriteRune(' ')
 	}
+
 	switch n.Operand.(type) {
 	case *UnaryExpression:
 		// Add space to avoid generating something like "--1"
@@ -96,13 +119,24 @@ func (u *unparser) VisitUnaryExpression(n *UnaryExpression, d interface{}) {
 	default:
 		n.Operand.Accept(u, d)
 	}
+
 	if n.IsParenthesized() {
 		u.out.WriteString(")")
 	}
 }
 
+func (u *unparser) VisitBetweenExpression(
+	n *BetweenExpression, d interface{}) {
+	n.LHS.Accept(u, d)
+	u.out.WriteString(" BETWEEN ")
+	n.Low.Accept(u, d)
+	u.out.WriteString(" AND ")
+	n.High.Accept(u, d)
+}
+
 func (u *unparser) VisitJoin(n *Join, d interface{}) {
 	n.LHS.Accept(u, d)
+
 	switch n.JoinType {
 	case DefaultJoin:
 		u.indentedNewline()
@@ -125,8 +159,23 @@ func (u *unparser) VisitJoin(n *Join, d interface{}) {
 		u.indentedNewline()
 		u.out.WriteString("RIGHT JOIN")
 	}
+
 	u.indentedNewline()
 	n.RHS.Accept(u, d)
+}
+
+func (u *unparser) VisitTablePathExpression(
+	n *TablePathExpression, d interface{},
+) {
+	if n.PathExpr != nil {
+		n.PathExpr.Accept(u, d)
+	} else {
+		n.UnnestExpr.Accept(u, d)
+	}
+
+	if n.Alias != nil {
+		u.out.WriteString(" AS " + n.Alias.Identifier.IDString)
+	}
 }
 
 func (u *unparser) VisitTableSubquery(n *TableSubquery, d interface{}) {
@@ -137,13 +186,14 @@ func (u *unparser) VisitTableSubquery(n *TableSubquery, d interface{}) {
 	u.depth--
 	u.indentedNewline()
 	u.out.WriteString(")")
+
 	if n.Alias != nil {
 		u.out.WriteString(" AS " + n.Alias.Identifier.IDString)
 	}
 }
 
 func (u *unparser) VisitIdentifier(n *Identifier, d interface{}) {
-	u.out.WriteString(toIdentifierLiteral(n.IDString))
+	u.out.WriteString(ToIdentifierLiteral(n.IDString))
 }
 
 func (u *unparser) VisitDotIdentifier(n *DotIdentifier, d interface{}) {
@@ -153,11 +203,20 @@ func (u *unparser) VisitDotIdentifier(n *DotIdentifier, d interface{}) {
 }
 
 func (u *unparser) VisitPathExpression(n *PathExpression, d interface{}) {
+	if n.IsParenthesized() {
+		u.out.WriteRune('(')
+	}
+
 	for i, p := range n.Names {
 		if i > 0 {
 			u.out.WriteRune('.')
 		}
+
 		p.Accept(u, d)
+	}
+
+	if n.IsParenthesized() {
+		u.out.WriteRune(')')
 	}
 }
 
@@ -167,43 +226,82 @@ func (u *unparser) VisitCastExpression(n *CastExpression, d interface{}) {
 	} else {
 		u.out.WriteString("CAST(")
 	}
+
 	n.Expr.Accept(u, d)
 	u.out.WriteString(" AS ")
 	n.Type.Accept(u, d)
+
 	if n.Format != nil {
 		if n.Format.Format != nil {
-			u.out.WriteString("FORMAT ")
+			u.out.WriteString(" FORMAT ")
 			n.Format.Format.Accept(u, d)
 		}
+
 		if n.Format.TimeZoneExpr != nil {
-			u.out.WriteString("AT TIME ZONE ")
+			u.out.WriteString(" AT TIME ZONE ")
 			n.Format.TimeZoneExpr.Accept(u, d)
 		}
 	}
+
 	u.out.WriteRune(')')
 }
 
 func (u *unparser) VisitFunctionCall(n *FunctionCall, d interface{}) {
 	n.Function.Accept(u, n)
 	u.out.WriteRune('(')
+
 	if n.Distinct {
-		u.out.WriteString("DISTINCT ")
+		u.out.WriteString("DISTINCT")
+
+		if len(n.Arguments) > 0 {
+			u.out.WriteRune(' ')
+		}
 	}
+
 	for i, arg := range n.Arguments {
 		if i > 0 {
 			u.out.WriteString(", ")
 		}
+
 		arg.Accept(u, d)
 	}
+
 	u.out.WriteRune(')')
 }
 
 func (u *unparser) VisitAndExpr(n *AndExpr, d interface{}) {
+	if n.IsParenthesized() {
+		u.out.WriteRune('(')
+	}
+
 	for i, c := range n.Conjuncts {
 		if i > 0 {
 			u.out.WriteString(" AND ")
 		}
+
 		c.Accept(u, d)
+	}
+
+	if n.IsParenthesized() {
+		u.out.WriteRune(')')
+	}
+}
+
+func (u *unparser) VisitOrExpr(n *OrExpr, d interface{}) {
+	if n.IsParenthesized() {
+		u.out.WriteRune('(')
+	}
+
+	for i, c := range n.Disjuncts {
+		if i > 0 {
+			u.out.WriteString(" OR ")
+		}
+
+		c.Accept(u, d)
+	}
+
+	if n.IsParenthesized() {
+		u.out.WriteRune(')')
 	}
 }
 
@@ -217,16 +315,74 @@ func (u *unparser) VisitBooleanLiteral(n *BooleanLiteral, d interface{}) {
 
 func (u *unparser) VisitNamedType(n *NamedType, d interface{}) {
 	n.Name.Accept(u, d)
+
 	if t := n.TypeParameters(); t != nil {
 		u.out.WriteRune('(')
+
 		for i, p := range t.Parameters {
 			if i > 0 {
 				u.out.WriteString(", ")
 			}
+
 			p.Accept(u, d)
 		}
+
 		u.out.WriteRune(')')
 	}
+}
+
+func (u *unparser) VisitArrayType(n *ArrayType, d interface{}) {
+	u.out.WriteString("ARRAY< ")
+	n.ElementType.Accept(u, d)
+	u.out.WriteString(" >")
+}
+
+func (u *unparser) VisitStructType(n *StructType, d interface{}) {
+	u.out.WriteString("STRUCT< ")
+
+	for i, f := range n.StructFields {
+		if i > 0 {
+			u.out.WriteString(", ")
+		}
+
+		f.Accept(u, d)
+	}
+
+	u.out.WriteString(" >")
+}
+
+func (u *unparser) VisitStructField(n *StructField, d interface{}) {
+	if n.Name != nil {
+		n.Name.Accept(u, d)
+		u.out.WriteRune(' ')
+	}
+
+	n.Type.Accept(u, d)
+}
+
+func (u *unparser) VisitArrayConstructor(n *ArrayConstructor, d interface{}) {
+	u.out.WriteString("ARRAY[")
+
+	for i, e := range n.Elements {
+		if i > 0 {
+			u.out.WriteString(", ")
+		}
+
+		e.Accept(u, d)
+	}
+
+	u.out.WriteRune(']')
+}
+
+func (u *unparser) VisitArrayElement(n *ArrayElement, d interface{}) {
+	n.Array.Accept(u, d)
+	u.out.WriteRune('[')
+	n.Position.Accept(u, d)
+	u.out.WriteRune(']')
+}
+
+func (u *unparser) VisitNullLiteral(n *NullLiteral, d interface{}) {
+	u.out.WriteString("NULL")
 }
 
 func (u *unparser) indent() {

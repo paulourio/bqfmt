@@ -86,9 +86,13 @@ type PathExpression struct {
 // scan, referenced by a path expression or UNNEST, can optionally have
 // aliases.  Exactly one of PathExpr or UnnestExpr must be non nil.
 type TablePathExpression struct {
-	PathExpr   *PathExpression
-	UnnestExpr *UnnestExpression
-	Alias      *Alias
+	PathExpr      *PathExpression
+	UnnestExpr    *UnnestExpression
+	Alias         *Alias
+	WithOffset    *WithOffset
+	PivotClause   interface{}
+	UnpivotClause interface{}
+	SampleClause  *SampleClause
 
 	TableExpression
 }
@@ -247,19 +251,20 @@ type ArrayType struct {
 	Type
 }
 
+type StructType struct {
+	StructFields      []*StructField
+	TypeParameterList *TypeParameterList
+
+	Type
+}
+
 type StructField struct {
 	// Name will be nil for anonymous fields like in STRUCT<int,
 	// string>.
 	Name *Identifier
+	Type TypeHandler
 
 	Node
-}
-
-type StructType struct {
-	StructFields      *StructField
-	TypeParameterList *TypeParameterList
-
-	Type
 }
 
 type CastExpression struct {
@@ -556,16 +561,18 @@ type StarWithModifiers struct {
 // TableSubquery contains the table subquery, which can contain
 // either a PivotClause or an UnpivotClause.
 type TableSubquery struct {
-	Subquery     *Query
-	Alias        *Alias
-	SampleClause *SampleClause
+	Subquery      *Query
+	Alias         *Alias
+	PivotClause   interface{}
+	UnpivotClause interface{}
+	SampleClause  *SampleClause
 
 	TableExpression
 }
 
 type UnaryExpression struct {
-	Operand ExpressionHandler
 	Op      UnaryOp
+	Operand ExpressionHandler
 
 	Expression
 }
@@ -700,11 +707,10 @@ type AnalyticFunctionCall struct {
 func NewQueryStatement(
 	query interface{},
 ) (*QueryStatement, error) {
+	var err error
 
 	nn := &QueryStatement{}
 	nn.SetKind(QueryStatementKind)
-
-	var err error
 
 	err = nn.InitQuery(query)
 	if err != nil {
@@ -715,19 +721,25 @@ func NewQueryStatement(
 }
 
 func (n *QueryStatement) InitQuery(d interface{}) error {
+	return n.initQuery(d)
+}
+
+func (n *QueryStatement) initQuery(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("QueryStatement.Query: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initQuery(t.Value)
 	case NodeHandler:
 		n.Query = d.(*Query)
 		n.Statement.AddChild(t)
-	case *Wrapped:
-		n.Query = t.Value.(*Query)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Query = d.(*Query)
+		n.Statement.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -737,11 +749,10 @@ func NewQuery(
 	orderby interface{},
 	limitoffset interface{},
 ) (*Query, error) {
+	var err error
 
 	nn := &Query{}
 	nn.SetKind(QueryKind)
-
-	var err error
 
 	err = nn.InitWithClause(withclause)
 	if err != nil {
@@ -767,76 +778,105 @@ func NewQuery(
 }
 
 func (n *Query) InitWithClause(d interface{}) error {
+	return n.initWithClause(d)
+}
+
+func (n *Query) initWithClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.WithClause = d.(*WithClause)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.WithClause = t.Value.(*WithClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWithClause(t.Value)
 	default:
 		n.WithClause = d.(*WithClause)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Query) InitQueryExpr(d interface{}) error {
+	return n.initQueryExpr(d)
+}
+
+func (n *Query) initQueryExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("Query.QueryExpr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initQueryExpr(t.Value)
 	case NodeHandler:
 		n.QueryExpr = d.(QueryExpressionHandler)
 		n.QueryExpression.AddChild(t)
-	case *Wrapped:
-		n.QueryExpr = t.Value.(QueryExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.QueryExpr = d.(QueryExpressionHandler)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Query) InitOrderBy(d interface{}) error {
+	return n.initOrderBy(d)
+}
+
+func (n *Query) initOrderBy(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.OrderBy = d.(*OrderBy)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.OrderBy = t.Value.(*OrderBy)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOrderBy(t.Value)
 	default:
 		n.OrderBy = d.(*OrderBy)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Query) InitLimitOffset(d interface{}) error {
+	return n.initLimitOffset(d)
+}
+
+func (n *Query) initLimitOffset(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.LimitOffset = d.(*LimitOffset)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.LimitOffset = t.Value.(*LimitOffset)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLimitOffset(t.Value)
 	default:
 		n.LimitOffset = d.(*LimitOffset)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Query) InitIsNested(d interface{}) error {
+	return n.initIsNested(d)
+}
+
+func (n *Query) initIsNested(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case *Wrapped:
-		n.IsNested = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIsNested(t.Value)
 	default:
 		n.IsNested = d.(bool)
 	}
+
 	return nil
 }
 
@@ -851,11 +891,10 @@ func NewSelect(
 	qualify interface{},
 	windowclause interface{},
 ) (*Select, error) {
+	var err error
 
 	nn := &Select{}
 	nn.SetKind(SelectKind)
-
-	var err error
 
 	err = nn.InitDistinct(distinct)
 	if err != nil {
@@ -906,146 +945,198 @@ func NewSelect(
 }
 
 func (n *Select) InitDistinct(d interface{}) error {
+	return n.initDistinct(d)
+}
+
+func (n *Select) initDistinct(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.Distinct = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initDistinct(t.Value)
 	default:
 		n.Distinct = d.(bool)
 	}
+
 	return nil
 }
 
 func (n *Select) InitSelectAs(d interface{}) error {
+	return n.initSelectAs(d)
+}
+
+func (n *Select) initSelectAs(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.SelectAs = d.(*SelectAs)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.SelectAs = t.Value.(*SelectAs)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSelectAs(t.Value)
 	default:
 		n.SelectAs = d.(*SelectAs)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Select) InitSelectList(d interface{}) error {
+	return n.initSelectList(d)
+}
+
+func (n *Select) initSelectList(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("Select.SelectList: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSelectList(t.Value)
 	case NodeHandler:
 		n.SelectList = d.(*SelectList)
 		n.QueryExpression.AddChild(t)
-	case *Wrapped:
-		n.SelectList = t.Value.(*SelectList)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.SelectList = d.(*SelectList)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Select) InitFromClause(d interface{}) error {
+	return n.initFromClause(d)
+}
+
+func (n *Select) initFromClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.FromClause = d.(*FromClause)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.FromClause = t.Value.(*FromClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initFromClause(t.Value)
 	default:
 		n.FromClause = d.(*FromClause)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Select) InitWhereClause(d interface{}) error {
+	return n.initWhereClause(d)
+}
+
+func (n *Select) initWhereClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.WhereClause = d.(*WhereClause)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.WhereClause = t.Value.(*WhereClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWhereClause(t.Value)
 	default:
 		n.WhereClause = d.(*WhereClause)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Select) InitGroupBy(d interface{}) error {
+	return n.initGroupBy(d)
+}
+
+func (n *Select) initGroupBy(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.GroupBy = d.(*GroupBy)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.GroupBy = t.Value.(*GroupBy)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initGroupBy(t.Value)
 	default:
 		n.GroupBy = d.(*GroupBy)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Select) InitHaving(d interface{}) error {
+	return n.initHaving(d)
+}
+
+func (n *Select) initHaving(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Having = d.(*Having)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.Having = t.Value.(*Having)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initHaving(t.Value)
 	default:
 		n.Having = d.(*Having)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Select) InitQualify(d interface{}) error {
+	return n.initQualify(d)
+}
+
+func (n *Select) initQualify(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Qualify = d.(*Qualify)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.Qualify = t.Value.(*Qualify)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initQualify(t.Value)
 	default:
 		n.Qualify = d.(*Qualify)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Select) InitWindowClause(d interface{}) error {
+	return n.initWindowClause(d)
+}
+
+func (n *Select) initWindowClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.WindowClause = d.(*WindowClause)
 		n.QueryExpression.AddChild(t)
 	case *Wrapped:
-		n.WindowClause = t.Value.(*WindowClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWindowClause(t.Value)
 	default:
 		n.WindowClause = d.(*WindowClause)
+		n.QueryExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewSelectList(
 	columns interface{},
 ) (*SelectList, error) {
+	var err error
 
 	nn := &SelectList{}
 	nn.SetKind(SelectListKind)
-
-	var err error
 
 	err = nn.InitColumns(columns)
 	if err != nil {
@@ -1060,14 +1151,19 @@ func (n *SelectList) InitColumns(d interface{}) error {
 		return fmt.Errorf("SelectList.Columns: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Columns = make([]*SelectColumn, 0, defaultCapacity)
+
+	return n.initColumns(d)
+}
+
+func (n *SelectList) initColumns(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initColumns(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*SelectColumn)
-		n.Columns = append(n.Columns, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -1076,11 +1172,13 @@ func (n *SelectList) InitColumns(d interface{}) error {
 		newElem := d.(*SelectColumn)
 		n.Columns = append(n.Columns, newElem)
 	}
+
 	return nil
 }
 
 func (n *SelectList) AddChild(c NodeHandler) {
 	n.Columns = append(n.Columns, c.(*SelectColumn))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -1090,7 +1188,9 @@ func (n *SelectList) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Columns = append(n.Columns, c.(*SelectColumn))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -1100,11 +1200,10 @@ func NewSelectColumn(
 	expression interface{},
 	alias interface{},
 ) (*SelectColumn, error) {
+	var err error
 
 	nn := &SelectColumn{}
 	nn.SetKind(SelectColumnKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -1120,43 +1219,54 @@ func NewSelectColumn(
 }
 
 func (n *SelectColumn) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *SelectColumn) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("SelectColumn.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *SelectColumn) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *SelectColumn) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Alias = d.(*Alias)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Alias = t.Value.(*Alias)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	default:
 		n.Alias = d.(*Alias)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewIntLiteral() (*IntLiteral, error) {
+	var err error
 
 	nn := &IntLiteral{}
 	nn.SetKind(IntLiteralKind)
-
-	var err error
 
 	return nn, err
 }
@@ -1164,11 +1274,10 @@ func NewIntLiteral() (*IntLiteral, error) {
 func NewIdentifier(
 	idstring interface{},
 ) (*Identifier, error) {
+	var err error
 
 	nn := &Identifier{}
 	nn.SetKind(IdentifierKind)
-
-	var err error
 
 	err = nn.InitIDString(idstring)
 	if err != nil {
@@ -1179,24 +1288,28 @@ func NewIdentifier(
 }
 
 func (n *Identifier) InitIDString(d interface{}) error {
+	return n.initIDString(d)
+}
+
+func (n *Identifier) initIDString(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.IDString = t.Value.(string)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIDString(t.Value)
 	default:
 		n.IDString = d.(string)
 	}
+
 	return nil
 }
 
 func NewAlias(
 	identifier interface{},
 ) (*Alias, error) {
+	var err error
 
 	nn := &Alias{}
 	nn.SetKind(AliasKind)
-
-	var err error
 
 	err = nn.InitIdentifier(identifier)
 	if err != nil {
@@ -1207,30 +1320,35 @@ func NewAlias(
 }
 
 func (n *Alias) InitIdentifier(d interface{}) error {
+	return n.initIdentifier(d)
+}
+
+func (n *Alias) initIdentifier(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("Alias.Identifier: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIdentifier(t.Value)
 	case NodeHandler:
 		n.Identifier = d.(*Identifier)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Identifier = t.Value.(*Identifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Identifier = d.(*Identifier)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewPathExpression(
 	names interface{},
 ) (*PathExpression, error) {
+	var err error
 
 	nn := &PathExpression{}
 	nn.SetKind(PathExpressionKind)
-
-	var err error
 
 	err = nn.InitNames(names)
 	if err != nil {
@@ -1245,14 +1363,19 @@ func (n *PathExpression) InitNames(d interface{}) error {
 		return fmt.Errorf("PathExpression.Names: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Names = make([]*Identifier, 0, defaultCapacity)
+
+	return n.initNames(d)
+}
+
+func (n *PathExpression) initNames(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initNames(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*Identifier)
-		n.Names = append(n.Names, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -1261,11 +1384,13 @@ func (n *PathExpression) InitNames(d interface{}) error {
 		newElem := d.(*Identifier)
 		n.Names = append(n.Names, newElem)
 	}
+
 	return nil
 }
 
 func (n *PathExpression) AddChild(c NodeHandler) {
 	n.Names = append(n.Names, c.(*Identifier))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -1275,7 +1400,9 @@ func (n *PathExpression) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Names = append(n.Names, c.(*Identifier))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -1285,12 +1412,15 @@ func NewTablePathExpression(
 	pathexpr interface{},
 	unnestexpr interface{},
 	alias interface{},
+	withoffset interface{},
+	pivotclause interface{},
+	unpivotclause interface{},
+	sampleclause interface{},
 ) (*TablePathExpression, error) {
+	var err error
 
 	nn := &TablePathExpression{}
 	nn.SetKind(TablePathExpressionKind)
-
-	var err error
 
 	err = nn.InitPathExpr(pathexpr)
 	if err != nil {
@@ -1307,62 +1437,183 @@ func NewTablePathExpression(
 		return nil, err
 	}
 
+	err = nn.InitWithOffset(withoffset)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitPivotClause(pivotclause)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitUnpivotClause(unpivotclause)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitSampleClause(sampleclause)
+	if err != nil {
+		return nil, err
+	}
+
 	return nn, err
 }
 
 func (n *TablePathExpression) InitPathExpr(d interface{}) error {
+	return n.initPathExpr(d)
+}
+
+func (n *TablePathExpression) initPathExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.PathExpr = d.(*PathExpression)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.PathExpr = t.Value.(*PathExpression)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPathExpr(t.Value)
 	default:
 		n.PathExpr = d.(*PathExpression)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *TablePathExpression) InitUnnestExpr(d interface{}) error {
+	return n.initUnnestExpr(d)
+}
+
+func (n *TablePathExpression) initUnnestExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.UnnestExpr = d.(*UnnestExpression)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.UnnestExpr = t.Value.(*UnnestExpression)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initUnnestExpr(t.Value)
 	default:
 		n.UnnestExpr = d.(*UnnestExpression)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *TablePathExpression) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *TablePathExpression) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Alias = d.(*Alias)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.Alias = t.Value.(*Alias)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	default:
 		n.Alias = d.(*Alias)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
+	return nil
+}
+
+func (n *TablePathExpression) InitWithOffset(d interface{}) error {
+	return n.initWithOffset(d)
+}
+
+func (n *TablePathExpression) initWithOffset(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.WithOffset = d.(*WithOffset)
+		n.TableExpression.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWithOffset(t.Value)
+	default:
+		n.WithOffset = d.(*WithOffset)
+		n.TableExpression.AddChild(d.(NodeHandler))
+	}
+
+	return nil
+}
+
+func (n *TablePathExpression) InitPivotClause(d interface{}) error {
+	return n.initPivotClause(d)
+}
+
+func (n *TablePathExpression) initPivotClause(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.PivotClause = d.(interface{})
+		n.TableExpression.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPivotClause(t.Value)
+	default:
+		n.PivotClause = d.(interface{})
+		n.TableExpression.AddChild(d.(NodeHandler))
+	}
+
+	return nil
+}
+
+func (n *TablePathExpression) InitUnpivotClause(d interface{}) error {
+	return n.initUnpivotClause(d)
+}
+
+func (n *TablePathExpression) initUnpivotClause(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.UnpivotClause = d.(interface{})
+		n.TableExpression.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initUnpivotClause(t.Value)
+	default:
+		n.UnpivotClause = d.(interface{})
+		n.TableExpression.AddChild(d.(NodeHandler))
+	}
+
+	return nil
+}
+
+func (n *TablePathExpression) InitSampleClause(d interface{}) error {
+	return n.initSampleClause(d)
+}
+
+func (n *TablePathExpression) initSampleClause(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.SampleClause = d.(*SampleClause)
+		n.TableExpression.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSampleClause(t.Value)
+	default:
+		n.SampleClause = d.(*SampleClause)
+		n.TableExpression.AddChild(d.(NodeHandler))
+	}
+
 	return nil
 }
 
 func NewFromClause(
 	tableexpression interface{},
 ) (*FromClause, error) {
+	var err error
 
 	nn := &FromClause{}
 	nn.SetKind(FromClauseKind)
-
-	var err error
 
 	err = nn.InitTableExpression(tableexpression)
 	if err != nil {
@@ -1373,30 +1624,35 @@ func NewFromClause(
 }
 
 func (n *FromClause) InitTableExpression(d interface{}) error {
+	return n.initTableExpression(d)
+}
+
+func (n *FromClause) initTableExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("FromClause.TableExpression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initTableExpression(t.Value)
 	case NodeHandler:
 		n.TableExpression = d.(TableExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.TableExpression = t.Value.(TableExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.TableExpression = d.(TableExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewWhereClause(
 	expression interface{},
 ) (*WhereClause, error) {
+	var err error
 
 	nn := &WhereClause{}
 	nn.SetKind(WhereClauseKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -1407,52 +1663,61 @@ func NewWhereClause(
 }
 
 func (n *WhereClause) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *WhereClause) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WhereClause.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewBooleanLiteral() (*BooleanLiteral, error) {
+	var err error
 
 	nn := &BooleanLiteral{}
 	nn.SetKind(BooleanLiteralKind)
-
-	var err error
 
 	return nn, err
 }
 
 func (n *BooleanLiteral) InitValue(d interface{}) error {
+	return n.initValue(d)
+}
+
+func (n *BooleanLiteral) initValue(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case *Wrapped:
-		n.Value = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initValue(t.Value)
 	default:
 		n.Value = d.(bool)
 	}
+
 	return nil
 }
 
 func NewAndExpr(
 	conjuncts interface{},
 ) (*AndExpr, error) {
+	var err error
 
 	nn := &AndExpr{}
 	nn.SetKind(AndExprKind)
-
-	var err error
 
 	err = nn.InitConjuncts(conjuncts)
 	if err != nil {
@@ -1467,14 +1732,19 @@ func (n *AndExpr) InitConjuncts(d interface{}) error {
 		return fmt.Errorf("AndExpr.Conjuncts: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Conjuncts = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initConjuncts(d)
+}
+
+func (n *AndExpr) initConjuncts(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initConjuncts(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.Conjuncts = append(n.Conjuncts, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -1483,11 +1753,13 @@ func (n *AndExpr) InitConjuncts(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.Conjuncts = append(n.Conjuncts, newElem)
 	}
+
 	return nil
 }
 
 func (n *AndExpr) AddChild(c NodeHandler) {
 	n.Conjuncts = append(n.Conjuncts, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -1497,7 +1769,9 @@ func (n *AndExpr) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Conjuncts = append(n.Conjuncts, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -1509,11 +1783,10 @@ func NewBinaryExpression(
 	rhs interface{},
 	isnot interface{},
 ) (*BinaryExpression, error) {
+	var err error
 
 	nn := &BinaryExpression{}
 	nn.SetKind(BinaryExpressionKind)
-
-	var err error
 
 	err = nn.InitOp(op)
 	if err != nil {
@@ -1539,96 +1812,118 @@ func NewBinaryExpression(
 }
 
 func (n *BinaryExpression) InitOp(d interface{}) error {
+	return n.initOp(d)
+}
+
+func (n *BinaryExpression) initOp(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.Op = t.Value.(BinaryOp)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOp(t.Value)
 	default:
 		n.Op = d.(BinaryOp)
 	}
+
 	return nil
 }
 
 func (n *BinaryExpression) InitLHS(d interface{}) error {
+	return n.initLHS(d)
+}
+
+func (n *BinaryExpression) initLHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("BinaryExpression.LHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLHS(t.Value)
 	case NodeHandler:
 		n.LHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.LHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *BinaryExpression) InitRHS(d interface{}) error {
+	return n.initRHS(d)
+}
+
+func (n *BinaryExpression) initRHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("BinaryExpression.RHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initRHS(t.Value)
 	case NodeHandler:
 		n.RHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.RHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.RHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *BinaryExpression) InitIsNot(d interface{}) error {
+	return n.initIsNot(d)
+}
+
+func (n *BinaryExpression) initIsNot(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-	case NodeHandler:
-		n.IsNot = d.(bool)
-		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.IsNot = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIsNot(t.Value)
 	default:
 		n.IsNot = d.(bool)
 	}
+
 	return nil
 }
 
 func NewStringLiteral() (*StringLiteral, error) {
+	var err error
 
 	nn := &StringLiteral{}
 	nn.SetKind(StringLiteralKind)
-
-	var err error
 
 	return nn, err
 }
 
 func (n *StringLiteral) InitStringValue(d interface{}) error {
+	return n.initStringValue(d)
+}
+
+func (n *StringLiteral) initStringValue(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.StringValue = d.(string)
 		n.Leaf.AddChild(t)
 	case *Wrapped:
-		n.StringValue = t.Value.(string)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initStringValue(t.Value)
 	default:
 		n.StringValue = d.(string)
+		n.Leaf.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewStar() (*Star, error) {
+	var err error
 
 	nn := &Star{}
 	nn.SetKind(StarKind)
-
-	var err error
 
 	return nn, err
 }
@@ -1636,11 +1931,10 @@ func NewStar() (*Star, error) {
 func NewOrExpr(
 	disjuncts interface{},
 ) (*OrExpr, error) {
+	var err error
 
 	nn := &OrExpr{}
 	nn.SetKind(OrExprKind)
-
-	var err error
 
 	err = nn.InitDisjuncts(disjuncts)
 	if err != nil {
@@ -1655,14 +1949,19 @@ func (n *OrExpr) InitDisjuncts(d interface{}) error {
 		return fmt.Errorf("OrExpr.Disjuncts: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Disjuncts = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initDisjuncts(d)
+}
+
+func (n *OrExpr) initDisjuncts(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initDisjuncts(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.Disjuncts = append(n.Disjuncts, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -1671,11 +1970,13 @@ func (n *OrExpr) InitDisjuncts(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.Disjuncts = append(n.Disjuncts, newElem)
 	}
+
 	return nil
 }
 
 func (n *OrExpr) AddChild(c NodeHandler) {
 	n.Disjuncts = append(n.Disjuncts, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -1685,7 +1986,9 @@ func (n *OrExpr) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Disjuncts = append(n.Disjuncts, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -1695,11 +1998,10 @@ func NewGroupingItem(
 	expression interface{},
 	rollup interface{},
 ) (*GroupingItem, error) {
+	var err error
 
 	nn := &GroupingItem{}
 	nn.SetKind(GroupingItemKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -1715,43 +2017,54 @@ func NewGroupingItem(
 }
 
 func (n *GroupingItem) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *GroupingItem) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *GroupingItem) InitRollup(d interface{}) error {
+	return n.initRollup(d)
+}
+
+func (n *GroupingItem) initRollup(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Rollup = d.(*Rollup)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Rollup = t.Value.(*Rollup)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initRollup(t.Value)
 	default:
 		n.Rollup = d.(*Rollup)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewGroupBy(
 	groupingitems interface{},
 ) (*GroupBy, error) {
+	var err error
 
 	nn := &GroupBy{}
 	nn.SetKind(GroupByKind)
-
-	var err error
 
 	err = nn.InitGroupingItems(groupingitems)
 	if err != nil {
@@ -1766,14 +2079,19 @@ func (n *GroupBy) InitGroupingItems(d interface{}) error {
 		return fmt.Errorf("GroupBy.GroupingItems: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.GroupingItems = make([]*GroupingItem, 0, defaultCapacity)
+
+	return n.initGroupingItems(d)
+}
+
+func (n *GroupBy) initGroupingItems(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initGroupingItems(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*GroupingItem)
-		n.GroupingItems = append(n.GroupingItems, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -1782,11 +2100,13 @@ func (n *GroupBy) InitGroupingItems(d interface{}) error {
 		newElem := d.(*GroupingItem)
 		n.GroupingItems = append(n.GroupingItems, newElem)
 	}
+
 	return nil
 }
 
 func (n *GroupBy) AddChild(c NodeHandler) {
 	n.GroupingItems = append(n.GroupingItems, c.(*GroupingItem))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -1796,7 +2116,9 @@ func (n *GroupBy) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.GroupingItems = append(n.GroupingItems, c.(*GroupingItem))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -1807,11 +2129,10 @@ func NewOrderingExpression(
 	nullorder interface{},
 	orderingspec interface{},
 ) (*OrderingExpression, error) {
+	var err error
 
 	nn := &OrderingExpression{}
 	nn.SetKind(OrderingExpressionKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -1832,60 +2153,77 @@ func NewOrderingExpression(
 }
 
 func (n *OrderingExpression) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *OrderingExpression) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("OrderingExpression.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *OrderingExpression) InitNullOrder(d interface{}) error {
+	return n.initNullOrder(d)
+}
+
+func (n *OrderingExpression) initNullOrder(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.NullOrder = d.(*NullOrder)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.NullOrder = t.Value.(*NullOrder)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initNullOrder(t.Value)
 	default:
 		n.NullOrder = d.(*NullOrder)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *OrderingExpression) InitOrderingSpec(d interface{}) error {
+	return n.initOrderingSpec(d)
+}
+
+func (n *OrderingExpression) initOrderingSpec(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.OrderingSpec = d.(OrderingSpec)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.OrderingSpec = t.Value.(OrderingSpec)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOrderingSpec(t.Value)
 	default:
 		n.OrderingSpec = d.(OrderingSpec)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewOrderBy(
 	orderingexpression interface{},
 ) (*OrderBy, error) {
+	var err error
 
 	nn := &OrderBy{}
 	nn.SetKind(OrderByKind)
-
-	var err error
 
 	err = nn.InitOrderingExpression(orderingexpression)
 	if err != nil {
@@ -1900,14 +2238,19 @@ func (n *OrderBy) InitOrderingExpression(d interface{}) error {
 		return fmt.Errorf("OrderBy.OrderingExpression: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.OrderingExpression = make([]*OrderingExpression, 0, defaultCapacity)
+
+	return n.initOrderingExpression(d)
+}
+
+func (n *OrderBy) initOrderingExpression(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOrderingExpression(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*OrderingExpression)
-		n.OrderingExpression = append(n.OrderingExpression, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -1916,11 +2259,13 @@ func (n *OrderBy) InitOrderingExpression(d interface{}) error {
 		newElem := d.(*OrderingExpression)
 		n.OrderingExpression = append(n.OrderingExpression, newElem)
 	}
+
 	return nil
 }
 
 func (n *OrderBy) AddChild(c NodeHandler) {
 	n.OrderingExpression = append(n.OrderingExpression, c.(*OrderingExpression))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -1930,7 +2275,9 @@ func (n *OrderBy) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.OrderingExpression = append(n.OrderingExpression, c.(*OrderingExpression))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -1940,11 +2287,10 @@ func NewLimitOffset(
 	limit interface{},
 	offset interface{},
 ) (*LimitOffset, error) {
+	var err error
 
 	nn := &LimitOffset{}
 	nn.SetKind(LimitOffsetKind)
-
-	var err error
 
 	err = nn.InitLimit(limit)
 	if err != nil {
@@ -1960,53 +2306,63 @@ func NewLimitOffset(
 }
 
 func (n *LimitOffset) InitLimit(d interface{}) error {
+	return n.initLimit(d)
+}
+
+func (n *LimitOffset) initLimit(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("LimitOffset.Limit: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLimit(t.Value)
 	case NodeHandler:
 		n.Limit = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Limit = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Limit = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *LimitOffset) InitOffset(d interface{}) error {
+	return n.initOffset(d)
+}
+
+func (n *LimitOffset) initOffset(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Offset = d.(ExpressionHandler)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Offset = t.Value.(ExpressionHandler)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOffset(t.Value)
 	default:
 		n.Offset = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewFloatLiteral() (*FloatLiteral, error) {
+	var err error
 
 	nn := &FloatLiteral{}
 	nn.SetKind(FloatLiteralKind)
-
-	var err error
 
 	return nn, err
 }
 
 func NewNullLiteral() (*NullLiteral, error) {
+	var err error
 
 	nn := &NullLiteral{}
 	nn.SetKind(NullLiteralKind)
-
-	var err error
 
 	return nn, err
 }
@@ -2014,11 +2370,10 @@ func NewNullLiteral() (*NullLiteral, error) {
 func NewOnClause(
 	expression interface{},
 ) (*OnClause, error) {
+	var err error
 
 	nn := &OnClause{}
 	nn.SetKind(OnClauseKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -2029,19 +2384,25 @@ func NewOnClause(
 }
 
 func (n *OnClause) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *OnClause) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("OnClause.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -2049,11 +2410,10 @@ func NewWithClauseEntry(
 	alias interface{},
 	query interface{},
 ) (*WithClauseEntry, error) {
+	var err error
 
 	nn := &WithClauseEntry{}
 	nn.SetKind(WithClauseEntryKind)
-
-	var err error
 
 	err = nn.InitAlias(alias)
 	if err != nil {
@@ -2069,36 +2429,48 @@ func NewWithClauseEntry(
 }
 
 func (n *WithClauseEntry) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *WithClauseEntry) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WithClauseEntry.Alias: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	case NodeHandler:
 		n.Alias = d.(*Identifier)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Alias = t.Value.(*Identifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Alias = d.(*Identifier)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WithClauseEntry) InitQuery(d interface{}) error {
+	return n.initQuery(d)
+}
+
+func (n *WithClauseEntry) initQuery(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WithClauseEntry.Query: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initQuery(t.Value)
 	case NodeHandler:
 		n.Query = d.(*Query)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Query = t.Value.(*Query)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Query = d.(*Query)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -2108,11 +2480,10 @@ func NewJoin(
 	clauselist interface{},
 	jointype interface{},
 ) (*Join, error) {
+	var err error
 
 	nn := &Join{}
 	nn.SetKind(JoinKind)
-
-	var err error
 
 	err = nn.InitLHS(lhs)
 	if err != nil {
@@ -2138,88 +2509,116 @@ func NewJoin(
 }
 
 func (n *Join) InitLHS(d interface{}) error {
+	return n.initLHS(d)
+}
+
+func (n *Join) initLHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("Join.LHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLHS(t.Value)
 	case NodeHandler:
 		n.LHS = d.(TableExpressionHandler)
 		n.TableExpression.AddChild(t)
-	case *Wrapped:
-		n.LHS = t.Value.(TableExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.LHS = d.(TableExpressionHandler)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Join) InitRHS(d interface{}) error {
+	return n.initRHS(d)
+}
+
+func (n *Join) initRHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("Join.RHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initRHS(t.Value)
 	case NodeHandler:
 		n.RHS = d.(TableExpressionHandler)
 		n.TableExpression.AddChild(t)
-	case *Wrapped:
-		n.RHS = t.Value.(TableExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.RHS = d.(TableExpressionHandler)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Join) InitClauseList(d interface{}) error {
+	return n.initClauseList(d)
+}
+
+func (n *Join) initClauseList(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.ClauseList = d.(*OnOrUsingClauseList)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.ClauseList = t.Value.(*OnOrUsingClauseList)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initClauseList(t.Value)
 	default:
 		n.ClauseList = d.(*OnOrUsingClauseList)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *Join) InitJoinType(d interface{}) error {
+	return n.initJoinType(d)
+}
+
+func (n *Join) initJoinType(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.JoinType = t.Value.(JoinType)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initJoinType(t.Value)
 	default:
 		n.JoinType = d.(JoinType)
 	}
+
 	return nil
 }
 
 func (n *Join) InitContainsCommaJoin(d interface{}) error {
+	return n.initContainsCommaJoin(d)
+}
+
+func (n *Join) initContainsCommaJoin(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.ContainsCommaJoin = d.(bool)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.ContainsCommaJoin = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initContainsCommaJoin(t.Value)
 	default:
 		n.ContainsCommaJoin = d.(bool)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewUsingClause(
 	keys interface{},
 ) (*UsingClause, error) {
+	var err error
 
 	nn := &UsingClause{}
 	nn.SetKind(UsingClauseKind)
-
-	var err error
 
 	err = nn.Initkeys(keys)
 	if err != nil {
@@ -2234,14 +2633,19 @@ func (n *UsingClause) Initkeys(d interface{}) error {
 		return fmt.Errorf("UsingClause.keys: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.keys = make([]*Identifier, 0, defaultCapacity)
+
+	return n.initkeys(d)
+}
+
+func (n *UsingClause) initkeys(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initkeys(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*Identifier)
-		n.keys = append(n.keys, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -2250,11 +2654,13 @@ func (n *UsingClause) Initkeys(d interface{}) error {
 		newElem := d.(*Identifier)
 		n.keys = append(n.keys, newElem)
 	}
+
 	return nil
 }
 
 func (n *UsingClause) AddChild(c NodeHandler) {
 	n.keys = append(n.keys, c.(*Identifier))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -2264,7 +2670,9 @@ func (n *UsingClause) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.keys = append(n.keys, c.(*Identifier))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -2273,11 +2681,10 @@ func (n *UsingClause) AddChildren(children []NodeHandler) {
 func NewWithClause(
 	with interface{},
 ) (*WithClause, error) {
+	var err error
 
 	nn := &WithClause{}
 	nn.SetKind(WithClauseKind)
-
-	var err error
 
 	err = nn.InitWith(with)
 	if err != nil {
@@ -2292,14 +2699,19 @@ func (n *WithClause) InitWith(d interface{}) error {
 		return fmt.Errorf("WithClause.With: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.With = make([]*WithClauseEntry, 0, defaultCapacity)
+
+	return n.initWith(d)
+}
+
+func (n *WithClause) initWith(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWith(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*WithClauseEntry)
-		n.With = append(n.With, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -2308,11 +2720,13 @@ func (n *WithClause) InitWith(d interface{}) error {
 		newElem := d.(*WithClauseEntry)
 		n.With = append(n.With, newElem)
 	}
+
 	return nil
 }
 
 func (n *WithClause) AddChild(c NodeHandler) {
 	n.With = append(n.With, c.(*WithClauseEntry))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -2322,18 +2736,19 @@ func (n *WithClause) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.With = append(n.With, c.(*WithClauseEntry))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
 }
 
 func NewHaving() (*Having, error) {
+	var err error
 
 	nn := &Having{}
 	nn.SetKind(HavingKind)
-
-	var err error
 
 	return nn, err
 }
@@ -2341,11 +2756,10 @@ func NewHaving() (*Having, error) {
 func NewNamedType(
 	name interface{},
 ) (*NamedType, error) {
+	var err error
 
 	nn := &NamedType{}
 	nn.SetKind(NamedTypeKind)
-
-	var err error
 
 	err = nn.InitName(name)
 	if err != nil {
@@ -2356,30 +2770,35 @@ func NewNamedType(
 }
 
 func (n *NamedType) InitName(d interface{}) error {
+	return n.initName(d)
+}
+
+func (n *NamedType) initName(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("NamedType.Name: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initName(t.Value)
 	case NodeHandler:
 		n.Name = d.(*PathExpression)
 		n.Type.AddChild(t)
-	case *Wrapped:
-		n.Name = t.Value.(*PathExpression)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Name = d.(*PathExpression)
+		n.Type.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewArrayType(
 	elementtype interface{},
 ) (*ArrayType, error) {
+	var err error
 
 	nn := &ArrayType{}
 	nn.SetKind(ArrayTypeKind)
-
-	var err error
 
 	err = nn.InitElementType(elementtype)
 	if err != nil {
@@ -2390,70 +2809,37 @@ func NewArrayType(
 }
 
 func (n *ArrayType) InitElementType(d interface{}) error {
+	return n.initElementType(d)
+}
+
+func (n *ArrayType) initElementType(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ArrayType.ElementType: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initElementType(t.Value)
 	case NodeHandler:
 		n.ElementType = d.(TypeHandler)
 		n.Type.AddChild(t)
-	case *Wrapped:
-		n.ElementType = t.Value.(TypeHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.ElementType = d.(TypeHandler)
-	}
-	return nil
-}
-
-func NewStructField(
-	name interface{},
-) (*StructField, error) {
-
-	nn := &StructField{}
-	nn.SetKind(StructFieldKind)
-
-	var err error
-
-	err = nn.InitName(name)
-	if err != nil {
-		return nil, err
+		n.Type.AddChild(d.(NodeHandler))
 	}
 
-	return nn, err
-}
-
-func (n *StructField) InitName(d interface{}) error {
-	switch t := d.(type) {
-	case nil:
-	case NodeHandler:
-		n.Name = d.(*Identifier)
-		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Name = t.Value.(*Identifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
-	default:
-		n.Name = d.(*Identifier)
-	}
 	return nil
 }
 
 func NewStructType(
 	structfields interface{},
-	typeparameterlist interface{},
 ) (*StructType, error) {
+	var err error
 
 	nn := &StructType{}
 	nn.SetKind(StructTypeKind)
 
-	var err error
-
 	err = nn.InitStructFields(structfields)
-	if err != nil {
-		return nil, err
-	}
-
-	err = nn.InitTypeParameterList(typeparameterlist)
 	if err != nil {
 		return nil, err
 	}
@@ -2462,34 +2848,139 @@ func NewStructType(
 }
 
 func (n *StructType) InitStructFields(d interface{}) error {
-	switch t := d.(type) {
-	case nil:
+	if n.StructFields != nil {
 		return fmt.Errorf("StructType.StructFields: %w",
-			ErrMissingRequiredField)
-	case NodeHandler:
-		n.StructFields = d.(*StructField)
-		n.Type.AddChild(t)
-	case *Wrapped:
-		n.StructFields = t.Value.(*StructField)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
-	default:
-		n.StructFields = d.(*StructField)
+			ErrFieldAlreadyInitialized)
 	}
+
+	n.StructFields = make([]*StructField, 0, defaultCapacity)
+
+	return n.initStructFields(d)
+}
+
+func (n *StructType) initStructFields(d interface{}) error {
+	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initStructFields(t.Value)
+	case NodeHandler:
+		n.AddChild(t)
+	case []interface{}:
+		for _, elem := range t {
+			n.AddChild(elem.(NodeHandler))
+		}
+	default:
+		newElem := d.(*StructField)
+		n.StructFields = append(n.StructFields, newElem)
+	}
+
 	return nil
 }
 
 func (n *StructType) InitTypeParameterList(d interface{}) error {
+	return n.initTypeParameterList(d)
+}
+
+func (n *StructType) initTypeParameterList(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.TypeParameterList = d.(*TypeParameterList)
 		n.Type.AddChild(t)
 	case *Wrapped:
-		n.TypeParameterList = t.Value.(*TypeParameterList)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initTypeParameterList(t.Value)
 	default:
 		n.TypeParameterList = d.(*TypeParameterList)
+		n.Type.AddChild(d.(NodeHandler))
 	}
+
+	return nil
+}
+
+func (n *StructType) AddChild(c NodeHandler) {
+	n.StructFields = append(n.StructFields, c.(*StructField))
+
+	n.Node.AddChild(c)
+	c.SetParent(n)
+}
+
+func (n *StructType) AddChildren(children []NodeHandler) {
+	for _, c := range children {
+		if c == nil {
+			continue
+		}
+
+		n.StructFields = append(n.StructFields, c.(*StructField))
+
+		n.Node.AddChild(c)
+		c.SetParent(n)
+	}
+}
+
+func NewStructField(
+	name interface{},
+	typ interface{},
+) (*StructField, error) {
+	var err error
+
+	nn := &StructField{}
+	nn.SetKind(StructFieldKind)
+
+	err = nn.InitName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitType(typ)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn, err
+}
+
+func (n *StructField) InitName(d interface{}) error {
+	return n.initName(d)
+}
+
+func (n *StructField) initName(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.Name = d.(*Identifier)
+		n.Node.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initName(t.Value)
+	default:
+		n.Name = d.(*Identifier)
+		n.Node.AddChild(d.(NodeHandler))
+	}
+
+	return nil
+}
+
+func (n *StructField) InitType(d interface{}) error {
+	return n.initType(d)
+}
+
+func (n *StructField) initType(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+		return fmt.Errorf("StructField.Type: %w",
+			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initType(t.Value)
+	case NodeHandler:
+		n.Type = d.(TypeHandler)
+		n.Node.AddChild(t)
+	default:
+		n.Type = d.(TypeHandler)
+		n.Node.AddChild(d.(NodeHandler))
+	}
+
 	return nil
 }
 
@@ -2499,11 +2990,10 @@ func NewCastExpression(
 	format interface{},
 	issafecast interface{},
 ) (*CastExpression, error) {
+	var err error
 
 	nn := &CastExpression{}
 	nn.SetKind(CastExpressionKind)
-
-	var err error
 
 	err = nn.InitExpr(expr)
 	if err != nil {
@@ -2529,62 +3019,85 @@ func NewCastExpression(
 }
 
 func (n *CastExpression) InitExpr(d interface{}) error {
+	return n.initExpr(d)
+}
+
+func (n *CastExpression) initExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("CastExpression.Expr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpr(t.Value)
 	case NodeHandler:
 		n.Expr = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Expr = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *CastExpression) InitType(d interface{}) error {
+	return n.initType(d)
+}
+
+func (n *CastExpression) initType(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("CastExpression.Type: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initType(t.Value)
 	case NodeHandler:
 		n.Type = d.(TypeHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Type = t.Value.(TypeHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Type = d.(TypeHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *CastExpression) InitFormat(d interface{}) error {
+	return n.initFormat(d)
+}
+
+func (n *CastExpression) initFormat(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Format = d.(*FormatClause)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.Format = t.Value.(*FormatClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initFormat(t.Value)
 	default:
 		n.Format = d.(*FormatClause)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *CastExpression) InitIsSafeCast(d interface{}) error {
+	return n.initIsSafeCast(d)
+}
+
+func (n *CastExpression) initIsSafeCast(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.IsSafeCast = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIsSafeCast(t.Value)
 	default:
 		n.IsSafeCast = d.(bool)
 	}
+
 	return nil
 }
 
@@ -2592,11 +3105,10 @@ func NewSelectAs(
 	typename interface{},
 	asmode interface{},
 ) (*SelectAs, error) {
+	var err error
 
 	nn := &SelectAs{}
 	nn.SetKind(SelectAsKind)
-
-	var err error
 
 	err = nn.InitTypeName(typename)
 	if err != nil {
@@ -2612,39 +3124,49 @@ func NewSelectAs(
 }
 
 func (n *SelectAs) InitTypeName(d interface{}) error {
+	return n.initTypeName(d)
+}
+
+func (n *SelectAs) initTypeName(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.TypeName = d.(*PathExpression)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.TypeName = t.Value.(*PathExpression)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initTypeName(t.Value)
 	default:
 		n.TypeName = d.(*PathExpression)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *SelectAs) InitAsMode(d interface{}) error {
+	return n.initAsMode(d)
+}
+
+func (n *SelectAs) initAsMode(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.AsMode = t.Value.(AsMode)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAsMode(t.Value)
 	default:
 		n.AsMode = d.(AsMode)
 	}
+
 	return nil
 }
 
 func NewRollup(
 	expressions interface{},
 ) (*Rollup, error) {
+	var err error
 
 	nn := &Rollup{}
 	nn.SetKind(RollupKind)
-
-	var err error
 
 	err = nn.InitExpressions(expressions)
 	if err != nil {
@@ -2659,14 +3181,19 @@ func (n *Rollup) InitExpressions(d interface{}) error {
 		return fmt.Errorf("Rollup.Expressions: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Expressions = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initExpressions(d)
+}
+
+func (n *Rollup) initExpressions(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpressions(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.Expressions = append(n.Expressions, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -2675,11 +3202,13 @@ func (n *Rollup) InitExpressions(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.Expressions = append(n.Expressions, newElem)
 	}
+
 	return nil
 }
 
 func (n *Rollup) AddChild(c NodeHandler) {
 	n.Expressions = append(n.Expressions, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -2689,7 +3218,9 @@ func (n *Rollup) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Expressions = append(n.Expressions, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -2699,11 +3230,10 @@ func NewFunctionCall(
 	function interface{},
 	distinct interface{},
 ) (*FunctionCall, error) {
+	var err error
 
 	nn := &FunctionCall{}
 	nn.SetKind(FunctionCallKind)
-
-	var err error
 
 	err = nn.InitFunction(function)
 	if err != nil {
@@ -2719,19 +3249,25 @@ func NewFunctionCall(
 }
 
 func (n *FunctionCall) InitFunction(d interface{}) error {
+	return n.initFunction(d)
+}
+
+func (n *FunctionCall) initFunction(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("FunctionCall.Function: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initFunction(t.Value)
 	case NodeHandler:
 		n.Function = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Function = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Function = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -2740,14 +3276,19 @@ func (n *FunctionCall) InitArguments(d interface{}) error {
 		return fmt.Errorf("FunctionCall.Arguments: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initArguments(d)
+}
+
+func (n *FunctionCall) initArguments(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initArguments(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.Arguments = append(n.Arguments, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -2756,71 +3297,88 @@ func (n *FunctionCall) InitArguments(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.Arguments = append(n.Arguments, newElem)
 	}
+
 	return nil
 }
 
 func (n *FunctionCall) InitOrderBy(d interface{}) error {
+	return n.initOrderBy(d)
+}
+
+func (n *FunctionCall) initOrderBy(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.OrderBy = d.(*OrderBy)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.OrderBy = t.Value.(*OrderBy)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOrderBy(t.Value)
 	default:
 		n.OrderBy = d.(*OrderBy)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *FunctionCall) InitLimitOffset(d interface{}) error {
+	return n.initLimitOffset(d)
+}
+
+func (n *FunctionCall) initLimitOffset(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.LimitOffset = d.(*LimitOffset)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.LimitOffset = t.Value.(*LimitOffset)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLimitOffset(t.Value)
 	default:
 		n.LimitOffset = d.(*LimitOffset)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *FunctionCall) InitNullHandlingModifier(d interface{}) error {
+	return n.initNullHandlingModifier(d)
+}
+
+func (n *FunctionCall) initNullHandlingModifier(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
-	case NodeHandler:
-		n.NullHandlingModifier = d.(NullHandlingModifier)
-		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.NullHandlingModifier = t.Value.(NullHandlingModifier)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initNullHandlingModifier(t.Value)
 	default:
 		n.NullHandlingModifier = d.(NullHandlingModifier)
 	}
+
 	return nil
 }
 
 func (n *FunctionCall) InitDistinct(d interface{}) error {
+	return n.initDistinct(d)
+}
+
+func (n *FunctionCall) initDistinct(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-	case NodeHandler:
-		n.Distinct = d.(bool)
-		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.Distinct = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initDistinct(t.Value)
 	default:
 		n.Distinct = d.(bool)
 	}
+
 	return nil
 }
 
 func (n *FunctionCall) AddChild(c NodeHandler) {
 	n.Arguments = append(n.Arguments, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -2830,7 +3388,9 @@ func (n *FunctionCall) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Arguments = append(n.Arguments, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -2838,20 +3398,13 @@ func (n *FunctionCall) AddChildren(children []NodeHandler) {
 
 func NewArrayConstructor(
 	typ interface{},
-	elements interface{},
 ) (*ArrayConstructor, error) {
+	var err error
 
 	nn := &ArrayConstructor{}
 	nn.SetKind(ArrayConstructorKind)
 
-	var err error
-
 	err = nn.InitType(typ)
-	if err != nil {
-		return nil, err
-	}
-
-	err = nn.InitElements(elements)
 	if err != nil {
 		return nil, err
 	}
@@ -2860,17 +3413,23 @@ func NewArrayConstructor(
 }
 
 func (n *ArrayConstructor) InitType(d interface{}) error {
+	return n.initType(d)
+}
+
+func (n *ArrayConstructor) initType(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Type = d.(*ArrayType)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.Type = t.Value.(*ArrayType)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initType(t.Value)
 	default:
 		n.Type = d.(*ArrayType)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -2879,14 +3438,19 @@ func (n *ArrayConstructor) InitElements(d interface{}) error {
 		return fmt.Errorf("ArrayConstructor.Elements: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Elements = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initElements(d)
+}
+
+func (n *ArrayConstructor) initElements(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initElements(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.Elements = append(n.Elements, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -2895,11 +3459,13 @@ func (n *ArrayConstructor) InitElements(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.Elements = append(n.Elements, newElem)
 	}
+
 	return nil
 }
 
 func (n *ArrayConstructor) AddChild(c NodeHandler) {
 	n.Elements = append(n.Elements, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -2909,7 +3475,9 @@ func (n *ArrayConstructor) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Elements = append(n.Elements, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -2919,11 +3487,10 @@ func NewStructConstructorArg(
 	expression interface{},
 	alias interface{},
 ) (*StructConstructorArg, error) {
+	var err error
 
 	nn := &StructConstructorArg{}
 	nn.SetKind(StructConstructorArgKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -2939,47 +3506,58 @@ func NewStructConstructorArg(
 }
 
 func (n *StructConstructorArg) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *StructConstructorArg) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("StructConstructorArg.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *StructConstructorArg) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *StructConstructorArg) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("StructConstructorArg.Alias: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	case NodeHandler:
 		n.Alias = d.(*Alias)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Alias = t.Value.(*Alias)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Alias = d.(*Alias)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewStructConstructorWithParens(
 	fieldexpressions interface{},
 ) (*StructConstructorWithParens, error) {
+	var err error
 
 	nn := &StructConstructorWithParens{}
 	nn.SetKind(StructConstructorWithParensKind)
-
-	var err error
 
 	err = nn.InitFieldExpressions(fieldexpressions)
 	if err != nil {
@@ -2994,14 +3572,19 @@ func (n *StructConstructorWithParens) InitFieldExpressions(d interface{}) error 
 		return fmt.Errorf("StructConstructorWithParens.FieldExpressions: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.FieldExpressions = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initFieldExpressions(d)
+}
+
+func (n *StructConstructorWithParens) initFieldExpressions(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initFieldExpressions(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.FieldExpressions = append(n.FieldExpressions, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -3010,11 +3593,13 @@ func (n *StructConstructorWithParens) InitFieldExpressions(d interface{}) error 
 		newElem := d.(ExpressionHandler)
 		n.FieldExpressions = append(n.FieldExpressions, newElem)
 	}
+
 	return nil
 }
 
 func (n *StructConstructorWithParens) AddChild(c NodeHandler) {
 	n.FieldExpressions = append(n.FieldExpressions, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -3024,7 +3609,9 @@ func (n *StructConstructorWithParens) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.FieldExpressions = append(n.FieldExpressions, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -3032,20 +3619,13 @@ func (n *StructConstructorWithParens) AddChildren(children []NodeHandler) {
 
 func NewStructConstructorWithKeyword(
 	structtype interface{},
-	fields interface{},
 ) (*StructConstructorWithKeyword, error) {
+	var err error
 
 	nn := &StructConstructorWithKeyword{}
 	nn.SetKind(StructConstructorWithKeywordKind)
 
-	var err error
-
 	err = nn.InitStructType(structtype)
-	if err != nil {
-		return nil, err
-	}
-
-	err = nn.InitFields(fields)
 	if err != nil {
 		return nil, err
 	}
@@ -3054,17 +3634,23 @@ func NewStructConstructorWithKeyword(
 }
 
 func (n *StructConstructorWithKeyword) InitStructType(d interface{}) error {
+	return n.initStructType(d)
+}
+
+func (n *StructConstructorWithKeyword) initStructType(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.StructType = d.(*StructType)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.StructType = t.Value.(*StructType)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initStructType(t.Value)
 	default:
 		n.StructType = d.(*StructType)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -3073,14 +3659,19 @@ func (n *StructConstructorWithKeyword) InitFields(d interface{}) error {
 		return fmt.Errorf("StructConstructorWithKeyword.Fields: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Fields = make([]*StructConstructorArg, 0, defaultCapacity)
+
+	return n.initFields(d)
+}
+
+func (n *StructConstructorWithKeyword) initFields(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initFields(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*StructConstructorArg)
-		n.Fields = append(n.Fields, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -3089,11 +3680,13 @@ func (n *StructConstructorWithKeyword) InitFields(d interface{}) error {
 		newElem := d.(*StructConstructorArg)
 		n.Fields = append(n.Fields, newElem)
 	}
+
 	return nil
 }
 
 func (n *StructConstructorWithKeyword) AddChild(c NodeHandler) {
 	n.Fields = append(n.Fields, c.(*StructConstructorArg))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -3103,7 +3696,9 @@ func (n *StructConstructorWithKeyword) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Fields = append(n.Fields, c.(*StructConstructorArg))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -3116,11 +3711,10 @@ func NewInExpression(
 	unnestexpr interface{},
 	isnot interface{},
 ) (*InExpression, error) {
+	var err error
 
 	nn := &InExpression{}
 	nn.SetKind(InExpressionKind)
-
-	var err error
 
 	err = nn.InitLHS(lhs)
 	if err != nil {
@@ -3151,90 +3745,114 @@ func NewInExpression(
 }
 
 func (n *InExpression) InitLHS(d interface{}) error {
+	return n.initLHS(d)
+}
+
+func (n *InExpression) initLHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("InExpression.LHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLHS(t.Value)
 	case NodeHandler:
 		n.LHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.LHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *InExpression) InitInList(d interface{}) error {
+	return n.initInList(d)
+}
+
+func (n *InExpression) initInList(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.InList = d.(*InList)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.InList = t.Value.(*InList)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initInList(t.Value)
 	default:
 		n.InList = d.(*InList)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *InExpression) InitQuery(d interface{}) error {
+	return n.initQuery(d)
+}
+
+func (n *InExpression) initQuery(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Query = d.(*Query)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.Query = t.Value.(*Query)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initQuery(t.Value)
 	default:
 		n.Query = d.(*Query)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *InExpression) InitUnnestExpr(d interface{}) error {
+	return n.initUnnestExpr(d)
+}
+
+func (n *InExpression) initUnnestExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.UnnestExpr = d.(*UnnestExpression)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.UnnestExpr = t.Value.(*UnnestExpression)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initUnnestExpr(t.Value)
 	default:
 		n.UnnestExpr = d.(*UnnestExpression)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *InExpression) InitIsNot(d interface{}) error {
+	return n.initIsNot(d)
+}
+
+func (n *InExpression) initIsNot(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-	case NodeHandler:
-		n.IsNot = d.(bool)
-		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.IsNot = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIsNot(t.Value)
 	default:
 		n.IsNot = d.(bool)
 	}
+
 	return nil
 }
 
 func NewInList(
 	list interface{},
 ) (*InList, error) {
+	var err error
 
 	nn := &InList{}
 	nn.SetKind(InListKind)
-
-	var err error
 
 	err = nn.InitList(list)
 	if err != nil {
@@ -3249,14 +3867,19 @@ func (n *InList) InitList(d interface{}) error {
 		return fmt.Errorf("InList.List: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.List = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initList(d)
+}
+
+func (n *InList) initList(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initList(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.List = append(n.List, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -3265,11 +3888,13 @@ func (n *InList) InitList(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.List = append(n.List, newElem)
 	}
+
 	return nil
 }
 
 func (n *InList) AddChild(c NodeHandler) {
 	n.List = append(n.List, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -3279,7 +3904,9 @@ func (n *InList) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.List = append(n.List, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -3291,11 +3918,10 @@ func NewBetweenExpression(
 	high interface{},
 	isnot interface{},
 ) (*BetweenExpression, error) {
+	var err error
 
 	nn := &BetweenExpression{}
 	nn.SetKind(BetweenExpressionKind)
-
-	var err error
 
 	err = nn.InitLHS(lhs)
 	if err != nil {
@@ -3321,97 +3947,113 @@ func NewBetweenExpression(
 }
 
 func (n *BetweenExpression) InitLHS(d interface{}) error {
+	return n.initLHS(d)
+}
+
+func (n *BetweenExpression) initLHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("BetweenExpression.LHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLHS(t.Value)
 	case NodeHandler:
 		n.LHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.LHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *BetweenExpression) InitLow(d interface{}) error {
+	return n.initLow(d)
+}
+
+func (n *BetweenExpression) initLow(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("BetweenExpression.Low: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLow(t.Value)
 	case NodeHandler:
 		n.Low = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Low = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Low = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *BetweenExpression) InitHigh(d interface{}) error {
+	return n.initHigh(d)
+}
+
+func (n *BetweenExpression) initHigh(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("BetweenExpression.High: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initHigh(t.Value)
 	case NodeHandler:
 		n.High = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.High = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.High = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *BetweenExpression) InitIsNot(d interface{}) error {
+	return n.initIsNot(d)
+}
+
+func (n *BetweenExpression) initIsNot(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-	case NodeHandler:
-		n.IsNot = d.(bool)
-		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.IsNot = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIsNot(t.Value)
 	default:
 		n.IsNot = d.(bool)
 	}
+
 	return nil
 }
 
 func NewNumericLiteral() (*NumericLiteral, error) {
+	var err error
 
 	nn := &NumericLiteral{}
 	nn.SetKind(NumericLiteralKind)
-
-	var err error
 
 	return nn, err
 }
 
 func NewBigNumericLiteral() (*BigNumericLiteral, error) {
+	var err error
 
 	nn := &BigNumericLiteral{}
 	nn.SetKind(BigNumericLiteralKind)
-
-	var err error
 
 	return nn, err
 }
 
 func NewBytesLiteral() (*BytesLiteral, error) {
+	var err error
 
 	nn := &BytesLiteral{}
 	nn.SetKind(BytesLiteralKind)
-
-	var err error
 
 	return nn, err
 }
@@ -3420,11 +4062,10 @@ func NewDateOrTimeLiteral(
 	stringliteral interface{},
 	typekind interface{},
 ) (*DateOrTimeLiteral, error) {
+	var err error
 
 	nn := &DateOrTimeLiteral{}
 	nn.SetKind(DateOrTimeLiteralKind)
-
-	var err error
 
 	err = nn.InitStringLiteral(stringliteral)
 	if err != nil {
@@ -3440,45 +4081,56 @@ func NewDateOrTimeLiteral(
 }
 
 func (n *DateOrTimeLiteral) InitStringLiteral(d interface{}) error {
+	return n.initStringLiteral(d)
+}
+
+func (n *DateOrTimeLiteral) initStringLiteral(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DateOrTimeLiteral.StringLiteral: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initStringLiteral(t.Value)
 	case NodeHandler:
 		n.StringLiteral = d.(*StringLiteral)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.StringLiteral = t.Value.(*StringLiteral)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.StringLiteral = d.(*StringLiteral)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *DateOrTimeLiteral) InitTypeKind(d interface{}) error {
+	return n.initTypeKind(d)
+}
+
+func (n *DateOrTimeLiteral) initTypeKind(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.TypeKind = d.(TypeKind)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.TypeKind = t.Value.(TypeKind)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initTypeKind(t.Value)
 	default:
 		n.TypeKind = d.(TypeKind)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewCaseValueExpression(
 	arguments interface{},
 ) (*CaseValueExpression, error) {
+	var err error
 
 	nn := &CaseValueExpression{}
 	nn.SetKind(CaseValueExpressionKind)
-
-	var err error
 
 	err = nn.InitArguments(arguments)
 	if err != nil {
@@ -3493,14 +4145,19 @@ func (n *CaseValueExpression) InitArguments(d interface{}) error {
 		return fmt.Errorf("CaseValueExpression.Arguments: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initArguments(d)
+}
+
+func (n *CaseValueExpression) initArguments(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initArguments(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.Arguments = append(n.Arguments, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -3509,11 +4166,13 @@ func (n *CaseValueExpression) InitArguments(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.Arguments = append(n.Arguments, newElem)
 	}
+
 	return nil
 }
 
 func (n *CaseValueExpression) AddChild(c NodeHandler) {
 	n.Arguments = append(n.Arguments, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -3523,7 +4182,9 @@ func (n *CaseValueExpression) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Arguments = append(n.Arguments, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -3532,11 +4193,10 @@ func (n *CaseValueExpression) AddChildren(children []NodeHandler) {
 func NewCaseNoValueExpression(
 	arguments interface{},
 ) (*CaseNoValueExpression, error) {
+	var err error
 
 	nn := &CaseNoValueExpression{}
 	nn.SetKind(CaseNoValueExpressionKind)
-
-	var err error
 
 	err = nn.InitArguments(arguments)
 	if err != nil {
@@ -3551,14 +4211,19 @@ func (n *CaseNoValueExpression) InitArguments(d interface{}) error {
 		return fmt.Errorf("CaseNoValueExpression.Arguments: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Arguments = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initArguments(d)
+}
+
+func (n *CaseNoValueExpression) initArguments(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initArguments(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.Arguments = append(n.Arguments, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -3567,11 +4232,13 @@ func (n *CaseNoValueExpression) InitArguments(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.Arguments = append(n.Arguments, newElem)
 	}
+
 	return nil
 }
 
 func (n *CaseNoValueExpression) AddChild(c NodeHandler) {
 	n.Arguments = append(n.Arguments, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -3581,7 +4248,9 @@ func (n *CaseNoValueExpression) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Arguments = append(n.Arguments, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -3591,11 +4260,10 @@ func NewArrayElement(
 	array interface{},
 	position interface{},
 ) (*ArrayElement, error) {
+	var err error
 
 	nn := &ArrayElement{}
 	nn.SetKind(ArrayElementKind)
-
-	var err error
 
 	err = nn.InitArray(array)
 	if err != nil {
@@ -3611,36 +4279,48 @@ func NewArrayElement(
 }
 
 func (n *ArrayElement) InitArray(d interface{}) error {
+	return n.initArray(d)
+}
+
+func (n *ArrayElement) initArray(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ArrayElement.Array: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initArray(t.Value)
 	case NodeHandler:
 		n.Array = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Array = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Array = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *ArrayElement) InitPosition(d interface{}) error {
+	return n.initPosition(d)
+}
+
+func (n *ArrayElement) initPosition(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ArrayElement.Position: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPosition(t.Value)
 	case NodeHandler:
 		n.Position = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Position = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Position = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -3649,11 +4329,10 @@ func NewBitwiseShiftExpression(
 	rhs interface{},
 	isleftshift interface{},
 ) (*BitwiseShiftExpression, error) {
+	var err error
 
 	nn := &BitwiseShiftExpression{}
 	nn.SetKind(BitwiseShiftExpressionKind)
-
-	var err error
 
 	err = nn.InitLHS(lhs)
 	if err != nil {
@@ -3674,51 +4353,69 @@ func NewBitwiseShiftExpression(
 }
 
 func (n *BitwiseShiftExpression) InitLHS(d interface{}) error {
+	return n.initLHS(d)
+}
+
+func (n *BitwiseShiftExpression) initLHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("BitwiseShiftExpression.LHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLHS(t.Value)
 	case NodeHandler:
 		n.LHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.LHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *BitwiseShiftExpression) InitRHS(d interface{}) error {
+	return n.initRHS(d)
+}
+
+func (n *BitwiseShiftExpression) initRHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("BitwiseShiftExpression.RHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initRHS(t.Value)
 	case NodeHandler:
 		n.RHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.RHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.RHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *BitwiseShiftExpression) InitIsLeftShift(d interface{}) error {
+	return n.initIsLeftShift(d)
+}
+
+func (n *BitwiseShiftExpression) initIsLeftShift(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.IsLeftShift = d.(bool)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.IsLeftShift = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIsLeftShift(t.Value)
 	default:
 		n.IsLeftShift = d.(bool)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -3726,11 +4423,10 @@ func NewDotGeneralizedField(
 	expr interface{},
 	path interface{},
 ) (*DotGeneralizedField, error) {
+	var err error
 
 	nn := &DotGeneralizedField{}
 	nn.SetKind(DotGeneralizedFieldKind)
-
-	var err error
 
 	err = nn.InitExpr(expr)
 	if err != nil {
@@ -3746,36 +4442,48 @@ func NewDotGeneralizedField(
 }
 
 func (n *DotGeneralizedField) InitExpr(d interface{}) error {
+	return n.initExpr(d)
+}
+
+func (n *DotGeneralizedField) initExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DotGeneralizedField.Expr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpr(t.Value)
 	case NodeHandler:
 		n.Expr = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Expr = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *DotGeneralizedField) InitPath(d interface{}) error {
+	return n.initPath(d)
+}
+
+func (n *DotGeneralizedField) initPath(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DotGeneralizedField.Path: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPath(t.Value)
 	case NodeHandler:
 		n.Path = d.(*PathExpression)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Path = t.Value.(*PathExpression)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Path = d.(*PathExpression)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -3783,11 +4491,10 @@ func NewDotIdentifier(
 	expr interface{},
 	name interface{},
 ) (*DotIdentifier, error) {
+	var err error
 
 	nn := &DotIdentifier{}
 	nn.SetKind(DotIdentifierKind)
-
-	var err error
 
 	err = nn.InitExpr(expr)
 	if err != nil {
@@ -3803,47 +4510,58 @@ func NewDotIdentifier(
 }
 
 func (n *DotIdentifier) InitExpr(d interface{}) error {
+	return n.initExpr(d)
+}
+
+func (n *DotIdentifier) initExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DotIdentifier.Expr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpr(t.Value)
 	case NodeHandler:
 		n.Expr = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Expr = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *DotIdentifier) InitName(d interface{}) error {
+	return n.initName(d)
+}
+
+func (n *DotIdentifier) initName(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DotIdentifier.Name: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initName(t.Value)
 	case NodeHandler:
 		n.Name = d.(*Identifier)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Name = t.Value.(*Identifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Name = d.(*Identifier)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewDotStar(
 	expr interface{},
 ) (*DotStar, error) {
+	var err error
 
 	nn := &DotStar{}
 	nn.SetKind(DotStarKind)
-
-	var err error
 
 	err = nn.InitExpr(expr)
 	if err != nil {
@@ -3854,19 +4572,25 @@ func NewDotStar(
 }
 
 func (n *DotStar) InitExpr(d interface{}) error {
+	return n.initExpr(d)
+}
+
+func (n *DotStar) initExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DotStar.Expr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpr(t.Value)
 	case NodeHandler:
 		n.Expr = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Expr = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -3874,11 +4598,10 @@ func NewDotStarWithModifiers(
 	expr interface{},
 	modifiers interface{},
 ) (*DotStarWithModifiers, error) {
+	var err error
 
 	nn := &DotStarWithModifiers{}
 	nn.SetKind(DotStarWithModifiersKind)
-
-	var err error
 
 	err = nn.InitExpr(expr)
 	if err != nil {
@@ -3894,36 +4617,48 @@ func NewDotStarWithModifiers(
 }
 
 func (n *DotStarWithModifiers) InitExpr(d interface{}) error {
+	return n.initExpr(d)
+}
+
+func (n *DotStarWithModifiers) initExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DotStarWithModifiers.Expr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpr(t.Value)
 	case NodeHandler:
 		n.Expr = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Expr = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *DotStarWithModifiers) InitModifiers(d interface{}) error {
+	return n.initModifiers(d)
+}
+
+func (n *DotStarWithModifiers) initModifiers(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("DotStarWithModifiers.Modifiers: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initModifiers(t.Value)
 	case NodeHandler:
 		n.Modifiers = d.(*StarModifiers)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Modifiers = t.Value.(*StarModifiers)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Modifiers = d.(*StarModifiers)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -3931,11 +4666,10 @@ func NewExpressionSubquery(
 	query interface{},
 	modifier interface{},
 ) (*ExpressionSubquery, error) {
+	var err error
 
 	nn := &ExpressionSubquery{}
 	nn.SetKind(ExpressionSubqueryKind)
-
-	var err error
 
 	err = nn.InitQuery(query)
 	if err != nil {
@@ -3951,36 +4685,48 @@ func NewExpressionSubquery(
 }
 
 func (n *ExpressionSubquery) InitQuery(d interface{}) error {
+	return n.initQuery(d)
+}
+
+func (n *ExpressionSubquery) initQuery(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ExpressionSubquery.Query: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initQuery(t.Value)
 	case NodeHandler:
 		n.Query = d.(*Query)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Query = t.Value.(*Query)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Query = d.(*Query)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *ExpressionSubquery) InitModifier(d interface{}) error {
+	return n.initModifier(d)
+}
+
+func (n *ExpressionSubquery) initModifier(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ExpressionSubquery.Modifier: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initModifier(t.Value)
 	case NodeHandler:
 		n.Modifier = d.(SubqueryModifier)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Modifier = t.Value.(SubqueryModifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Modifier = d.(SubqueryModifier)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -3989,11 +4735,10 @@ func NewExtractExpression(
 	rhs interface{},
 	timezone interface{},
 ) (*ExtractExpression, error) {
+	var err error
 
 	nn := &ExtractExpression{}
 	nn.SetKind(ExtractExpressionKind)
-
-	var err error
 
 	err = nn.InitLHS(lhs)
 	if err != nil {
@@ -4014,51 +4759,69 @@ func NewExtractExpression(
 }
 
 func (n *ExtractExpression) InitLHS(d interface{}) error {
+	return n.initLHS(d)
+}
+
+func (n *ExtractExpression) initLHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ExtractExpression.LHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLHS(t.Value)
 	case NodeHandler:
 		n.LHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.LHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *ExtractExpression) InitRHS(d interface{}) error {
+	return n.initRHS(d)
+}
+
+func (n *ExtractExpression) initRHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ExtractExpression.RHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initRHS(t.Value)
 	case NodeHandler:
 		n.RHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.RHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.RHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *ExtractExpression) InitTimeZone(d interface{}) error {
+	return n.initTimeZone(d)
+}
+
+func (n *ExtractExpression) initTimeZone(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.TimeZone = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.TimeZone = t.Value.(ExpressionHandler)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initTimeZone(t.Value)
 	default:
 		n.TimeZone = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -4067,11 +4830,10 @@ func NewIntervalExpr(
 	datepartname interface{},
 	datepartnameto interface{},
 ) (*IntervalExpr, error) {
+	var err error
 
 	nn := &IntervalExpr{}
 	nn.SetKind(IntervalExprKind)
-
-	var err error
 
 	err = nn.InitIntervalValue(intervalvalue)
 	if err != nil {
@@ -4092,62 +4854,79 @@ func NewIntervalExpr(
 }
 
 func (n *IntervalExpr) InitIntervalValue(d interface{}) error {
+	return n.initIntervalValue(d)
+}
+
+func (n *IntervalExpr) initIntervalValue(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("IntervalExpr.IntervalValue: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIntervalValue(t.Value)
 	case NodeHandler:
 		n.IntervalValue = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.IntervalValue = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.IntervalValue = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *IntervalExpr) InitDatePartName(d interface{}) error {
+	return n.initDatePartName(d)
+}
+
+func (n *IntervalExpr) initDatePartName(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("IntervalExpr.DatePartName: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initDatePartName(t.Value)
 	case NodeHandler:
 		n.DatePartName = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.DatePartName = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.DatePartName = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *IntervalExpr) InitDatePartNameTo(d interface{}) error {
+	return n.initDatePartNameTo(d)
+}
+
+func (n *IntervalExpr) initDatePartNameTo(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.DatePartNameTo = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.DatePartNameTo = t.Value.(ExpressionHandler)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initDatePartNameTo(t.Value)
 	default:
 		n.DatePartNameTo = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewNullOrder(
 	nullsfirst interface{},
 ) (*NullOrder, error) {
+	var err error
 
 	nn := &NullOrder{}
 	nn.SetKind(NullOrderKind)
-
-	var err error
 
 	err = nn.InitNullsFirst(nullsfirst)
 	if err != nil {
@@ -4158,24 +4937,28 @@ func NewNullOrder(
 }
 
 func (n *NullOrder) InitNullsFirst(d interface{}) error {
+	return n.initNullsFirst(d)
+}
+
+func (n *NullOrder) initNullsFirst(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.NullsFirst = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initNullsFirst(t.Value)
 	default:
 		n.NullsFirst = d.(bool)
 	}
+
 	return nil
 }
 
 func NewOnOrUsingClauseList(
 	list interface{},
 ) (*OnOrUsingClauseList, error) {
+	var err error
 
 	nn := &OnOrUsingClauseList{}
 	nn.SetKind(OnOrUsingClauseListKind)
-
-	var err error
 
 	err = nn.InitList(list)
 	if err != nil {
@@ -4190,14 +4973,19 @@ func (n *OnOrUsingClauseList) InitList(d interface{}) error {
 		return fmt.Errorf("OnOrUsingClauseList.List: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.List = make([]NodeHandler, 0, defaultCapacity)
+
+	return n.initList(d)
+}
+
+func (n *OnOrUsingClauseList) initList(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initList(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(NodeHandler)
-		n.List = append(n.List, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -4206,11 +4994,13 @@ func (n *OnOrUsingClauseList) InitList(d interface{}) error {
 		newElem := d.(NodeHandler)
 		n.List = append(n.List, newElem)
 	}
+
 	return nil
 }
 
 func (n *OnOrUsingClauseList) AddChild(c NodeHandler) {
-	n.List = append(n.List, c.(NodeHandler))
+	n.List = append(n.List, c)
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -4220,7 +5010,9 @@ func (n *OnOrUsingClauseList) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
-		n.List = append(n.List, c.(NodeHandler))
+
+		n.List = append(n.List, c)
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -4230,11 +5022,10 @@ func NewParenthesizedJoin(
 	join interface{},
 	sampleclause interface{},
 ) (*ParenthesizedJoin, error) {
+	var err error
 
 	nn := &ParenthesizedJoin{}
 	nn.SetKind(ParenthesizedJoinKind)
-
-	var err error
 
 	err = nn.InitJoin(join)
 	if err != nil {
@@ -4250,45 +5041,56 @@ func NewParenthesizedJoin(
 }
 
 func (n *ParenthesizedJoin) InitJoin(d interface{}) error {
+	return n.initJoin(d)
+}
+
+func (n *ParenthesizedJoin) initJoin(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("ParenthesizedJoin.Join: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initJoin(t.Value)
 	case NodeHandler:
 		n.Join = d.(*Join)
 		n.TableExpression.AddChild(t)
-	case *Wrapped:
-		n.Join = t.Value.(*Join)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Join = d.(*Join)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *ParenthesizedJoin) InitSampleClause(d interface{}) error {
+	return n.initSampleClause(d)
+}
+
+func (n *ParenthesizedJoin) initSampleClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.SampleClause = d.(SampleClause)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.SampleClause = t.Value.(SampleClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSampleClause(t.Value)
 	default:
 		n.SampleClause = d.(SampleClause)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewPartitionBy(
 	partitioningexpressions interface{},
 ) (*PartitionBy, error) {
+	var err error
 
 	nn := &PartitionBy{}
 	nn.SetKind(PartitionByKind)
-
-	var err error
 
 	err = nn.InitPartitioningExpressions(partitioningexpressions)
 	if err != nil {
@@ -4303,14 +5105,19 @@ func (n *PartitionBy) InitPartitioningExpressions(d interface{}) error {
 		return fmt.Errorf("PartitionBy.PartitioningExpressions: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.PartitioningExpressions = make([]ExpressionHandler, 0, defaultCapacity)
+
+	return n.initPartitioningExpressions(d)
+}
+
+func (n *PartitionBy) initPartitioningExpressions(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPartitioningExpressions(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(ExpressionHandler)
-		n.PartitioningExpressions = append(n.PartitioningExpressions, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -4319,11 +5126,13 @@ func (n *PartitionBy) InitPartitioningExpressions(d interface{}) error {
 		newElem := d.(ExpressionHandler)
 		n.PartitioningExpressions = append(n.PartitioningExpressions, newElem)
 	}
+
 	return nil
 }
 
 func (n *PartitionBy) AddChild(c NodeHandler) {
 	n.PartitioningExpressions = append(n.PartitioningExpressions, c.(ExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -4333,7 +5142,9 @@ func (n *PartitionBy) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.PartitioningExpressions = append(n.PartitioningExpressions, c.(ExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -4344,11 +5155,10 @@ func NewSetOperation(
 	optype interface{},
 	distinct interface{},
 ) (*SetOperation, error) {
+	var err error
 
 	nn := &SetOperation{}
 	nn.SetKind(SetOperationKind)
-
-	var err error
 
 	err = nn.InitInputs(inputs)
 	if err != nil {
@@ -4373,14 +5183,19 @@ func (n *SetOperation) InitInputs(d interface{}) error {
 		return fmt.Errorf("SetOperation.Inputs: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Inputs = make([]QueryExpressionHandler, 0, defaultCapacity)
+
+	return n.initInputs(d)
+}
+
+func (n *SetOperation) initInputs(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initInputs(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(QueryExpressionHandler)
-		n.Inputs = append(n.Inputs, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -4389,33 +5204,45 @@ func (n *SetOperation) InitInputs(d interface{}) error {
 		newElem := d.(QueryExpressionHandler)
 		n.Inputs = append(n.Inputs, newElem)
 	}
+
 	return nil
 }
 
 func (n *SetOperation) InitOpType(d interface{}) error {
+	return n.initOpType(d)
+}
+
+func (n *SetOperation) initOpType(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.OpType = t.Value.(SetOp)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOpType(t.Value)
 	default:
 		n.OpType = d.(SetOp)
 	}
+
 	return nil
 }
 
 func (n *SetOperation) InitDistinct(d interface{}) error {
+	return n.initDistinct(d)
+}
+
+func (n *SetOperation) initDistinct(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.Distinct = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initDistinct(t.Value)
 	default:
 		n.Distinct = d.(bool)
 	}
+
 	return nil
 }
 
 func (n *SetOperation) AddChild(c NodeHandler) {
 	n.Inputs = append(n.Inputs, c.(QueryExpressionHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -4425,7 +5252,9 @@ func (n *SetOperation) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Inputs = append(n.Inputs, c.(QueryExpressionHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -4434,11 +5263,10 @@ func (n *SetOperation) AddChildren(children []NodeHandler) {
 func NewStarExceptList(
 	identifiers interface{},
 ) (*StarExceptList, error) {
+	var err error
 
 	nn := &StarExceptList{}
 	nn.SetKind(StarExceptListKind)
-
-	var err error
 
 	err = nn.InitIdentifiers(identifiers)
 	if err != nil {
@@ -4453,14 +5281,19 @@ func (n *StarExceptList) InitIdentifiers(d interface{}) error {
 		return fmt.Errorf("StarExceptList.Identifiers: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Identifiers = make([]*Identifier, 0, defaultCapacity)
+
+	return n.initIdentifiers(d)
+}
+
+func (n *StarExceptList) initIdentifiers(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIdentifiers(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*Identifier)
-		n.Identifiers = append(n.Identifiers, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -4469,11 +5302,13 @@ func (n *StarExceptList) InitIdentifiers(d interface{}) error {
 		newElem := d.(*Identifier)
 		n.Identifiers = append(n.Identifiers, newElem)
 	}
+
 	return nil
 }
 
 func (n *StarExceptList) AddChild(c NodeHandler) {
 	n.Identifiers = append(n.Identifiers, c.(*Identifier))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -4483,7 +5318,9 @@ func (n *StarExceptList) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Identifiers = append(n.Identifiers, c.(*Identifier))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -4493,11 +5330,10 @@ func NewStarModifiers(
 	exceptlist interface{},
 	replaceitems interface{},
 ) (*StarModifiers, error) {
+	var err error
 
 	nn := &StarModifiers{}
 	nn.SetKind(StarModifiersKind)
-
-	var err error
 
 	err = nn.InitExceptList(exceptlist)
 	if err != nil {
@@ -4513,17 +5349,23 @@ func NewStarModifiers(
 }
 
 func (n *StarModifiers) InitExceptList(d interface{}) error {
+	return n.initExceptList(d)
+}
+
+func (n *StarModifiers) initExceptList(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.ExceptList = d.(*StarExceptList)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.ExceptList = t.Value.(*StarExceptList)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExceptList(t.Value)
 	default:
 		n.ExceptList = d.(*StarExceptList)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -4532,14 +5374,19 @@ func (n *StarModifiers) InitReplaceItems(d interface{}) error {
 		return fmt.Errorf("StarModifiers.ReplaceItems: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.ReplaceItems = make([]*StarReplaceItem, 0, defaultCapacity)
+
+	return n.initReplaceItems(d)
+}
+
+func (n *StarModifiers) initReplaceItems(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initReplaceItems(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*StarReplaceItem)
-		n.ReplaceItems = append(n.ReplaceItems, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -4548,11 +5395,13 @@ func (n *StarModifiers) InitReplaceItems(d interface{}) error {
 		newElem := d.(*StarReplaceItem)
 		n.ReplaceItems = append(n.ReplaceItems, newElem)
 	}
+
 	return nil
 }
 
 func (n *StarModifiers) AddChild(c NodeHandler) {
 	n.ReplaceItems = append(n.ReplaceItems, c.(*StarReplaceItem))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -4562,7 +5411,9 @@ func (n *StarModifiers) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.ReplaceItems = append(n.ReplaceItems, c.(*StarReplaceItem))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -4572,11 +5423,10 @@ func NewStarReplaceItem(
 	expression interface{},
 	alias interface{},
 ) (*StarReplaceItem, error) {
+	var err error
 
 	nn := &StarReplaceItem{}
 	nn.SetKind(StarReplaceItemKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -4592,47 +5442,58 @@ func NewStarReplaceItem(
 }
 
 func (n *StarReplaceItem) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *StarReplaceItem) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("StarReplaceItem.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *StarReplaceItem) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *StarReplaceItem) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("StarReplaceItem.Alias: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	case NodeHandler:
 		n.Alias = d.(*Identifier)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Alias = t.Value.(*Identifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Alias = d.(*Identifier)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewStarWithModifiers(
 	modifiers interface{},
 ) (*StarWithModifiers, error) {
+	var err error
 
 	nn := &StarWithModifiers{}
 	nn.SetKind(StarWithModifiersKind)
-
-	var err error
 
 	err = nn.InitModifiers(modifiers)
 	if err != nil {
@@ -4643,32 +5504,39 @@ func NewStarWithModifiers(
 }
 
 func (n *StarWithModifiers) InitModifiers(d interface{}) error {
+	return n.initModifiers(d)
+}
+
+func (n *StarWithModifiers) initModifiers(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("StarWithModifiers.Modifiers: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initModifiers(t.Value)
 	case NodeHandler:
 		n.Modifiers = d.(*StarModifiers)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Modifiers = t.Value.(*StarModifiers)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Modifiers = d.(*StarModifiers)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewTableSubquery(
 	subquery interface{},
 	alias interface{},
+	pivotclause interface{},
+	unpivotclause interface{},
 	sampleclause interface{},
 ) (*TableSubquery, error) {
+	var err error
 
 	nn := &TableSubquery{}
 	nn.SetKind(TableSubqueryKind)
-
-	var err error
 
 	err = nn.InitSubquery(subquery)
 	if err != nil {
@@ -4676,6 +5544,16 @@ func NewTableSubquery(
 	}
 
 	err = nn.InitAlias(alias)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitPivotClause(pivotclause)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nn.InitUnpivotClause(unpivotclause)
 	if err != nil {
 		return nil, err
 	}
@@ -4689,68 +5567,127 @@ func NewTableSubquery(
 }
 
 func (n *TableSubquery) InitSubquery(d interface{}) error {
+	return n.initSubquery(d)
+}
+
+func (n *TableSubquery) initSubquery(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("TableSubquery.Subquery: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSubquery(t.Value)
 	case NodeHandler:
 		n.Subquery = d.(*Query)
 		n.TableExpression.AddChild(t)
-	case *Wrapped:
-		n.Subquery = t.Value.(*Query)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Subquery = d.(*Query)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *TableSubquery) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *TableSubquery) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Alias = d.(*Alias)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.Alias = t.Value.(*Alias)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	default:
 		n.Alias = d.(*Alias)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
+	return nil
+}
+
+func (n *TableSubquery) InitPivotClause(d interface{}) error {
+	return n.initPivotClause(d)
+}
+
+func (n *TableSubquery) initPivotClause(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.PivotClause = d.(interface{})
+		n.TableExpression.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPivotClause(t.Value)
+	default:
+		n.PivotClause = d.(interface{})
+		n.TableExpression.AddChild(d.(NodeHandler))
+	}
+
+	return nil
+}
+
+func (n *TableSubquery) InitUnpivotClause(d interface{}) error {
+	return n.initUnpivotClause(d)
+}
+
+func (n *TableSubquery) initUnpivotClause(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.UnpivotClause = d.(interface{})
+		n.TableExpression.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initUnpivotClause(t.Value)
+	default:
+		n.UnpivotClause = d.(interface{})
+		n.TableExpression.AddChild(d.(NodeHandler))
+	}
+
 	return nil
 }
 
 func (n *TableSubquery) InitSampleClause(d interface{}) error {
+	return n.initSampleClause(d)
+}
+
+func (n *TableSubquery) initSampleClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.SampleClause = d.(*SampleClause)
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
-		n.SampleClause = t.Value.(*SampleClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSampleClause(t.Value)
 	default:
 		n.SampleClause = d.(*SampleClause)
+		n.TableExpression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewUnaryExpression(
-	operand interface{},
 	op interface{},
+	operand interface{},
 ) (*UnaryExpression, error) {
+	var err error
 
 	nn := &UnaryExpression{}
 	nn.SetKind(UnaryExpressionKind)
 
-	var err error
-
-	err = nn.InitOperand(operand)
+	err = nn.InitOp(op)
 	if err != nil {
 		return nil, err
 	}
 
-	err = nn.InitOp(op)
+	err = nn.InitOperand(operand)
 	if err != nil {
 		return nil, err
 	}
@@ -4758,42 +5695,52 @@ func NewUnaryExpression(
 	return nn, err
 }
 
+func (n *UnaryExpression) InitOp(d interface{}) error {
+	return n.initOp(d)
+}
+
+func (n *UnaryExpression) initOp(d interface{}) error {
+	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOp(t.Value)
+	default:
+		n.Op = d.(UnaryOp)
+	}
+
+	return nil
+}
+
 func (n *UnaryExpression) InitOperand(d interface{}) error {
+	return n.initOperand(d)
+}
+
+func (n *UnaryExpression) initOperand(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("UnaryExpression.Operand: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOperand(t.Value)
 	case NodeHandler:
 		n.Operand = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Operand = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Operand = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
-	return nil
-}
 
-func (n *UnaryExpression) InitOp(d interface{}) error {
-	switch t := d.(type) {
-	case *Wrapped:
-		n.Op = t.Value.(UnaryOp)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
-	default:
-		n.Op = d.(UnaryOp)
-	}
 	return nil
 }
 
 func NewUnnestExpression(
 	expression interface{},
 ) (*UnnestExpression, error) {
+	var err error
 
 	nn := &UnnestExpression{}
 	nn.SetKind(UnnestExpressionKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -4804,30 +5751,35 @@ func NewUnnestExpression(
 }
 
 func (n *UnnestExpression) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *UnnestExpression) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("UnnestExpression.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewWindowClause(
 	windows interface{},
 ) (*WindowClause, error) {
+	var err error
 
 	nn := &WindowClause{}
 	nn.SetKind(WindowClauseKind)
-
-	var err error
 
 	err = nn.InitWindows(windows)
 	if err != nil {
@@ -4842,14 +5794,19 @@ func (n *WindowClause) InitWindows(d interface{}) error {
 		return fmt.Errorf("WindowClause.Windows: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Windows = make([]*WindowDefinition, 0, defaultCapacity)
+
+	return n.initWindows(d)
+}
+
+func (n *WindowClause) initWindows(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWindows(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(*WindowDefinition)
-		n.Windows = append(n.Windows, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -4858,11 +5815,13 @@ func (n *WindowClause) InitWindows(d interface{}) error {
 		newElem := d.(*WindowDefinition)
 		n.Windows = append(n.Windows, newElem)
 	}
+
 	return nil
 }
 
 func (n *WindowClause) AddChild(c NodeHandler) {
 	n.Windows = append(n.Windows, c.(*WindowDefinition))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -4872,7 +5831,9 @@ func (n *WindowClause) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Windows = append(n.Windows, c.(*WindowDefinition))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -4882,11 +5843,10 @@ func NewWindowDefinition(
 	name interface{},
 	windowspec interface{},
 ) (*WindowDefinition, error) {
+	var err error
 
 	nn := &WindowDefinition{}
 	nn.SetKind(WindowDefinitionKind)
-
-	var err error
 
 	err = nn.InitName(name)
 	if err != nil {
@@ -4902,36 +5862,48 @@ func NewWindowDefinition(
 }
 
 func (n *WindowDefinition) InitName(d interface{}) error {
+	return n.initName(d)
+}
+
+func (n *WindowDefinition) initName(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WindowDefinition.Name: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initName(t.Value)
 	case NodeHandler:
 		n.Name = d.(*Identifier)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Name = t.Value.(*Identifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Name = d.(*Identifier)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WindowDefinition) InitWindowSpec(d interface{}) error {
+	return n.initWindowSpec(d)
+}
+
+func (n *WindowDefinition) initWindowSpec(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WindowDefinition.WindowSpec: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWindowSpec(t.Value)
 	case NodeHandler:
 		n.WindowSpec = d.(*WindowSpecification)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.WindowSpec = t.Value.(*WindowSpecification)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.WindowSpec = d.(*WindowSpecification)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -4940,11 +5912,10 @@ func NewWindowFrame(
 	endexpr interface{},
 	frameunit interface{},
 ) (*WindowFrame, error) {
+	var err error
 
 	nn := &WindowFrame{}
 	nn.SetKind(WindowFrameKind)
-
-	var err error
 
 	err = nn.InitStartExpr(startexpr)
 	if err != nil {
@@ -4965,53 +5936,71 @@ func NewWindowFrame(
 }
 
 func (n *WindowFrame) InitStartExpr(d interface{}) error {
+	return n.initStartExpr(d)
+}
+
+func (n *WindowFrame) initStartExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WindowFrame.StartExpr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initStartExpr(t.Value)
 	case NodeHandler:
 		n.StartExpr = d.(*WindowFrameExpr)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.StartExpr = t.Value.(*WindowFrameExpr)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.StartExpr = d.(*WindowFrameExpr)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WindowFrame) InitEndExpr(d interface{}) error {
+	return n.initEndExpr(d)
+}
+
+func (n *WindowFrame) initEndExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WindowFrame.EndExpr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initEndExpr(t.Value)
 	case NodeHandler:
 		n.EndExpr = d.(*WindowFrameExpr)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.EndExpr = t.Value.(*WindowFrameExpr)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.EndExpr = d.(*WindowFrameExpr)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WindowFrame) InitFrameUnit(d interface{}) error {
+	return n.initFrameUnit(d)
+}
+
+func (n *WindowFrame) initFrameUnit(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WindowFrame.FrameUnit: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initFrameUnit(t.Value)
 	case NodeHandler:
 		n.FrameUnit = d.(FrameUnit)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.FrameUnit = t.Value.(FrameUnit)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.FrameUnit = d.(FrameUnit)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -5019,11 +6008,10 @@ func NewWindowFrameExpr(
 	expression interface{},
 	boundarytype interface{},
 ) (*WindowFrameExpr, error) {
+	var err error
 
 	nn := &WindowFrameExpr{}
 	nn.SetKind(WindowFrameExprKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -5039,34 +6027,46 @@ func NewWindowFrameExpr(
 }
 
 func (n *WindowFrameExpr) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *WindowFrameExpr) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("WindowFrameExpr.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WindowFrameExpr) InitBoundaryType(d interface{}) error {
+	return n.initBoundaryType(d)
+}
+
+func (n *WindowFrameExpr) initBoundaryType(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.BoundaryType = d.(BoundaryType)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.BoundaryType = t.Value.(BoundaryType)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initBoundaryType(t.Value)
 	default:
 		n.BoundaryType = d.(BoundaryType)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -5075,11 +6075,10 @@ func NewLikeExpression(
 	inlist interface{},
 	isnot interface{},
 ) (*LikeExpression, error) {
+	var err error
 
 	nn := &LikeExpression{}
 	nn.SetKind(LikeExpressionKind)
-
-	var err error
 
 	err = nn.InitLHS(lhs)
 	if err != nil {
@@ -5100,47 +6099,64 @@ func NewLikeExpression(
 }
 
 func (n *LikeExpression) InitLHS(d interface{}) error {
+	return n.initLHS(d)
+}
+
+func (n *LikeExpression) initLHS(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("LikeExpression.LHS: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initLHS(t.Value)
 	case NodeHandler:
 		n.LHS = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.LHS = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.LHS = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *LikeExpression) InitInList(d interface{}) error {
+	return n.initInList(d)
+}
+
+func (n *LikeExpression) initInList(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("LikeExpression.InList: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initInList(t.Value)
 	case NodeHandler:
 		n.InList = d.(*InList)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.InList = t.Value.(*InList)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.InList = d.(*InList)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *LikeExpression) InitIsNot(d interface{}) error {
+	return n.initIsNot(d)
+}
+
+func (n *LikeExpression) initIsNot(d interface{}) error {
 	switch t := d.(type) {
 	case *Wrapped:
-		n.IsNot = t.Value.(bool)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initIsNot(t.Value)
 	default:
 		n.IsNot = d.(bool)
 	}
+
 	return nil
 }
 
@@ -5150,11 +6166,10 @@ func NewWindowSpecification(
 	orderby interface{},
 	windowframe interface{},
 ) (*WindowSpecification, error) {
+	var err error
 
 	nn := &WindowSpecification{}
 	nn.SetKind(WindowSpecificationKind)
-
-	var err error
 
 	err = nn.InitBaseWindowName(basewindowname)
 	if err != nil {
@@ -5180,73 +6195,96 @@ func NewWindowSpecification(
 }
 
 func (n *WindowSpecification) InitBaseWindowName(d interface{}) error {
+	return n.initBaseWindowName(d)
+}
+
+func (n *WindowSpecification) initBaseWindowName(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.BaseWindowName = d.(*Identifier)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.BaseWindowName = t.Value.(*Identifier)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initBaseWindowName(t.Value)
 	default:
 		n.BaseWindowName = d.(*Identifier)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WindowSpecification) InitPartitionBy(d interface{}) error {
+	return n.initPartitionBy(d)
+}
+
+func (n *WindowSpecification) initPartitionBy(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.PartitionBy = d.(*PartitionBy)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.PartitionBy = t.Value.(*PartitionBy)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPartitionBy(t.Value)
 	default:
 		n.PartitionBy = d.(*PartitionBy)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WindowSpecification) InitOrderBy(d interface{}) error {
+	return n.initOrderBy(d)
+}
+
+func (n *WindowSpecification) initOrderBy(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.OrderBy = d.(*OrderBy)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.OrderBy = t.Value.(*OrderBy)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initOrderBy(t.Value)
 	default:
 		n.OrderBy = d.(*OrderBy)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *WindowSpecification) InitWindowFrame(d interface{}) error {
+	return n.initWindowFrame(d)
+}
+
+func (n *WindowSpecification) initWindowFrame(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.WindowFrame = d.(*WindowFrame)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.WindowFrame = t.Value.(*WindowFrame)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWindowFrame(t.Value)
 	default:
 		n.WindowFrame = d.(*WindowFrame)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewWithOffset(
 	alias interface{},
 ) (*WithOffset, error) {
+	var err error
 
 	nn := &WithOffset{}
 	nn.SetKind(WithOffsetKind)
-
-	var err error
 
 	err = nn.InitAlias(alias)
 	if err != nil {
@@ -5257,28 +6295,33 @@ func NewWithOffset(
 }
 
 func (n *WithOffset) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *WithOffset) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Alias = d.(*Alias)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Alias = t.Value.(*Alias)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	default:
 		n.Alias = d.(*Alias)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewTypeParameterList(
 	parameters interface{},
 ) (*TypeParameterList, error) {
+	var err error
 
 	nn := &TypeParameterList{}
 	nn.SetKind(TypeParameterListKind)
-
-	var err error
 
 	err = nn.InitParameters(parameters)
 	if err != nil {
@@ -5293,14 +6336,19 @@ func (n *TypeParameterList) InitParameters(d interface{}) error {
 		return fmt.Errorf("TypeParameterList.Parameters: %w",
 			ErrFieldAlreadyInitialized)
 	}
+
 	n.Parameters = make([]LeafHandler, 0, defaultCapacity)
+
+	return n.initParameters(d)
+}
+
+func (n *TypeParameterList) initParameters(d interface{}) error {
 	switch t := d.(type) {
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initParameters(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
-	case *Wrapped:
-		e := t.Value.(LeafHandler)
-		n.Parameters = append(n.Parameters, e)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	case []interface{}:
 		for _, elem := range t {
 			n.AddChild(elem.(NodeHandler))
@@ -5309,11 +6357,13 @@ func (n *TypeParameterList) InitParameters(d interface{}) error {
 		newElem := d.(LeafHandler)
 		n.Parameters = append(n.Parameters, newElem)
 	}
+
 	return nil
 }
 
 func (n *TypeParameterList) AddChild(c NodeHandler) {
 	n.Parameters = append(n.Parameters, c.(LeafHandler))
+
 	n.Node.AddChild(c)
 	c.SetParent(n)
 }
@@ -5323,7 +6373,9 @@ func (n *TypeParameterList) AddChildren(children []NodeHandler) {
 		if c == nil {
 			continue
 		}
+
 		n.Parameters = append(n.Parameters, c.(LeafHandler))
+
 		n.Node.AddChild(c)
 		c.SetParent(n)
 	}
@@ -5334,11 +6386,10 @@ func NewSampleClause(
 	samplesize interface{},
 	samplesuffix interface{},
 ) (*SampleClause, error) {
+	var err error
 
 	nn := &SampleClause{}
 	nn.SetKind(SampleClauseKind)
-
-	var err error
 
 	err = nn.InitSampleMethod(samplemethod)
 	if err != nil {
@@ -5359,51 +6410,69 @@ func NewSampleClause(
 }
 
 func (n *SampleClause) InitSampleMethod(d interface{}) error {
+	return n.initSampleMethod(d)
+}
+
+func (n *SampleClause) initSampleMethod(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("SampleClause.SampleMethod: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSampleMethod(t.Value)
 	case NodeHandler:
 		n.SampleMethod = d.(*Identifier)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.SampleMethod = t.Value.(*Identifier)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.SampleMethod = d.(*Identifier)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *SampleClause) InitSampleSize(d interface{}) error {
+	return n.initSampleSize(d)
+}
+
+func (n *SampleClause) initSampleSize(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("SampleClause.SampleSize: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSampleSize(t.Value)
 	case NodeHandler:
 		n.SampleSize = d.(*SampleSize)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.SampleSize = t.Value.(*SampleSize)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.SampleSize = d.(*SampleSize)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *SampleClause) InitSampleSuffix(d interface{}) error {
+	return n.initSampleSuffix(d)
+}
+
+func (n *SampleClause) initSampleSuffix(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.SampleSuffix = d.(*SampleSuffix)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.SampleSuffix = t.Value.(*SampleSuffix)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSampleSuffix(t.Value)
 	default:
 		n.SampleSuffix = d.(*SampleSuffix)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -5412,11 +6481,10 @@ func NewSampleSize(
 	partitionby interface{},
 	unit interface{},
 ) (*SampleSize, error) {
+	var err error
 
 	nn := &SampleSize{}
 	nn.SetKind(SampleSizeKind)
-
-	var err error
 
 	err = nn.InitSize(size)
 	if err != nil {
@@ -5437,49 +6505,67 @@ func NewSampleSize(
 }
 
 func (n *SampleSize) InitSize(d interface{}) error {
+	return n.initSize(d)
+}
+
+func (n *SampleSize) initSize(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("SampleSize.Size: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initSize(t.Value)
 	case NodeHandler:
 		n.Size = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Size = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Size = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *SampleSize) InitPartitionBy(d interface{}) error {
+	return n.initPartitionBy(d)
+}
+
+func (n *SampleSize) initPartitionBy(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.PartitionBy = d.(*PartitionBy)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.PartitionBy = t.Value.(*PartitionBy)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initPartitionBy(t.Value)
 	default:
 		n.PartitionBy = d.(*PartitionBy)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *SampleSize) InitUnit(d interface{}) error {
+	return n.initUnit(d)
+}
+
+func (n *SampleSize) initUnit(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Unit = d.(SampleSizeUnit)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Unit = t.Value.(SampleSizeUnit)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initUnit(t.Value)
 	default:
 		n.Unit = d.(SampleSizeUnit)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -5487,11 +6573,10 @@ func NewSampleSuffix(
 	weight interface{},
 	repeat interface{},
 ) (*SampleSuffix, error) {
+	var err error
 
 	nn := &SampleSuffix{}
 	nn.SetKind(SampleSuffixKind)
-
-	var err error
 
 	err = nn.InitWeight(weight)
 	if err != nil {
@@ -5507,43 +6592,54 @@ func NewSampleSuffix(
 }
 
 func (n *SampleSuffix) InitWeight(d interface{}) error {
+	return n.initWeight(d)
+}
+
+func (n *SampleSuffix) initWeight(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Weight = d.(*WithWeight)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Weight = t.Value.(*WithWeight)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWeight(t.Value)
 	default:
 		n.Weight = d.(*WithWeight)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *SampleSuffix) InitRepeat(d interface{}) error {
+	return n.initRepeat(d)
+}
+
+func (n *SampleSuffix) initRepeat(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Repeat = d.(*RepeatableClause)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Repeat = t.Value.(*RepeatableClause)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initRepeat(t.Value)
 	default:
 		n.Repeat = d.(*RepeatableClause)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewWithWeight(
 	alias interface{},
 ) (*WithWeight, error) {
+	var err error
 
 	nn := &WithWeight{}
 	nn.SetKind(WithWeightKind)
-
-	var err error
 
 	err = nn.InitAlias(alias)
 	if err != nil {
@@ -5554,28 +6650,33 @@ func NewWithWeight(
 }
 
 func (n *WithWeight) InitAlias(d interface{}) error {
+	return n.initAlias(d)
+}
+
+func (n *WithWeight) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Alias = d.(*Alias)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.Alias = t.Value.(*Alias)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	default:
 		n.Alias = d.(*Alias)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewRepeatableClause(
 	argument interface{},
 ) (*RepeatableClause, error) {
+	var err error
 
 	nn := &RepeatableClause{}
 	nn.SetKind(RepeatableClauseKind)
-
-	var err error
 
 	err = nn.InitArgument(argument)
 	if err != nil {
@@ -5586,30 +6687,35 @@ func NewRepeatableClause(
 }
 
 func (n *RepeatableClause) InitArgument(d interface{}) error {
+	return n.initArgument(d)
+}
+
+func (n *RepeatableClause) initArgument(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("RepeatableClause.Argument: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initArgument(t.Value)
 	case NodeHandler:
 		n.Argument = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Argument = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Argument = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewQualify(
 	expression interface{},
 ) (*Qualify, error) {
+	var err error
 
 	nn := &Qualify{}
 	nn.SetKind(QualifyKind)
-
-	var err error
 
 	err = nn.InitExpression(expression)
 	if err != nil {
@@ -5620,19 +6726,25 @@ func NewQualify(
 }
 
 func (n *Qualify) InitExpression(d interface{}) error {
+	return n.initExpression(d)
+}
+
+func (n *Qualify) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("Qualify.Expression: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Expression = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expression = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -5640,11 +6752,10 @@ func NewFormatClause(
 	format interface{},
 	timezoneexpr interface{},
 ) (*FormatClause, error) {
+	var err error
 
 	nn := &FormatClause{}
 	nn.SetKind(FormatClauseKind)
-
-	var err error
 
 	err = nn.InitFormat(format)
 	if err != nil {
@@ -5660,45 +6771,56 @@ func NewFormatClause(
 }
 
 func (n *FormatClause) InitFormat(d interface{}) error {
+	return n.initFormat(d)
+}
+
+func (n *FormatClause) initFormat(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("FormatClause.Format: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initFormat(t.Value)
 	case NodeHandler:
 		n.Format = d.(ExpressionHandler)
 		n.Node.AddChild(t)
-	case *Wrapped:
-		n.Format = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Format = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *FormatClause) InitTimeZoneExpr(d interface{}) error {
+	return n.initTimeZoneExpr(d)
+}
+
+func (n *FormatClause) initTimeZoneExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.TimeZoneExpr = d.(ExpressionHandler)
 		n.Node.AddChild(t)
 	case *Wrapped:
-		n.TimeZoneExpr = t.Value.(ExpressionHandler)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initTimeZoneExpr(t.Value)
 	default:
 		n.TimeZoneExpr = d.(ExpressionHandler)
+		n.Node.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func NewParameterExpr(
 	name interface{},
 ) (*ParameterExpr, error) {
+	var err error
 
 	nn := &ParameterExpr{}
 	nn.SetKind(ParameterExprKind)
-
-	var err error
 
 	err = nn.InitName(name)
 	if err != nil {
@@ -5709,17 +6831,23 @@ func NewParameterExpr(
 }
 
 func (n *ParameterExpr) InitName(d interface{}) error {
+	return n.initName(d)
+}
+
+func (n *ParameterExpr) initName(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
 		n.Name = d.(*Identifier)
 		n.Expression.AddChild(t)
 	case *Wrapped:
-		n.Name = t.Value.(*Identifier)
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initName(t.Value)
 	default:
 		n.Name = d.(*Identifier)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -5727,11 +6855,10 @@ func NewAnalyticFunctionCall(
 	expr interface{},
 	windowspec interface{},
 ) (*AnalyticFunctionCall, error) {
+	var err error
 
 	nn := &AnalyticFunctionCall{}
 	nn.SetKind(AnalyticFunctionCallKind)
-
-	var err error
 
 	err = nn.InitExpr(expr)
 	if err != nil {
@@ -5747,36 +6874,48 @@ func NewAnalyticFunctionCall(
 }
 
 func (n *AnalyticFunctionCall) InitExpr(d interface{}) error {
+	return n.initExpr(d)
+}
+
+func (n *AnalyticFunctionCall) initExpr(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("AnalyticFunctionCall.Expr: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpr(t.Value)
 	case NodeHandler:
 		n.Expr = d.(ExpressionHandler)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.Expr = t.Value.(ExpressionHandler)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.Expr = d.(ExpressionHandler)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
 func (n *AnalyticFunctionCall) InitWindowSpec(d interface{}) error {
+	return n.initWindowSpec(d)
+}
+
+func (n *AnalyticFunctionCall) initWindowSpec(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 		return fmt.Errorf("AnalyticFunctionCall.WindowSpec: %w",
 			ErrMissingRequiredField)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initWindowSpec(t.Value)
 	case NodeHandler:
 		n.WindowSpec = d.(*WindowSpecification)
 		n.Expression.AddChild(t)
-	case *Wrapped:
-		n.WindowSpec = t.Value.(*WindowSpecification)
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 	default:
 		n.WindowSpec = d.(*WindowSpecification)
+		n.Expression.AddChild(d.(NodeHandler))
 	}
+
 	return nil
 }
 
@@ -5825,8 +6964,8 @@ type Visitor interface {
 	VisitHaving(*Having, interface{})
 	VisitNamedType(*NamedType, interface{})
 	VisitArrayType(*ArrayType, interface{})
-	VisitStructField(*StructField, interface{})
 	VisitStructType(*StructType, interface{})
+	VisitStructField(*StructField, interface{})
 	VisitCastExpression(*CastExpression, interface{})
 	VisitSelectAs(*SelectAs, interface{})
 	VisitRollup(*Rollup, interface{})
@@ -6016,12 +7155,12 @@ func (n *ArrayType) Accept(v Visitor, d interface{}) {
 	v.VisitArrayType(n, d)
 }
 
-func (n *StructField) Accept(v Visitor, d interface{}) {
-	v.VisitStructField(n, d)
-}
-
 func (n *StructType) Accept(v Visitor, d interface{}) {
 	v.VisitStructType(n, d)
+}
+
+func (n *StructField) Accept(v Visitor, d interface{}) {
+	v.VisitStructField(n, d)
 }
 
 func (n *CastExpression) Accept(v Visitor, d interface{}) {
@@ -6373,11 +7512,11 @@ func (o *Operation) VisitNamedType(n *NamedType, d interface{}) {
 func (o *Operation) VisitArrayType(n *ArrayType, d interface{}) {
 	o.visitor.VisitTypeHandler(n, d)
 }
-func (o *Operation) VisitStructField(n *StructField, d interface{}) {
-	o.visitor.VisitNodeHandler(n, d)
-}
 func (o *Operation) VisitStructType(n *StructType, d interface{}) {
 	o.visitor.VisitTypeHandler(n, d)
+}
+func (o *Operation) VisitStructField(n *StructField, d interface{}) {
+	o.visitor.VisitNodeHandler(n, d)
 }
 func (o *Operation) VisitCastExpression(n *CastExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
@@ -6581,8 +7720,8 @@ const (
 	HavingKind
 	NamedTypeKind
 	ArrayTypeKind
-	StructFieldKind
 	StructTypeKind
+	StructFieldKind
 	CastExpressionKind
 	SelectAsKind
 	RollupKind
@@ -6708,10 +7847,10 @@ func (k NodeKind) String() string {
 		return "NamedType"
 	case ArrayTypeKind:
 		return "ArrayType"
-	case StructFieldKind:
-		return "StructField"
 	case StructTypeKind:
 		return "StructType"
+	case StructFieldKind:
+		return "StructField"
 	case CastExpressionKind:
 		return "CastExpression"
 	case SelectAsKind:
@@ -6823,5 +7962,6 @@ func (k NodeKind) String() string {
 	case AnalyticFunctionCallKind:
 		return "AnalyticFunctionCall"
 	}
+
 	panic("unexpected kind")
 }

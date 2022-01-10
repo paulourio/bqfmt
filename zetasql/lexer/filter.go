@@ -20,5 +20,6 @@ func (l *LexerFilter) Scan() (tok *token.Token) {
 			break
 		}
 	}
+
 	return
 }

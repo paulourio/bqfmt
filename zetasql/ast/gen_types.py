@@ -236,6 +236,10 @@ def main():
             Field('PathExpr', '*PathExpression'),
             Field('UnnestExpr', '*UnnestExpression'),
             Field('Alias', '*Alias'),
+            Field('WithOffset', '*WithOffset'),
+            Field('PivotClause', 'interface{}'),
+            Field('UnpivotClause', 'interface{}'),
+            Field('SampleClause', '*SampleClause'),
         ])
 
     gen.add_node(
@@ -285,9 +289,11 @@ def main():
             Field(
                 'IsNot',
                 'bool',
+                FieldLoader.REQUIRED,
                 comment=(
                     'IsNot indicates whether the binary operator has a '
-                    'preceding NOT to it.  For NOT LIKE and IS NOT.')),
+                    'preceding NOT to it.  For NOT LIKE and IS NOT.'),
+                scalar=True),
         ])
 
     gen.add_node(
@@ -431,6 +437,14 @@ def main():
         ])
 
     gen.add_node(
+        name='StructType',
+        composition='Type',
+        fields=[
+            Field('StructFields', '*StructField', FieldLoader.REPEATED),
+            Field('TypeParameterList', '*TypeParameterList', init=False),
+        ])
+
+    gen.add_node(
         name='StructField',
         composition='Node',
         fields=[
@@ -440,14 +454,7 @@ def main():
                 comment=(
                     'Name will be nil for anonymous fields '
                     'like in STRUCT<int, string>.')),
-        ])
-
-    gen.add_node(
-        name='StructType',
-        composition='Type',
-        fields=[
-            Field('StructFields', '*StructField', FieldLoader.REQUIRED),
-            Field('TypeParameterList', '*TypeParameterList'),
+            Field('Type', 'TypeHandler', FieldLoader.REQUIRED),
         ])
 
     gen.add_node(
@@ -506,13 +513,16 @@ def main():
                 comment=(
                     'NullHandlingModifier is set when the function is '
                     'called with FUNC(args {IGNORE|RESPECT} NULLS).'),
-                init=False),
+                init=False,
+                scalar=True),
             Field(
                 'Distinct',
                 'bool',
+                FieldLoader.REQUIRED,
                 comment=(
                     'Distinct is true when the function is called with '
-                    'FUNC(DISTINCT args).')),
+                    'FUNC(DISTINCT args).'),
+                scalar=True),
         ])
 
     gen.add_node(
@@ -529,7 +539,8 @@ def main():
             Field(
                 'Elements',
                 'ExpressionHandler',
-                FieldLoader.REPEATED),
+                FieldLoader.REPEATED,
+                init=False),
         ])
 
     gen.add_node(
@@ -565,7 +576,8 @@ def main():
             'the type is explicitly defined.'),
         fields=[
             Field('StructType', '*StructType'),
-            Field('Fields', '*StructConstructorArg', FieldLoader.REPEATED),
+            Field('Fields', '*StructConstructorArg', FieldLoader.REPEATED,
+                  init=False),
         ])
 
     gen.add_node(
@@ -583,6 +595,8 @@ def main():
             Field(
                 'IsNot',
                 'bool',
+                FieldLoader.REQUIRED,
+                scalar=True,
                 comment=(
                     'IsNot signifies whether the IN operator as a '
                     'preceding NOT to it.')),
@@ -617,6 +631,8 @@ def main():
             Field(
                 'IsNot',
                 'bool',
+                FieldLoader.REQUIRED,
+                scalar=True,
                 comment=(
                     'IsNot signifies whether the BETWEEN operator '
                     'has a preceding NOT to it.'
@@ -850,8 +866,8 @@ def main():
         fields=[
             Field('Subquery', '*Query', FieldLoader.REQUIRED),
             Field('Alias', '*Alias'),
-            # Field('PivotClause', '*PivotClause'),
-            # Field('UnpivotClause', '*UnpivotClause'),
+            Field('PivotClause', 'interface{}'),
+            Field('UnpivotClause', 'interface{}'),
             Field('SampleClause', '*SampleClause'),
         ])
 
@@ -859,8 +875,8 @@ def main():
         name='UnaryExpression',
         composition='Expression',
         fields=[
-            Field('Operand', 'ExpressionHandler', FieldLoader.REQUIRED),
             Field('Op', 'UnaryOp', FieldLoader.REQUIRED, scalar=True),
+            Field('Operand', 'ExpressionHandler', FieldLoader.REQUIRED),
         ])
 
     gen.add_node(

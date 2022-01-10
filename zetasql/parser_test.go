@@ -24,7 +24,8 @@ func TestParser(t *testing.T) {
 	if !st.IsDir() {
 		t.Fatalf("%s must be a directory of .test files", testPath)
 	}
-	filepath.Walk(
+
+	err = filepath.Walk(
 		testPath,
 		func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
@@ -37,7 +38,7 @@ func TestParser(t *testing.T) {
 				return fs.SkipDir
 			}
 			if strings.HasSuffix(path, ".test") {
-				fmt.Printf("found %s", path)
+				fmt.Printf("found %s\n", path)
 				d, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
@@ -46,6 +47,10 @@ func TestParser(t *testing.T) {
 			}
 			return nil
 		})
+
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func runTest(t *testing.T, path string, input string) {
@@ -63,7 +68,7 @@ func runTest(t *testing.T, path string, input string) {
 		case 2:
 			// Syntax error test case
 			input = []byte(elements[0][1:])
-			expectedError = elements[1] + "\n"
+			expectedError = elements[1]
 		case 3:
 			// Regular parse test case
 			input = []byte(elements[0][1:])
@@ -78,39 +83,42 @@ func runTest(t *testing.T, path string, input string) {
 			p := parser.NewParser()
 			r, err := p.Parse(l)
 			if err != nil {
-				fmt.Println("Input:")
-				fmt.Println(string(input))
-				fmt.Println("---")
-				fmt.Println("Error")
-				fmt.Println(err.(*errors.Error).String())
-				fmt.Println("Expected Error")
-				fmt.Println(expectedError)
-				fmt.Println("---")
-				t.Fatalf("Error: %v", err)
-			}
+				errMsg := errors.FormatError(err, string(input))
+				if !assert.Equal(t, expectedError, errMsg) {
+					fmt.Println("Input:")
+					fmt.Println(string(input))
+					fmt.Println("---")
+					fmt.Println("Raw")
+					fmt.Println(err.(*errors.Error).String())
+					rec, serr := p.Error(err, l)
+					fmt.Println("recovered:", rec)
+					fmt.Println("errors:", serr)
+				}
+			} else {
 
-			dump := r.(ast.NodeStringer).DebugString("")
-			if expectedDump != dump {
-				fmt.Println("Input:")
-				fmt.Println(string(input))
-				fmt.Println("---")
-				fmt.Println("Dump:")
-				fmt.Println(dump)
-				fmt.Println("---")
-			}
+				dump := r.(ast.NodeStringer).DebugString("")
+				if expectedDump != dump {
+					fmt.Println("Input:")
+					fmt.Println(string(input))
+					fmt.Println("---")
+					fmt.Println("Dump:")
+					fmt.Println(dump)
+					fmt.Println("---")
+				}
 
-			unparsed := ast.Unparse(r.(ast.NodeHandler))
-			if unparsed != expectedUnparse {
-				fmt.Println("Unparsed:")
-				fmt.Println(unparsed)
-				fmt.Println("---")
-				fmt.Println("Expected:")
-				fmt.Println(expectedUnparse)
-				fmt.Println("---")
-			}
+				unparsed := ast.Unparse(r.(ast.NodeHandler))
+				if unparsed != expectedUnparse {
+					fmt.Println("Unparsed:")
+					fmt.Println(unparsed)
+					fmt.Println("---")
+					fmt.Println("Expected:")
+					fmt.Println(expectedUnparse)
+					fmt.Println("---")
+				}
 
-			assert.Equal(t, expectedDump, dump)
-			assert.Equal(t, expectedUnparse, unparsed)
+				assert.Equal(t, expectedDump, dump)
+				assert.Equal(t, expectedUnparse, unparsed)
+			}
 		})
 	}
 }
