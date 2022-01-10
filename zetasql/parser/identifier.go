@@ -15,7 +15,9 @@ func ParseIdentifier(s string, allowReservedKw bool) (string, error) {
 	}
 
 	if quoted {
-		if len(s) == 2 {
+		const quotesLength = 1 // Starts after the opening quote '`'.`
+
+		if len(s) == quotesLength*2 {
 			return "", errors.ErrEmptyIdentifier
 		}
 

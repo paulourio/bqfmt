@@ -1255,7 +1255,7 @@ Expression3:
 
 /* Unary operators */
 Expression2:
-      UnaryOperator Expression
+      UnaryOperator Expression1
       << ast.NewUnaryExpression($0, $1) >>
     | Expression1
     ;
@@ -1842,7 +1842,7 @@ FunctionCallExpressionWithArgsPrefix:
     ;
 
 FunctionCallExpressionBase:
-      Expression "(" distinct
+      PathExpression "(" distinct
       <<
       func() (Attrib, error) {
           c, err := ast.NewFunctionCall($0, true)
@@ -1853,7 +1853,7 @@ FunctionCallExpressionBase:
           return UpdateLoc(c, $2)
       }()
       >>
-    | Expression "("
+    | PathExpression "("
       <<
       func() (Attrib, error) {
           c, err := ast.NewFunctionCall($0, false)

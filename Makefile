@@ -18,3 +18,7 @@ zetasql/ast/types_generated.go: zetasql/ast/types_generated.go.j2 zetasql/ast/ge
 
 zetasql/parser/productionstable.go: zetasql/zetasql.bnf
 	cd zetasql && gocc $(GOCCFLAGS) zetasql.bnf
+
+.PHONY: debug_conflicts
+debug_conflicts:
+	cd zetasql && gocc -v zetasql.bnf
