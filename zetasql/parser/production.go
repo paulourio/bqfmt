@@ -84,8 +84,23 @@ func UpdateLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
 // WithExtraChild adds a child node to the node.
 func WithExtraChild(a Attrib, c Attrib) (ast.NodeHandler, error) {
 	node := a.(ast.NodeHandler)
-	child := c.(ast.NodeHandler)
+	child, loc := getNodeHandler(c)
 	node.AddChild(child)
+	node.ExpandLoc(loc.Start, loc.End)
+
+	return node, nil
+}
+
+// WithExtraChildren adds a child node to the node.
+func WithExtraChildren(a Attrib, children ...Attrib) (ast.NodeHandler, error) {
+	node := a.(ast.NodeHandler)
+	for _, c := range children {
+		if c != nil {
+			n, loc := getNodeHandler(c)
+			node.AddChild(n)
+			node.ExpandLoc(loc.Start, loc.End)
+		}
+	}
 
 	return node, nil
 }

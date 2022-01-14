@@ -381,6 +381,53 @@ func (u *unparser) VisitNullLiteral(n *NullLiteral, d interface{}) {
 	u.out.WriteString("NULL")
 }
 
+func (u *unparser) VisitCaseValueExpression(
+	n *CaseValueExpression, d interface{}) {
+	u.out.WriteString("CASE ")
+	n.Arguments[0].Accept(u, d)
+	u.depth++
+	args := n.Arguments[1:]
+	for len(args) >= 2 {
+		u.indentedNewline()
+		u.out.WriteString("WHEN ")
+		args[0].Accept(u, d)
+		u.out.WriteString(" THEN ")
+		args[1].Accept(u, d)
+		args = args[2:]
+	}
+	if len(args) == 1 {
+		u.indentedNewline()
+		u.out.WriteString("ELSE ")
+		args[0].Accept(u, d)
+	}
+	u.depth--
+	u.indentedNewline()
+	u.out.WriteString("END")
+}
+
+func (u *unparser) VisitCaseNoValueExpression(
+	n *CaseNoValueExpression, d interface{}) {
+	u.out.WriteString("CASE")
+	u.depth++
+	args := n.Arguments
+	for len(args) >= 2 {
+		u.indentedNewline()
+		u.out.WriteString("WHEN ")
+		args[0].Accept(u, d)
+		u.out.WriteString(" THEN ")
+		args[1].Accept(u, d)
+		args = args[2:]
+	}
+	if len(args) == 1 {
+		u.indentedNewline()
+		u.out.WriteString("ELSE ")
+		args[0].Accept(u, d)
+	}
+	u.depth--
+	u.indentedNewline()
+	u.out.WriteString("END")
+}
+
 func (u *unparser) indent() {
 	u.out.WriteString(strings.Repeat(" ", u.depth*2))
 }

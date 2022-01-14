@@ -914,6 +914,7 @@ Expression1:
     | ParenthesizedExpression
     | ArrayConstructor
     | StructConstructor
+    | CaseExpression
     | CastExpression
     | FunctionCallExpressionWithClauses
     | Identifier
@@ -1668,6 +1669,61 @@ OptAsAliasWithRequiredAs:
       >>
     | empty
     ;
+
+CaseExpression:
+      CaseExpressionPrefix end
+      << UpdateLoc($0, $1) >>
+    | CaseExpressionPrefix else Expression end
+      <<
+      func() (Attrib, error) {
+          e, err := WithExtraChild($0, $2)
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(e, $3)
+      }()
+      >>
+    ;
+
+CaseExpressionPrefix:
+      CaseNoValueExpressionPrefix
+    | CaseValueExpressionPrefix
+    ;
+
+
+CaseValueExpressionPrefix:
+      case Expression when Expression then Expression
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewCaseValueExpression(List($1, $3, $5))
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    | CaseValueExpressionPrefix when Expression then Expression
+      << WithExtraChildren($0, $2, $4) >>
+    ;
+
+CaseNoValueExpressionPrefix:
+      case when Expression then Expression
+      <<
+      func() (Attrib, error) {
+          e, err := ast.NewCaseNoValueExpression(List($2, $4))
+          if err != nil {
+              return nil, err
+          }
+
+          return UpdateLoc(e, $0)
+      }()
+      >>
+    | CaseNoValueExpressionPrefix when Expression then Expression
+      << WithExtraChildren($0, $2, $4) >>
+    ;
+
 
 ComparativeOperator:
       "="   << WrapWithLoc(ast.BinaryEq, $0) >>
