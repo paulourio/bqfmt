@@ -67,11 +67,11 @@ func runTest(t *testing.T, path string, input string) {
 		switch len(elements) {
 		case 2:
 			// Syntax error test case
-			input = []byte(elements[0][1:])
+			input = []byte(getInput(elements[0]))
 			expectedError = elements[1]
 		case 3:
 			// Regular parse test case
-			input = []byte(elements[0][1:])
+			input = []byte(getInput(elements[0]))
 			expectedDump = elements[1] + "\n"
 			expectedUnparse = elements[2]
 		default:
@@ -81,44 +81,76 @@ func runTest(t *testing.T, path string, input string) {
 		t.Run(name, func(t *testing.T) {
 			l := lexer.NewLexer(input).WithoutComment()
 			p := parser.NewParser()
+
+			var dump, errMsg, unparsed string
+
 			r, err := p.Parse(l)
 			if err != nil {
-				errMsg := errors.FormatError(err, string(input))
+				//rec, serr := p.Error(err, l)
+				//fmt.Println("errors:", serr)
+				//fmt.Println("error formatted:", errMsg)
+				errMsg = errors.FormatError(err, string(input))
+			}
+
+			if expectedError == "" {
+				assert.Nil(t, err)
+			} else {
 				if !assert.Equal(t, expectedError, errMsg) {
 					fmt.Println("Input:")
 					fmt.Println(string(input))
 					fmt.Println("---")
 					fmt.Println("Raw")
-					fmt.Println(err.(*errors.Error).String())
-					rec, serr := p.Error(err, l)
-					fmt.Println("recovered:", rec)
-					fmt.Println("errors:", serr)
+					if perr, ok := err.(*errors.Error); ok {
+						fmt.Println(perr.String())
+					} else {
+						fmt.Println(perr)
+					}
+					//fmt.Println("recovered:", rec)
+					fmt.Println("original error:", err)
+					//fmt.Println("errors:", serr)
 				}
-			} else {
-
-				dump := r.(ast.NodeStringer).DebugString("")
-				if expectedDump != dump {
-					fmt.Println("Input:")
-					fmt.Println(string(input))
-					fmt.Println("---")
-					fmt.Println("Dump:")
-					fmt.Println(dump)
-					fmt.Println("---")
-				}
-
-				unparsed := ast.Unparse(r.(ast.NodeHandler))
-				if unparsed != expectedUnparse {
-					fmt.Println("Unparsed:")
-					fmt.Println(unparsed)
-					fmt.Println("---")
-					fmt.Println("Expected:")
-					fmt.Println(expectedUnparse)
-					fmt.Println("---")
-				}
-
-				assert.Equal(t, expectedDump, dump)
-				assert.Equal(t, expectedUnparse, unparsed)
 			}
+
+			if err == nil {
+				dump = r.(ast.NodeStringer).DebugString("")
+			}
+			if expectedDump != dump {
+				fmt.Println("Input:")
+				fmt.Println(string(input))
+				fmt.Println("---")
+				fmt.Println("Dump:")
+				fmt.Println(dump)
+				fmt.Println("---")
+			}
+
+			if err == nil {
+				unparsed = ast.Unparse(r.(ast.NodeHandler))
+			}
+			if unparsed != expectedUnparse {
+				fmt.Println("Unparsed:")
+				fmt.Println(unparsed)
+				fmt.Println("---")
+				fmt.Println("Expected:")
+				fmt.Println(expectedUnparse)
+				fmt.Println("---")
+			}
+
+			assert.Equal(t, expectedDump, dump)
+			assert.Equal(t, expectedUnparse, unparsed)
+
 		})
 	}
+}
+
+func getInput(section string) string {
+	lines := strings.Split(section[1:], "\n")
+	i := 0
+
+	for ; i < len(lines); i++ {
+		if !strings.HasPrefix(lines[i], "# ") {
+			break
+		}
+	}
+
+	return strings.Join(lines[i:], "\n")
 }

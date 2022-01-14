@@ -65,12 +65,8 @@ func (u *unparser) VisitSelectColumn(n *SelectColumn, d interface{}) {
 	}
 }
 
-func (u *unparser) VisitIntLiteral(n *IntLiteral, d interface{}) {
-	u.out.WriteString(n.image)
-}
-
-func (u *unparser) VisitStringLiteral(n *StringLiteral, d interface{}) {
-	u.out.WriteString(n.image)
+func (u *unparser) VisitLeafHandler(n LeafHandler, d interface{}) {
+	u.out.WriteString(n.Image())
 }
 
 func (u *unparser) VisitBinaryExpression(n *BinaryExpression, d interface{}) {

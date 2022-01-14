@@ -374,6 +374,10 @@ def main():
         composition='Leaf')
 
     gen.add_node(
+        name='JSONLiteral',
+        composition='Leaf')
+
+    gen.add_node(
         name='OnClause',
         composition='Node',
         fields=[
@@ -643,7 +647,13 @@ def main():
 
     gen.add_node(name='BigNumericLiteral', composition='Leaf')
 
-    gen.add_node(name='BytesLiteral', composition='Leaf')
+    gen.add_node(
+        name='BytesLiteral',
+        composition='Leaf',
+        fields=[
+            Field('BytesValue', '[]byte', init=False),
+        ],
+    )
 
     gen.add_node(
         name='DateOrTimeLiteral',

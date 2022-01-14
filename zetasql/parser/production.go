@@ -7,6 +7,7 @@ import (
 
 	"github.com/paulourio/bqfmt/zetasql/ast"
 	"github.com/paulourio/bqfmt/zetasql/errors"
+	"github.com/paulourio/bqfmt/zetasql/literal"
 	"github.com/paulourio/bqfmt/zetasql/token"
 )
 
@@ -141,6 +142,56 @@ func InitLiteral(lit ast.LeafHandler, t Attrib) (Attrib, error) {
 	lit.SetEndLoc(tok.Pos.Offset + len(tok.Lit))
 
 	return lit, nil
+}
+
+func NewStringLiteral(a Attrib) (Attrib, error) {
+	lit, err := ast.NewStringLiteral()
+	if err != nil {
+		return nil, err
+	}
+
+	tok := a.(*token.Token)
+
+	value, err := literal.ParseString(string(tok.Lit))
+	if err != nil {
+		if unescapeErr, ok := err.(*literal.UnescapeError); ok {
+			return nil, &literal.UnescapeError{
+				Msg:    unescapeErr.Msg,
+				Offset: tok.Offset + unescapeErr.Offset,
+			}
+		}
+
+		return nil, err
+	}
+
+	lit.StringValue = value
+
+	return InitLiteral(lit, a)
+}
+
+func NewBytesLiteral(a Attrib) (Attrib, error) {
+	lit, err := ast.NewBytesLiteral()
+	if err != nil {
+		return nil, err
+	}
+
+	tok := a.(*token.Token)
+
+	value, err := literal.ParseBytes(string(tok.Lit))
+	if err != nil {
+		if unescapeErr, ok := err.(*literal.UnescapeError); ok {
+			return nil, &literal.UnescapeError{
+				Msg:    unescapeErr.Msg,
+				Offset: tok.Offset + unescapeErr.Offset,
+			}
+		}
+
+		return nil, err
+	}
+
+	lit.BytesValue = value
+
+	return InitLiteral(lit, a)
 }
 
 func NewDashedIdentifier(lhs Attrib, rhs Attrib) (*ast.Identifier, error) {

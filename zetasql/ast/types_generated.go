@@ -198,6 +198,10 @@ type NullLiteral struct {
 	Leaf
 }
 
+type JSONLiteral struct {
+	Leaf
+}
+
 type OnClause struct {
 	Expression ExpressionHandler
 
@@ -391,6 +395,8 @@ type BigNumericLiteral struct {
 }
 
 type BytesLiteral struct {
+	BytesValue []byte
+
 	Leaf
 }
 
@@ -2367,6 +2373,15 @@ func NewNullLiteral() (*NullLiteral, error) {
 	return nn, err
 }
 
+func NewJSONLiteral() (*JSONLiteral, error) {
+	var err error
+
+	nn := &JSONLiteral{}
+	nn.SetKind(JSONLiteralKind)
+
+	return nn, err
+}
+
 func NewOnClause(
 	expression interface{},
 ) (*OnClause, error) {
@@ -4056,6 +4071,27 @@ func NewBytesLiteral() (*BytesLiteral, error) {
 	nn.SetKind(BytesLiteralKind)
 
 	return nn, err
+}
+
+func (n *BytesLiteral) InitBytesValue(d interface{}) error {
+	return n.initBytesValue(d)
+}
+
+func (n *BytesLiteral) initBytesValue(d interface{}) error {
+	switch t := d.(type) {
+	case nil:
+	case NodeHandler:
+		n.BytesValue = d.([]byte)
+		n.Leaf.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initBytesValue(t.Value)
+	default:
+		n.BytesValue = d.([]byte)
+		n.Leaf.AddChild(d.(NodeHandler))
+	}
+
+	return nil
 }
 
 func NewDateOrTimeLiteral(
@@ -6956,6 +6992,7 @@ type Visitor interface {
 	VisitLimitOffset(*LimitOffset, interface{})
 	VisitFloatLiteral(*FloatLiteral, interface{})
 	VisitNullLiteral(*NullLiteral, interface{})
+	VisitJSONLiteral(*JSONLiteral, interface{})
 	VisitOnClause(*OnClause, interface{})
 	VisitWithClauseEntry(*WithClauseEntry, interface{})
 	VisitJoin(*Join, interface{})
@@ -7121,6 +7158,10 @@ func (n *FloatLiteral) Accept(v Visitor, d interface{}) {
 
 func (n *NullLiteral) Accept(v Visitor, d interface{}) {
 	v.VisitNullLiteral(n, d)
+}
+
+func (n *JSONLiteral) Accept(v Visitor, d interface{}) {
+	v.VisitJSONLiteral(n, d)
 }
 
 func (n *OnClause) Accept(v Visitor, d interface{}) {
@@ -7488,6 +7529,9 @@ func (o *Operation) VisitFloatLiteral(n *FloatLiteral, d interface{}) {
 func (o *Operation) VisitNullLiteral(n *NullLiteral, d interface{}) {
 	o.visitor.VisitLeafHandler(n, d)
 }
+func (o *Operation) VisitJSONLiteral(n *JSONLiteral, d interface{}) {
+	o.visitor.VisitLeafHandler(n, d)
+}
 func (o *Operation) VisitOnClause(n *OnClause, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
@@ -7712,6 +7756,7 @@ const (
 	LimitOffsetKind
 	FloatLiteralKind
 	NullLiteralKind
+	JSONLiteralKind
 	OnClauseKind
 	WithClauseEntryKind
 	JoinKind
@@ -7831,6 +7876,8 @@ func (k NodeKind) String() string {
 		return "FloatLiteral"
 	case NullLiteralKind:
 		return "NullLiteral"
+	case JSONLiteralKind:
+		return "JSONLiteral"
 	case OnClauseKind:
 		return "OnClause"
 	case WithClauseEntryKind:

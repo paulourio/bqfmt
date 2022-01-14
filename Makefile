@@ -1,10 +1,20 @@
-GOCCFLAGS = -a
+GOCCFLAGS = -a # -debug_parser -debug_lexer
 
+.PHONY: build
 build: generated_types generated_parser
 	go build
 
+.PHONY: test
 test: build
-	go test -v ./zetasql/
+	go test -v ./zetasql/...
+
+.PHONY: test_lexer
+test_lexer: build
+	go test -v ./zetasql/lexer_test.go
+
+.PHONY: debug_conflicts
+debug_conflicts:
+	cd zetasql && gocc -v zetasql.bnf
 
 debug_test: GOCCFLAGS += -debug_parser
 debug_test: test
@@ -18,7 +28,3 @@ zetasql/ast/types_generated.go: zetasql/ast/types_generated.go.j2 zetasql/ast/ge
 
 zetasql/parser/productionstable.go: zetasql/zetasql.bnf
 	cd zetasql && gocc $(GOCCFLAGS) zetasql.bnf
-
-.PHONY: debug_conflicts
-debug_conflicts:
-	cd zetasql && gocc -v zetasql.bnf

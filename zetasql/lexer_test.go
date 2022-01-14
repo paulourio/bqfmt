@@ -67,8 +67,18 @@ var lexerTestCases = []lexerTestCase{
 		},
 	},
 	{
-		input:  "'a\nb'",
-		tokens: []string{"INVALID('a\n)", "INVALID(b')"},
+		input: "'a\nb'",
+		tokens: []string{
+			"unterminated_string_literal('a)",
+			"unterminated_bytes_literal(b')",
+		},
+	},
+	{
+		input: "\"a\nb\"",
+		tokens: []string{
+			"unterminated_string_literal(\"a)",
+			"unterminated_bytes_literal(b\")",
+		},
 	},
 	{
 		input:  "'''a\nb'''",
@@ -81,6 +91,20 @@ var lexerTestCases = []lexerTestCase{
 	{
 		input:  `"""abc"""`,
 		tokens: []string{`string_literal("""abc""")`},
+	},
+	{
+		input: `"""abc"\\""def""", """abc""\\"def"""`,
+		tokens: []string{
+			`string_literal("""abc"\\""def""")`,
+			`,(,)`,
+			`string_literal("""abc""\\"def""")`},
+	},
+	{
+		input: `'''abc'\\''def''', '''abc''\\'def'''`,
+		tokens: []string{
+			`string_literal('''abc'\\''def''')`,
+			`,(,)`,
+			`string_literal('''abc''\\'def''')`},
 	},
 	{
 		input:  `'''it's'''`,
@@ -148,15 +172,15 @@ var lexerTestCases = []lexerTestCase{
 	},
 	{
 		input:  `-123`,
-		tokens: []string{`integer_literal(-123)`},
+		tokens: []string{`-(-)`, `integer_literal(123)`},
 	},
 	{
 		input:  `+123`,
-		tokens: []string{`integer_literal(+123)`},
+		tokens: []string{`+(+)`, `integer_literal(123)`},
 	},
 	{
 		input:  `-0x12`,
-		tokens: []string{`integer_literal(-0x12)`},
+		tokens: []string{`-(-)`, `integer_literal(0x12)`},
 	},
 	{
 		input:  `066`,
@@ -197,6 +221,42 @@ var lexerTestCases = []lexerTestCase{
 	{
 		input:  "#\u00a0comment",
 		tokens: []string{"comment(#\u00a0comment)"},
+	},
+	{
+		input: `""""a""""`,
+		tokens: []string{
+			"string_literal(\"\"\"\"a\"\"\")",
+			"unterminated_string_literal(\")",
+		},
+	},
+	{
+		input:  `'a\b'`,
+		tokens: []string{"string_literal('a\\b')"},
+	},
+	{
+		input:  `br"\U1234"`,
+		tokens: []string{`bytes_literal(br"\U1234")`},
+	},
+	{
+		input: `132abc`,
+		tokens: []string{
+			`missing_whitespace_int_and_alias(132a)`,
+			`identifier(bc)`,
+		},
+	},
+	{
+		input: `select $d`,
+		tokens: []string{
+			`select(select)`,
+			`illegal_character($)`,
+			`identifier(d)`,
+		},
+	},
+	{
+		input: "b\"\"\"line1\nline2\\\nline3\"\"\"",
+		tokens: []string{
+			"bytes_literal(b\"\"\"line1\nline2\\\nline3\"\"\")",
+		},
 	},
 }
 

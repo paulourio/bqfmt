@@ -1,503 +1,192 @@
 /* Lexical part */
 
 /* String and bytes literals */
-string_literal:
-      _triple_quoted_string
-    | _quoted_string
-    | _raw_string
-    ;
+string_literal: [_raw_string_prefix](_sqtext|_sq3text|_dqtext|_dq3text) ;
+bytes_literal:  (_bytes_prefix|_raw_bytes_prefix)(_sqtext|_sq3text|_dqtext|_dq3text) ;
 
-bytes_literal:
-      _bytes_prefix _triple_quoted_string
-    | _bytes_prefix _quoted_string
-    | _raw_bytes
-    ;
+unterminated_string_literal:                    _sqtext_0|_dqtext_0 ;
+unterminated_triple_quoted_string_literal:      _sq3text_0|_dq3text_0 ;
+unterminated_raw_string_literal:                _raw_string_prefix(_sqtext_0|_dqtext_0) ;
+unterminated_triple_quoted_raw_string_literal:  _raw_string_prefix(_sq3text_0|_dq3text_0) ;
+unterminated_bytes_literal:                     _bytes_prefix(_sqtext_0|_dqtext_0) ;
+unterminated_raw_bytes_literal:                 _raw_bytes_prefix(_sqtext_0|_dqtext_0) ;
+unterminated_triple_quoted_bytes_literal:       _bytes_prefix(_sq3text_0|_dq3text_0) ;
+unterminated_triple_quoted_raw_bytes_literal:   _raw_bytes_prefix(_sq3text_0|_dq3text_0) ;
 
-/* Boolean literals */
-boolean_literal:
-      ( 'f' | 'F' ) ( 'a' | 'A' ) ( 'l' | 'L' ) ( 's' | 'S' ) ( 'e' | 'E' )
-    | ( 't' | 'T' ) ( 'r' | 'R' ) ( 'u' | 'U' ) ( 'e' | 'E' )
-    ;
+/*
+    The abbreviations here:
+      sq = single quote
+      dq = double quote
+      bq = backtick quote
+      3  = triple quote
+      _0 = unterminated versions.  They are used to return better error
+            messages for unterminated strings and bytes.
+
+    Here we accept arbitrary escapes instead of trying to narrowing it
+    down just de valid set.  The actual validation of the escapes, and
+    of things like UTF-8 structure, is done in the parser.
+ */
+_sqtext:      _sqtext_0 _sq ;
+_sqtext_0:    _sq{(_no_backslash_sq_newline|_any_escape)} ;
+_dqtext:      _dqtext_0 _dq ;
+_dqtext_0:    _dq{(_no_backslash_dq_newline|_any_escape)} ;
+_sq3text:     _sq3text_0 _sq3 ;
+_sq3text_0:   _sq3{[(_sq|(_sq _sq))](_no_backslash_sq|_any_escape)} ;
+_dq3text:     _dq3text_0 _dq3 ;
+_dq3text_0:   _dq3{[(_dq|(_dq _dq))](_no_backslash_dq|_any_escape)} ;
+
+_any_escape:              '\\'(_ascii_char|'"'|'\''|'\\'|'\n'|'\r');
+_raw_string_prefix:       ('r'|'R') ;
+_raw_bytes_prefix:        (('r'|'R')('b'|'B')) | (('b'|'B')('r'|'R')) ;
+_bytes_prefix:            ('b'|'B') ;
+_no_backslash_sq_newline: _char|'"' ;
+_no_backslash_dq_newline: _char|'\'' ;
+_no_backslash_sq:         _char|_dq|'\n' ;
+_no_backslash_dq:         _char|_sq|'\n' ;
+_sq3:                     _sq _sq _sq ;
+_dq3:                     _dq _dq _dq ;
+_sq:                      '\'' ;
+_dq:                      '"' ;
+
+_char:              _ascii_char|_unicode_byte ;
+_ascii_char:        '\x01'-'\x09' /* skip null (0x00) */
+                  | '\x0B'-'\x21' /* skip line feed (0x0A) */
+                  | '\x23'-'\x26' /* skip double quote (0x22) */
+                  | '\x28'-'\x5B' /* skip single quote (0x27) */
+                  | '\x5D'-'\x7F' /* skip backslash (0x5C) */
+                  ;
+_unicode_byte:    '\u0080'-'\uFFFC'|'\uFFFE'-'\U0010FFFF' ;
 
 /* Integer literals */
-integer_literal:
-      ( _decimal_literal | _hex_literal )
-    ;
+integer_literal: _int_literal ;
+
+missing_whitespace_int_and_alias: _int_literal('a'-'z'|'A'-'Z'|'_') ;
+
+_int_literal: (_decimal_literal|_hex_literal) ;
 
 /* Floating-point literals */
-floating_point_literal:
-      _decimals '.' [ _decimals ] [ _exponent ]
-    | _decimals _exponent
-    | '.' _decimals [ _exponent ]
-    ;
+floating_point_literal: _float_literal ;
 
-/* Date or time literals */
-date:
-      ( 'd' | 'D' ) ( 'a' | 'A' ) ( 't' | 'T' ) ( 'e' | 'E' )
-    ;
+missing_whitespace_float_and_alias: _float_literal('a'-'z'|'A'-'Z'|'_') ;
 
-datetime:
-      ( 'd' | 'D' ) ( 'a' | 'A' ) ( 't' | 'T' ) ( 'e' | 'E' )
-      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'e' | 'E' )
-    ;
+_float_literal:     _decimals'.'[_decimals][_exponent]
+                  | _decimals _exponent
+                  | '.'_decimals[_exponent]
+                  ;
+_decimals:        _decimal_digit{_decimal_digit} ;
+_exponent:        ('e'|'E')['+'|'-']_decimals ;
+_decimal_literal: _decimal_digit{_decimal_digit} ;
+_decimal_digit:   '0'-'9' ;
+_hex_literal:     '0'('x'|'X')_hex_digit{_hex_digit} ;
+_hex_digit:       _decimal_digit|'a'-'f'|'A'-'F' ;
 
-time:
-      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'e' | 'E' )
-    ;
-
-timestamp:
-      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'e' | 'E' )
-      ( 's' | 'S' ) ( 't' | 'T' ) ( 'a' | 'A' ) ( 'm' | 'M' ) ( 'p' | 'P' )
-    ;
+/* Boolean literals */
+boolean_literal: ('f'|'F')('a'|'A')('l'|'L')('s'|'S')('e'|'E')
+               | ('t'|'T')('r'|'R')('u'|'U')('e'|'E')
+               ;
 
 /* Numeric and decimal prefixes */
 numeric_or_decimal:
-      ( 'n' | 'N' ) ( 'u' | 'U' ) ( 'm' | 'M' ) ( 'e' | 'E' )
-      ( 'r' | 'R' ) ( 'i' | 'I' ) ( 'c' | 'C' )
-    | ( 'd' | 'D' ) ( 'e' | 'E' ) ( 'c' | 'C' ) ( 'i' | 'I' )
-      ( 'm' | 'M' ) ( 'a' | 'A' ) ( 'l' | 'L' )
+      ('n'|'N')('u'|'U')('m'|'M')('e'|'E')('r'|'R')('i'|'I')('c'|'C')
+    | ('d'|'D')('e'|'E')('c'|'C')('i'|'I')('m'|'M')('a'|'A')('l'|'L')
     ;
 
 bignumeric_or_bigdecimal:
-      ( 'b' | 'B' ) ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'n' | 'N' ) ( 'u' | 'U' )
-      ( 'm' | 'M' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'i' | 'I' ) ( 'c' | 'C' )
-    | ( 'b' | 'B' ) ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'd' | 'D' ) ( 'e' | 'E' )
-      ( 'c' | 'C' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'a' | 'A' ) ( 'l' | 'L' )
-    ;
-
-/* Array and struct literals prefix */
-array:
-      ( 'a' | 'A' ) ( 'r' | 'R' ) ( 'r' | 'R' ) ( 'a' | 'A' ) ( 'y' | 'Y' )
-    ;
-
-struct:
-      ( 's' | 'S' ) ( 't' | 'T' ) ( 'r' | 'R' ) ( 'u' | 'U' )
-      ( 'c' | 'C' ) ( 't' | 'T' )
+      ('b'|'B')('i'|'I')('g'|'G')('n'|'N')('u'|'U')
+      ('m'|'M')('e'|'E')('r'|'R')('i'|'I')('c'|'C')
+    | ('b'|'B')('i'|'I')('g'|'G')('d'|'D')('e'|'E')
+      ('c'|'C')('i'|'I')('m'|'M')('a'|'A')('l'|'L')
     ;
 
 /* Case-insensitive words */
-null:
-      ( 'n' | 'N' ) ( 'u' | 'U' ) ( 'l' | 'L' ) ( 'l' | 'L' )
-    ;
-
-format:
-      ( 'f' | 'F' ) ( 'o' | 'O' ) ( 'r' | 'R' )
-      ( 'm' | 'M' ) ( 'a' | 'A' ) ( 't' | 'T' )
-    ;
-
-select:
-      ( 's' | 'S' ) ( 'e' | 'E' ) ( 'l' | 'L' ) ( 'e' | 'E' )
-      ( 'c' | 'C' ) ( 't' | 'T' )
-    ;
-
-from:
-      ( 'f' | 'F' ) ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'm' | 'M' )
-    ;
-
-with:
-      ( 'w' | 'W' ) ( 'i' | 'I' ) ( 't' | 'T' ) ( 'h' | 'H' )
-    ;
-
-as:
-      ( 'a' | 'A' ) ( 's' | 'S' )
-    ;
-
-to:
-      ( 't' | 'T' ) ( 'o' | 'O' )
-    ;
-
-and:
-      ( 'a' | 'A' ) ( 'n' | 'N' ) ( 'd' | 'D' )
-    ;
-
-or:
-      ( 'o' | 'O' ) ( 'r' | 'R' )
-    ;
-
-is:
-      ( 'i' | 'I' ) ( 's' | 'S' )
-    ;
-
-in:
-      ( 'i' | 'I' ) ( 'n' | 'N' )
-    ;
-
-intersect:
-      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 't' | 'T' ) ( 'e' | 'E' ) ( 'r' | 'R' )
-      ( 's' | 'S' ) ( 'e' | 'E' ) ( 'c' | 'C' ) ( 't' | 'T' )
-    ;
-
-union:
-      ( 'u' | 'U' ) ( 'n' | 'N' ) ( 'i' | 'I' ) ( 'o' | 'O' ) ( 'n' | 'N' )
-    ;
-
-like:
-      ( 'l' | 'L' ) ( 'i' | 'I' ) ( 'k' | 'K' ) ( 'e' | 'E' )
-    ;
-
-not:
-      ( 'n' | 'N' ) ( 'o' | 'O' ) ( 't' | 'T' )
-    ;
-
-row:
-      ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'w' | 'W' )
-    ;
-
-rows:
-      ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'w' | 'W' ) ( 's' | 'S' )
-    ;
-
-range:
-      ( 'r' | 'R' ) ( 'a' | 'A' ) ( 'n' | 'N' ) ( 'g' | 'G' ) ( 'e' | 'E' )
-    ;
-
-following:
-      ( 'f' | 'F' ) ( 'o' | 'O' ) ( 'l' | 'L' ) ( 'l' | 'L' )
-      ( 'o' | 'O' ) ( 'w' | 'W' ) ( 'i' | 'I' ) ( 'n' | 'N' )
-      ( 'g' | 'G' )
-    ;
-
-preceding:
-      ( 'p' | 'P' ) ( 'r' | 'R' ) ( 'e' | 'E' ) ( 'c' | 'C' )
-      ( 'e' | 'E' ) ( 'd' | 'D' ) ( 'i' | 'I' ) ( 'n' | 'N' )
-      ( 'g' | 'G' )
-    ;
-
-current:
-      ( 'c' | 'C' ) ( 'u' | 'U' ) ( 'r' | 'R' ) ( 'r' | 'R' )
-      ( 'e' | 'E' ) ( 'n' | 'N' ) ( 't' | 'T' )
-    ;
-
-partition:
-      ( 'p' | 'P' ) ( 'a' | 'A' ) ( 'r' | 'R' ) ( 't' | 'T' ) ( 'i' | 'I' )
-      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'o' | 'O' ) ( 'n' | 'N' )
-    ;
-
-between:
-      ( 'b' | 'B' ) ( 'e' | 'E' ) ( 't' | 'T' ) ( 'w' | 'W' )
-      ( 'e' | 'E' ) ( 'e' | 'E' ) ( 'n' | 'N' )
-    ;
-
-respect:
-      ( 'r' | 'R' ) ( 'e' | 'E' ) ( 's' | 'S' ) ( 'p' | 'P' )
-      ( 'e' | 'E' ) ( 'c' | 'C' ) ( 't' | 'T' )
-    ;
-
-ignore:
-      ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'n' | 'N' ) ( 'o' | 'O' )
-      ( 'r' | 'R' ) ( 'e' | 'E' )
-    ;
-
-nulls:
-      ( 'n' | 'N' ) ( 'u' | 'U' ) ( 'l' | 'L' ) ( 'l' | 'L' )
-      ( 's' | 'S' )
-    ;
-
-unbounded:
-      ( 'u' | 'U' ) ( 'n' | 'N' ) ( 'b' | 'B' ) ( 'o' | 'O' ) ( 'u' | 'U' )
-      ( 'n' | 'N' ) ( 'd' | 'D' ) ( 'e' | 'E' ) ( 'd' | 'D' )
-    ;
-
-all:
-      ( 'a' | 'A' ) ( 'l' | 'L' ) ( 'l' | 'L' )
-    ;
-
-distinct:
-      ( 'd' | 'D' ) ( 'i' | 'I' ) ( 's' | 'S' )
-      ( 't' | 'T' ) ( 'i' | 'I' ) ( 'n' | 'N' )
-      ( 'c' | 'C' ) ( 't' | 'T' )
-    ;
-
-except:
-      ( 'e' | 'E' ) ( 'x' | 'X' ) ( 'c' | 'C' ) ( 'e' | 'E' )
-      ( 'p' | 'P' ) ( 't' | 'T' )
-    ;
-
-first:
-      ( 'f' | 'F' ) ( 'i' | 'I' ) ( 'r' | 'R' ) ( 's' | 'S' ) ( 't' | 'T' )
-    ;
-
-last:
-      ( 'l' | 'L' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 't' | 'T' )
-    ;
-
-replace:
-      ( 'r' | 'R' ) ( 'e' | 'E' ) ( 'p' | 'P' ) ( 'l' | 'L' ) ( 'a' | 'A' )
-      ( 'c' | 'C' ) ( 'e' | 'E' )
-    ;
-
-cast:
-      ( 'c' | 'C' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 't' | 'T' )
-    ;
-
-group:
-      ( 'g' | 'G' ) ( 'r' | 'R' ) ( 'o' | 'O' ) ( 'u' | 'U' ) ( 'p' | 'P' )
-    ;
-
-having:
-      ( 'h' | 'H' ) ( 'a' | 'A' ) ( 'v' | 'V' )
-      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 'g' | 'G' )
-    ;
-
-order:
-      ( 'o' | 'O' ) ( 'r' | 'R' ) ( 'd' | 'D' ) ( 'e' | 'E' ) ( 'r' | 'R' )
-    ;
-
-by:
-      ( 'b' | 'B' ) ( 'y' | 'Y' )
-    ;
-
-asc:
-      ( 'a' | 'A' ) ( 's' | 'S' ) ( 'c' | 'C' )
-    ;
-
-desc:
-      ( 'd' | 'D' ) ( 'e' | 'E' ) ( 's' | 'S' ) ( 'c' | 'C' )
-    ;
-
-limit:
-      ( 'l' | 'L' ) ( 'i' | 'I' ) ( 'm' | 'M' ) ( 'i' | 'I' ) ( 't' | 'T' )
-    ;
-
-offset:
-      ( 'o' | 'O' ) ( 'f' | 'F' ) ( 'f' | 'F' )
-      ( 's' | 'S' ) ( 'e' | 'E' ) ( 't' | 'T' )
-    ;
-
-at:
-      ( 'a' | 'A' ) ( 't' | 'T' )
-    ;
-
-zone:
-      ( 'z' | 'Z' ) ( 'o' | 'O' ) ( 'n' | 'N' ) ( 'e' | 'E' )
-    ;
-
-case:
-      ( 'c' | 'C' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 'e' | 'E' )
-    ;
-
-when:
-      ( 'w' | 'W' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'n' | 'N' )
-    ;
-
-then:
-      ( 't' | 'T' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'n' | 'N' )
-    ;
-
-else:
-      ( 'e' | 'E' ) ( 'l' | 'L' ) ( 's' | 'S' ) ( 'e' | 'E' )
-    ;
-
-end:
-      ( 'e' | 'E' ) ( 'n' | 'N' ) ( 'd' | 'D' )
-    ;
-
-unnest:
-      ( 'u' | 'U' ) ( 'n' | 'N' )
-      ( 'n' | 'N' ) ( 'e' | 'E' ) ( 's' | 'S' ) ( 't' | 'T' )
-    ;
-
-join:
-      ( 'j' | 'J' ) ( 'o' | 'O' ) ( 'i' | 'I' ) ( 'n' | 'N' )
-    ;
-
-cross:
-      ( 'c' | 'C' ) ( 'r' | 'R' ) ( 'o' | 'O' ) ( 's' | 'S' ) ( 's' | 'S' )
-    ;
-
-tablesample:
-      ( 't' | 'T' ) ( 'a' | 'A' ) ( 'b' | 'B' ) ( 'l' | 'L' ) ( 'e' | 'E' )
-      ( 's' | 'S' ) ( 'a' | 'A' ) ( 'm' | 'M' ) ( 'p' | 'P' ) ( 'l' | 'L' )
-      ( 'e' | 'E' )
-    ;
-
-percent:
-      ( 'p' | 'P' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'c' | 'C' ) ( 'e' | 'E' )
-      ( 'n' | 'N' ) ( 't' | 'T' )
-    ;
-
-repeatable:
-      ( 'r' | 'R' ) ( 'e' | 'E' ) ( 'p' | 'P' ) ( 'e' | 'E' ) ( 'a' | 'A' )
-      ( 't' | 'T' ) ( 'a' | 'A' ) ( 'b' | 'B' ) ( 'l' | 'L' ) ( 'e' | 'E' )
-    ;
-
-
-full:
-      ( 'f' | 'F' ) ( 'u' | 'U' ) ( 'l' | 'L' ) ( 'l' | 'L' )
-    ;
-
-outer:
-      ( 'o' | 'O' ) ( 'u' | 'U' ) ( 't' | 'T' ) ( 'e' | 'E' ) ( 'r' | 'R' )
-    ;
-
-left:
-      ( 'l' | 'L' ) ( 'e' | 'E' ) ( 'f' | 'F' ) ( 't' | 'T' )
-    ;
-
-right:
-      ( 'r' | 'R' ) ( 'i' | 'I' ) ( 'g' | 'G' ) ( 'h' | 'H' ) ( 't' | 'T' )
-    ;
-
-inner:
-      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 'n' | 'N' ) ( 'e' | 'E' ) ( 'r' | 'R' )
-    ;
-
-using:
-      ( 'u' | 'U' ) ( 's' | 'S' ) ( 'i' | 'I' ) ( 'n' | 'N' ) ( 'g' | 'G' )
-    ;
-
-on:
-      ( 'o' | 'O' ) ( 'n' | 'N' )
-    ;
-
-safe_cast:
-      ( 's' | 'S' ) ( 'a' | 'A' ) ( 'f' | 'F' ) ( 'e' | 'E' ) '_'
-      ( 'c' | 'C' ) ( 'a' | 'A' ) ( 's' | 'S' ) ( 't' | 'T' )
-    ;
-
-where:
-      ( 'w' | 'W' ) ( 'h' | 'H' ) ( 'e' | 'E' ) ( 'r' | 'R' ) ( 'e' | 'E' )
-    ;
-
-weight:
-      ( 'w' | 'W' ) ( 'e' | 'E' ) ( 'i' | 'I' )
-      ( 'g' | 'G' ) ( 'h' | 'H' ) ( 't' | 'T' )
-    ;
-
-window:
-      ( 'w' | 'W' ) ( 'i' | 'I' ) ( 'n' | 'N' )
-      ( 'd' | 'D' ) ( 'o' | 'O' ) ( 'w' | 'W' )
-    ;
-
-extract:
-      ( 'e' | 'E' ) ( 'x' | 'X' ) ( 't' | 'T' ) ( 'r' | 'R' )
-      ( 'a' | 'A' ) ( 'c' | 'C' ) ( 't' | 'T' )
-    ;
-
-over:
-      ( 'o' | 'O' ) ( 'v' | 'V' ) ( 'e' | 'E' ) ( 'r' | 'R' )
-    ;
-
-interval:
-      ( 'i' | 'I' ) ( 'n' | 'N' ) ( 't' | 'T' ) ( 'e' | 'E' ) ( 'r' | 'R' )
-      ( 'v' | 'V' ) ( 'a' | 'A' ) ( 'l' | 'L' )
-    ;
-
-qualify:
-      ( 'q' | 'Q' ) ( 'u' | 'U' ) ( 'a' | 'A' ) ( 'l' | 'L' ) ( 'i' | 'I' )
-      ( 'f' | 'F' ) ( 'y' | 'Y' )
-    ;
-
-_decimal_literal:
-      _decimal_digit { _decimal_digit }
-    ;
-
-_decimal_digit:
-      '0'-'9'
-    ;
-
-_hex_literal:
-      '0' ( 'x' | 'X' ) _hex_digit { _hex_digit }
-    ;
-
-_hex_digit:
-      _decimal_digit | 'a'-'f' | 'A'-'F'
-    ;
-
-comment:
-      '-' '-' { _single_line_comment_char } [ '\n' ]
-    | '#' { _single_line_comment_char } [ '\n' ]
-    | '/' '*' { ( . | '*' ) } '*' '/'
-    ;
-
-_triple_quoted_string:
-      '"' '"' '"' { ( _char | '`' | '\'' | '"' | '\n' ) } '"' '"' '"'
-    | '\'' '\'' '\'' { ( _char | '`' | '\'' | '"' | '\n' ) } '\'' '\'' '\''
-    ;
-
-_quoted_string:
-      '"' { ( _char | '`' | '\'' ) } '"'
-    | '\'' { ( _char | '`' | '"' ) } '\''
-    ;
-
-_raw_string_value:
-      '"' { ( _unescaped_char | '`' | '\'' ) } '"'
-    | '\'' { ( _unescaped_char | '`' | '"' ) } '\''
-    | '\'' '\'' '\'' { ( _unescaped_char | '`' | '"' ) } '\'' '\'' '\''
-    | '"' '"' '"' { ( _unescaped_char | '`' | '"' ) } '"' '"' '"'
-    ;
-
-_char:
-      _ascii_char | _unicode_value | _byte_value | _escaped_char
-    ;
-
-_unescaped_char:
-      _ascii_char | _unicode_char | '\\'
-    ;
-
-_raw_string:
-      _raw_string_prefix _raw_string_value
-    ;
-
-/* An arbitrary ASCII character except a few. */
-_ascii_char:
-      '\x01'-'\x09' /* skip null (0x00) */
-    | '\x0B'-'\x21' /* skip line feed (0x0A) */
-    | '\x23'-'\x26' /* skip double quote (0x22) */
-    | '\x28'-'\x5B' /* skip single quote (0x27) */
-    | '\x5D'-'\x5F' /* skip backslash (0x5C) */
-    | '\x61'-'\x7F' /* skip backtick (0x60) */
-    ;
-
-_unicode_char:
-      _ascii_char
-    | _unicode_byte
-    ;
-
-/* skip invalid code point (\uFFFD) */
-_unicode_byte:
-      '\u0080'-'\uFFFC'
-    | '\uFFFE'-'\U0010FFFF'
-    ;
-
-_raw_string_prefix:
-      ( 'r' | 'R' )
-    ;
-
-_escaped_char:
-      '\\' ( 'a' | 'b' | 'f' | 'n' | 'r' | 't'
-                 | 'v' | '"' | '?' | '`' | '\\' | '\'' )
-    ;
-
-_byte_value:
-      _octal_byte_value | _hex_byte_value
-    ;
-
-_octal_byte_value:
-      '\\' _octal_digit _octal_digit _octal_digit
-    ;
-
-_hex_byte_value:
-      '\\' { 'x' | 'X' } _hex_digit _hex_digit
-    ;
-
-_unicode_value:
-      _unicode_char | _little_u_value | _big_u_value
-    ;
-
-_big_u_value:
-      '\\' 'U'
-      _hex_digit _hex_digit _hex_digit _hex_digit
-      _hex_digit _hex_digit _hex_digit _hex_digit
-    ;
-
-_little_u_value:
-      '\\' 'u' _hex_digit _hex_digit _hex_digit _hex_digit
-    ;
-
-_octal_digit:
-      '0'-'7'
-    ;
+all:        ('a'|'A')('l'|'L')('l'|'L') ;
+and:        ('a'|'A')('n'|'N')('d'|'D') ;
+array:      ('a'|'A')('r'|'R')('r'|'R')('a'|'A')('y'|'Y') ;
+as:         ('a'|'A')('s'|'S') ;
+asc:        ('a'|'A')('s'|'S')('c'|'C') ;
+at:         ('a'|'A')('t'|'T') ;
+between:    ('b'|'B')('e'|'E')('t'|'T')('w'|'W')('e'|'E')('e'|'E')('n'|'N') ;
+by:         ('b'|'B')('y'|'Y') ;
+case:       ('c'|'C')('a'|'A')('s'|'S')('e'|'E') ;
+cast:       ('c'|'C')('a'|'A')('s'|'S')('t'|'T') ;
+cross:      ('c'|'C')('r'|'R')('o'|'O')('s'|'S')('s'|'S') ;
+current:    ('c'|'C')('u'|'U')('r'|'R')('r'|'R')('e'|'E')('n'|'N')('t'|'T') ;
+date:       ('d'|'D')('a'|'A')('t'|'T')('e'|'E') ;
+datetime:   ('d'|'D')('a'|'A')('t'|'T')('e'|'E')('t'|'T')('i'|'I')('m'|'M')('e'|'E') ;
+desc:       ('d'|'D')('e'|'E')('s'|'S')('c'|'C') ;
+distinct:   ('d'|'D')('i'|'I')('s'|'S')('t'|'T')('i'|'I')('n'|'N')('c'|'C')('t'|'T') ;
+else:       ('e'|'E')('l'|'L')('s'|'S')('e'|'E') ;
+end:        ('e'|'E')('n'|'N')('d'|'D') ;
+except:     ('e'|'E')('x'|'X')('c'|'C')('e'|'E')('p'|'P')('t'|'T') ;
+extract:    ('e'|'E')('x'|'X')('t'|'T')('r'|'R')('a'|'A')('c'|'C')('t'|'T') ;
+first:      ('f'|'F')('i'|'I')('r'|'R')('s'|'S')('t'|'T') ;
+following:  ('f'|'F')('o'|'O')('l'|'L')('l'|'L')('o'|'O')('w'|'W')('i'|'I')('n'|'N')('g'|'G') ;
+format:     ('f'|'F')('o'|'O')('r'|'R')('m'|'M')('a'|'A')('t'|'T') ;
+from:       ('f'|'F')('r'|'R')('o'|'O')('m'|'M') ;
+full:       ('f'|'F')('u'|'U')('l'|'L')('l'|'L') ;
+group:      ('g'|'G')('r'|'R')('o'|'O')('u'|'U')('p'|'P') ;
+having:     ('h'|'H')('a'|'A')('v'|'V')('i'|'I')('n'|'N')('g'|'G') ;
+ignore:     ('i'|'I')('g'|'G')('n'|'N')('o'|'O')('r'|'R')('e'|'E') ;
+in:         ('i'|'I')('n'|'N') ;
+inner:      ('i'|'I')('n'|'N')('n'|'N')('e'|'E')('r'|'R') ;
+intersect:  ('i'|'I')('n'|'N')('t'|'T')('e'|'E')('r'|'R')('s'|'S')('e'|'E')('c'|'C')('t'|'T') ;
+interval:   ('i'|'I')('n'|'N')('t'|'T')('e'|'E')('r'|'R')('v'|'V')('a'|'A')('l'|'L') ;
+is:         ('i'|'I')('s'|'S') ;
+join:       ('j'|'J')('o'|'O')('i'|'I')('n'|'N') ;
+json:       ('j'|'J')('s'|'S')('o'|'O')('n'|'N') ;
+last:       ('l'|'L')('a'|'A')('s'|'S')('t'|'T') ;
+left:       ('l'|'L')('e'|'E')('f'|'F')('t'|'T') ;
+like:       ('l'|'L')('i'|'I')('k'|'K')('e'|'E') ;
+limit:      ('l'|'L')('i'|'I')('m'|'M')('i'|'I')('t'|'T') ;
+not:        ('n'|'N')('o'|'O')('t'|'T') ;
+null:       ('n'|'N')('u'|'U')('l'|'L')('l'|'L') ;
+nulls:      ('n'|'N')('u'|'U')('l'|'L')('l'|'L')('s'|'S') ;
+offset:     ('o'|'O')('f'|'F')('f'|'F')('s'|'S')('e'|'E')('t'|'T') ;
+on:         ('o'|'O')('n'|'N') ;
+or:         ('o'|'O')('r'|'R') ;
+order:      ('o'|'O')('r'|'R')('d'|'D')('e'|'E')('r'|'R') ;
+outer:      ('o'|'O')('u'|'U')('t'|'T')('e'|'E')('r'|'R') ;
+over:       ('o'|'O')('v'|'V')('e'|'E')('r'|'R') ;
+partition:  ('p'|'P')('a'|'A')('r'|'R')('t'|'T')('i'|'I')('t'|'T')('i'|'I')('o'|'O')('n'|'N') ;
+percent:    ('p'|'P')('e'|'E')('r'|'R')('c'|'C')('e'|'E')('n'|'N')('t'|'T') ;
+preceding:  ('p'|'P')('r'|'R')('e'|'E')('c'|'C')('e'|'E')('d'|'D')('i'|'I')('n'|'N')('g'|'G') ;
+qualify:    ('q'|'Q')('u'|'U')('a'|'A')('l'|'L')('i'|'I')('f'|'F')('y'|'Y') ;
+range:      ('r'|'R')('a'|'A')('n'|'N')('g'|'G')('e'|'E') ;
+repeatable: ('r'|'R')('e'|'E')('p'|'P')('e'|'E')('a'|'A')('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E') ;
+replace:    ('r'|'R')('e'|'E')('p'|'P')('l'|'L')('a'|'A')('c'|'C')('e'|'E') ;
+respect:    ('r'|'R')('e'|'E')('s'|'S')('p'|'P')('e'|'E')('c'|'C')('t'|'T') ;
+right:      ('r'|'R')('i'|'I')('g'|'G')('h'|'H')('t'|'T') ;
+row:        ('r'|'R')('o'|'O')('w'|'W') ;
+rows:       ('r'|'R')('o'|'O')('w'|'W')('s'|'S') ;
+safe_cast:  ('s'|'S')('a'|'A')('f'|'F')('e'|'E')'_'('c'|'C')('a'|'A')('s'|'S')('t'|'T') ;
+select:     ('s'|'S')('e'|'E')('l'|'L')('e'|'E')('c'|'C')('t'|'T') ;
+struct:     ('s'|'S')('t'|'T')('r'|'R')('u'|'U')('c'|'C')('t'|'T') ;
+tablesample: ('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E')('s'|'S')('a'|'A')('m'|'M')('p'|'P')('l'|'L')('e'|'E') ;
+then:       ('t'|'T')('h'|'H')('e'|'E')('n'|'N') ;
+time:       ('t'|'T')('i'|'I')('m'|'M')('e'|'E') ;
+timestamp:  ('t'|'T')('i'|'I')('m'|'M')('e'|'E')('s'|'S')('t'|'T')('a'|'A')('m'|'M')('p'|'P') ;
+to:         ('t'|'T')('o'|'O') ;
+unbounded:  ('u'|'U')('n'|'N')('b'|'B')('o'|'O')('u'|'U')('n'|'N')('d'|'D')('e'|'E')('d'|'D') ;
+union:      ('u'|'U')('n'|'N')('i'|'I')('o'|'O')('n'|'N') ;
+unnest:     ('u'|'U')('n'|'N')('n'|'N')('e'|'E')('s'|'S')('t'|'T') ;
+using:      ('u'|'U')('s'|'S')('i'|'I')('n'|'N')('g'|'G') ;
+weight:     ('w'|'W')('e'|'E')('i'|'I')('g'|'G')('h'|'H')('t'|'T') ;
+when:       ('w'|'W')('h'|'H')('e'|'E')('n'|'N') ;
+where:      ('w'|'W')('h'|'H')('e'|'E')('r'|'R')('e'|'E') ;
+window:     ('w'|'W')('i'|'I')('n'|'N')('d'|'D')('o'|'O')('w'|'W') ;
+with:       ('w'|'W')('i'|'I')('t'|'T')('h'|'H') ;
+zone:       ('z'|'Z')('o'|'O')('n'|'N')('e'|'E') ;
+
+comment: '-''-'{_single_line_comment_char}['\n']
+       | '#'{_single_line_comment_char}['\n']
+       | _cs_comment
+       ;
+
+unterminated_comment: _cs_comment_begin ;
+
+/* C-style comments using slash+star */
+_cs_comment:        _cs_comment_begin'*'{'*'}'/' ;
+_cs_comment_begin:  '/''*'{(.|'*')} ;
 
 _single_line_comment_char:
       '\x01'-'\x09'         /* skip null (0x00) */
@@ -506,71 +195,24 @@ _single_line_comment_char:
     | '\uFFFE'-'\U0010FFFF' /* skip invalid code point (\uFFFD) */
     ;
 
-identifier:
-	  _unquoted_id_char { _unquoted_id_char | _decimal_digit }
-    | '`' _quoted_identifier '`'
-    ;
+identifier: _unquoted_identifier|_bqtext ;
 
-_unquoted_id_char:
-      _ascii_letter
-    | '_'
-    ;
+unterminated_escaped_identifier: _bqtext_0;
 
-/* Letters and digits */
-_letter:
-      _ascii_letter
-    | _unicode_byte
-    | '_'
-    ;
+_unquoted_identifier: _id_0{(_id_0|'0'-'9')} ;
+_id_0:      'a'-'z'|'A'-'Z'|'_' ;
+_bqtext_0:  _bq{(_id_char|_any_escape)} ;
+_bqtext:    _bqtext_0 _bq ;
+_bq:        '`' ;
+_id_char:   '\x01'-'\x09' /* skip null (0x00) */
+          | '\x0B'-'\x5B' /* skip line feed (0x0A) */
+          | '\x5D'-'\x5F' /* skip backslash (0x5C) */
+          | '\x61'-'\x7F' /* skip backtick (0x60) */
+          ;
 
-_ascii_letter:
-      'a'-'z'
-    | 'A'-'Z'
-    ;
+!whitespace: ' '|'\t'|'\n'|'\r'|'\u00a0' ;
 
-_quoted_identifier:
-      _quoted_identifier_character
-    | _quoted_identifier_character { _quoted_identifier_character }
-    ;
-
-_quoted_identifier_character:
-      _letter
-    | _decimal_digit
-    | ' '
-    | _symbol
-    ;
-
-_symbol:
-      '!' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '(' | ')'
-    | '-' | '[' | ']' | '{' | '}' | ':' | ';' | ',' | '.' | '?'
-    | '/' | '~' | '<' | '>' | '"' | '\\' | '\''
-    ;
-
-
-_raw_bytes:
-      _raw_bytes_prefix _raw_string_value
-    ;
-
-_bytes_prefix:
-      ( 'b' | 'B' )
-    ;
-
-_raw_bytes_prefix:
-      ( 'r' | 'R' ) ( 'b' | 'B' )
-    | ( 'b' | 'B' ) ( 'r' | 'R' )
-    ;
-
-_decimals:
-      _decimal_digit { _decimal_digit }
-    ;
-
-_exponent:
-      ( 'e' | 'E' ) [ '+' | '-' ] _decimals
-    ;
-
-!whitespace:
-      ' ' | '\t' | '\n' | '\r' | '\u00a0'
-    ;
+illegal_character: . ;
 
 /* Syntax part */
 
@@ -1265,7 +907,10 @@ Expression1:
       NullLiteral
     | IntegerLiteral
     | BooleanLiteral
+    | BytesLiteral
     | StringLiteral
+    | FloatingPointLiteral
+    | JSONLiteral
     | ParenthesizedExpression
     | ArrayConstructor
     | StructConstructor
@@ -1349,16 +994,7 @@ IntegerLiteral:
 
 StringLiteral:
       string_literal
-      <<
-      func() (Attrib, error) {
-          lit, err := ast.NewStringLiteral()
-          if err != nil {
-              return nil, err
-          }
-
-          return InitLiteral(lit, $0)
-      }()
-      >>
+      << NewStringLiteral($0) >>
     ;
 
 FloatingPointLiteral:
@@ -1377,16 +1013,7 @@ FloatingPointLiteral:
 
 BytesLiteral:
       bytes_literal
-      <<
-      func() (Attrib, error) {
-          lit, err := ast.NewBytesLiteral()
-          if err != nil {
-              return nil, err
-          }
-
-          return InitLiteral(lit, $0)
-      }()
-      >>
+      << NewBytesLiteral($0) >>
     ;
 
 BooleanLiteral:
@@ -1408,6 +1035,20 @@ NullLiteral:
       <<
       func() (Attrib, error) {
           lit, err := ast.NewNullLiteral()
+          if err != nil {
+              return nil, err
+          }
+
+          return InitLiteral(lit, $0)
+      }()
+      >>
+    ;
+
+JSONLiteral:
+      json StringLiteral
+      <<
+      func() (Attrib, error) {
+          lit, err := ast.NewJSONLiteral()
           if err != nil {
               return nil, err
           }
@@ -1451,6 +1092,7 @@ KeywordAsIdentifier:
     | numeric_or_decimal
     | extract
     | with
+    | json
     ;
 
 ParenthesizedExpression:
