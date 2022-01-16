@@ -22,7 +22,7 @@ type UnescapeError struct {
 }
 
 func (e *UnescapeError) Error() string {
-	return fmt.Sprintf(e.Msg)
+	return fmt.Sprintf("Syntax error: %s", e.Msg)
 }
 
 func ParseString(s string) (string, error) {
@@ -59,23 +59,6 @@ func ParseString(s string) (string, error) {
 	}
 
 	return e.Unescape()
-	// r, err := e.Unescape()
-	// if err != nil {
-	// 	log.Printf("source: %v\n", e.source)
-	// 	log.Printf("source: %v (bytes)\n", []byte(e.source))
-	// 	log.Printf("quotesLen: %v\n", e.quotesLen)
-	// 	log.Printf("offset: %v\n", e.offset)
-	// 	log.Printf("isRaw: %v\n", e.isRaw)
-	// 	log.Printf("isBytes: %v\n", e.isBytes)
-	// 	log.Printf("data: %v\n", e.data)
-	// 	log.Printf("data: %v (string)\n", string(e.data))
-	// 	log.Printf("quotes: %v\n", e.quotes)
-	// 	log.Printf("out: %v\n", e.out)
-	// 	log.Printf("pos: %v\n", e.pos)
-	// 	log.Printf("err: %v\n", err)
-	// 	log.Printf("---\n")
-	// }
-	// return r, err
 }
 
 func ParseBytes(s string) ([]byte, error) {

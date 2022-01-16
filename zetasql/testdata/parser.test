@@ -133,12 +133,12 @@ SELECT
 select --
 5
 --
-QueryStatement [22-33]
-  Query [22-33]
-    Select [22-33]
-      SelectList [32-33]
-        SelectColumn [32-33]
-          IntLiteral(5) [32-33]
+QueryStatement [0-11]
+  Query [0-11]
+    Select [0-11]
+      SelectList [10-11]
+        SelectColumn [10-11]
+          IntLiteral(5) [10-11]
 --
 SELECT
   5
@@ -148,12 +148,12 @@ SELECT
 select --
 5
 --
-QueryStatement [22-33]
-  Query [22-33]
-    Select [22-33]
-      SelectList [32-33]
-        SelectColumn [32-33]
-          IntLiteral(5) [32-33]
+QueryStatement [0-11]
+  Query [0-11]
+    Select [0-11]
+      SelectList [10-11]
+        SelectColumn [10-11]
+          IntLiteral(5) [10-11]
 --
 SELECT
   5
@@ -213,16 +213,16 @@ select "abc -- def",
        "abc # def",
        "abc /* def */ ghi"
 --
-QueryStatement [30-97]
-  Query [30-97]
-    Select [30-97]
-      SelectList [37-97]
-        SelectColumn [37-49]
-          StringLiteral("abc -- def") [37-49]
-        SelectColumn [58-69]
-          StringLiteral("abc # def") [58-69]
-        SelectColumn [78-97]
-          StringLiteral("abc /* def */ ghi") [78-97]
+QueryStatement [0-67]
+  Query [0-67]
+    Select [0-67]
+      SelectList [7-67]
+        SelectColumn [7-19]
+          StringLiteral("abc -- def") [7-19]
+        SelectColumn [28-39]
+          StringLiteral("abc # def") [28-39]
+        SelectColumn [48-67]
+          StringLiteral("abc /* def */ ghi") [48-67]
 --
 SELECT
   "abc -- def",

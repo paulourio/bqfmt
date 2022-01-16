@@ -257,7 +257,7 @@ func (e *Expression) SetParenthesized(v bool)     { e.parenthesized = v }
 func (e *Expression) IsAllowedInComparison() bool { return true }
 
 func (e *QueryExpression) IsQueryExpression() bool { return true }
-func (e *QueryExpression) IsParenthesized() bool   { return true }
+func (e *QueryExpression) IsParenthesized() bool   { return e.parenthesized }
 func (e *QueryExpression) SetParenthesized(v bool) { e.parenthesized = v }
 
 func (e *AndExpr) IsAllowedInComparison() bool { return e.IsParenthesized() }
@@ -311,7 +311,14 @@ func (n *Identifier) SingleNodeDebugString() string {
 }
 
 func (n *Join) SingleNodeDebugString() string {
+	if n.JoinType == DefaultJoin {
+		return n.kind.String()
+	}
 	return fmt.Sprintf("%s(%v)", n.kind.String(), n.JoinType)
+}
+
+func (n *OrderingExpression) SingleNodeDebugString() string {
+	return fmt.Sprintf("%s(%v)", n.kind.String(), n.OrderingSpec)
 }
 
 func (n *FunctionCall) SingleNodeDebugString() string {

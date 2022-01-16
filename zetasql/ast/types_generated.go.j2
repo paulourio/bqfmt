@@ -100,6 +100,7 @@ func (n *{{ node.name }}) init{{ field.name }}(d interface{}) error {
 	{%- elif field.field_loader == FieldLoader.REPEATED -%}
 
 	switch t := d.(type) {
+	case nil:
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.init{{ field.name }}(t.Value)

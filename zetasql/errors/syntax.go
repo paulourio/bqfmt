@@ -25,5 +25,5 @@ func NewSyntaxError(loc ast.Loc, msg string) *SyntaxError {
 }
 
 func (e *SyntaxError) Error() string {
-	return fmt.Sprintf("Syntax Error: %s", e.Msg)
+	return fmt.Sprintf("Syntax error: %s", e.Msg)
 }

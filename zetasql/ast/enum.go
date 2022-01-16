@@ -98,6 +98,17 @@ const (
 	DescendingOrder
 )
 
+func (o OrderingSpec) String() string {
+	switch o {
+	case NoOrderingSpec, AscendingOrder:
+		return "ASC"
+	case DescendingOrder:
+		return "DESC"
+	}
+
+	panic("unknown ordering spec")
+}
+
 type JoinType int
 
 const (
@@ -180,6 +191,17 @@ const (
 	RowsSampling SampleSizeUnit = iota
 	PercentSampling
 )
+
+func (s SampleSizeUnit) String() string {
+	switch s {
+	case RowsSampling:
+		return "ROWS"
+	case PercentSampling:
+		return "PERCENT"
+	}
+
+	panic("unknown sample size unit")
+}
 
 type TypeKind int
 

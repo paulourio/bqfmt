@@ -23,6 +23,7 @@ type pivotOrUnpivotAndAlias struct {
 // as reference instead.
 func OverrideLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
 	n := node.(ast.NodeHandler)
+	first := true
 
 	for i, t := range tokens {
 		if t == nil {
@@ -41,13 +42,17 @@ func OverrideLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
 		case *ast.Wrapped:
 			start = elem.Loc.Start
 			end = elem.Loc.End
+		case ast.Loc:
+			start = elem.Start
+			end = elem.End
 		default:
 			return nil, fmt.Errorf(
 				"OverrideLoc: invalid argument %d of type %v",
 				i+1, reflect.TypeOf(t))
 		}
 
-		if i == 0 {
+		if first {
+			first = false
 			n.SetStartLoc(start)
 			n.SetEndLoc(end)
 		} else {
@@ -73,8 +78,13 @@ func UpdateLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
 			n.ExpandLoc(v.Pos.Offset, v.Pos.Offset+len(v.Lit))
 		case ast.Loc:
 			n.ExpandLoc(v.Start, v.End)
+		case ast.NodeHandler:
+			n.ExpandLoc(v.StartLoc(), v.EndLoc())
 		default:
-			return nil, errors.ErrMalformedParser
+			return nil, fmt.Errorf(
+				"%w: cannot UpdateLoc with type %v",
+				errors.ErrMalformedParser,
+				reflect.TypeOf(t))
 		}
 	}
 
@@ -247,6 +257,33 @@ func NewIdentifier(a Attrib, allowReservedKw bool) (Attrib, error) {
 	return ast.NewIdentifier(wrapped)
 }
 
+func NewIntLiteral(a Attrib) (Attrib, error) {
+	lit, err := ast.NewIntLiteral()
+	if err != nil {
+		return nil, err
+	}
+
+	return InitLiteral(lit, a)
+}
+
+func NewFloatLiteral(a Attrib) (Attrib, error) {
+	lit, err := ast.NewFloatLiteral()
+	if err != nil {
+		return nil, err
+	}
+
+	return InitLiteral(lit, a)
+}
+
+func NewBooleanLiteral(a Attrib) (Attrib, error) {
+	lit, err := ast.NewBooleanLiteral()
+	if err != nil {
+		return nil, err
+	}
+
+	return InitLiteral(lit, a)
+}
+
 // ExpandPathExpressionOrNewDotIdentifier tries to build path
 // expressions as long as identifiers are added. As soon as a dotted
 // path contains anything else, we use generalized DotIdentifier.
@@ -274,6 +311,35 @@ func ExpandPathExpressionOrNewDotIdentifier(
 
 		return WrapWithLoc(d, expr, name)
 	}
+}
+
+func NewFunctionCall(
+	expr, nulls, orderby, limit, closetok Attrib,
+) (Attrib, error) {
+	f := expr.(*ast.FunctionCall)
+
+	if nulls != nil {
+		err := f.InitNullHandlingModifier(nulls)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if orderby != nil {
+		err := f.InitOrderBy(orderby)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if limit != nil {
+		err := f.InitLimitOffset(limit)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return UpdateLoc(f, closetok)
 }
 
 func NewLikeBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
@@ -385,7 +451,10 @@ func NewTablePathExpression(
 	case *ast.UnnestExpression:
 		unnest = v
 	default:
-		return nil, errors.ErrMalformedParser
+		return nil, fmt.Errorf(
+			"%w: NewTablePathExperession path/unnest with type %#v",
+			errors.ErrMalformedParser,
+			reflect.TypeOf(base))
 	}
 
 	if offset != nil {

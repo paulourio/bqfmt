@@ -1,4 +1,4 @@
-GOCCFLAGS = -a # -debug_parser -debug_lexer
+GOCCFLAGS = -a # -debug_parser
 
 .PHONY: build
 build: generated_types generated_parser
@@ -6,7 +6,7 @@ build: generated_types generated_parser
 
 .PHONY: test
 test: build
-	go test -v ./zetasql/...
+	gotestsum --format dots ./zetasql/...
 
 .PHONY: test_lexer
 test_lexer: build

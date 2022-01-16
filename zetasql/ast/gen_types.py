@@ -337,7 +337,8 @@ def main():
         fields=[
             Field('Expression', 'ExpressionHandler', FieldLoader.REQUIRED),
             Field('NullOrder', '*NullOrder'),
-            Field('OrderingSpec', 'OrderingSpec'),
+            Field('OrderingSpec', 'OrderingSpec', FieldLoader.REQUIRED,
+                  scalar=True),
         ])
 
     gen.add_node(
@@ -403,16 +404,34 @@ def main():
         fields=[
             Field('LHS', 'TableExpressionHandler', FieldLoader.REQUIRED),
             Field('RHS', 'TableExpressionHandler', FieldLoader.REQUIRED),
-            Field('ClauseList', '*OnOrUsingClauseList'),
             Field('JoinType', 'JoinType', FieldLoader.REQUIRED, scalar=True),
+            Field('OnClause', '*OnClause', init=False),
+            Field('UsingClause', '*UsingClause', init=False),
+            Field(
+                'ClauseList',
+                '*OnOrUsingClauseList',
+                comment=(
+                    'When consecutive ON/USING clauses are encountered, '
+                    'they are saved as ClauseList, and both OnClause and '
+                    'UsingClause will be nil.'),
+                init=False),
             Field('ContainsCommaJoin', 'bool', init=False),
+            Field(
+                'TransformationNeeded',
+                'bool',
+                init=False,
+                comment=(
+                    'Indicates whether this node needs to be transformed. '
+                    'This is true if contains if ClauseList is non nil, '
+                    'or if there is a JOIN with ON/USING clause list '
+                    'on the lhs of the tree path.')),
         ])
 
     gen.add_node(
         name='UsingClause',
         composition='Node',
         fields=[
-            Field('keys', '*Identifier', FieldLoader.REPEATED),
+            Field('Keys', '*Identifier', FieldLoader.REPEATED),
         ])
 
     gen.add_node(
@@ -424,7 +443,10 @@ def main():
 
     gen.add_node(
         name='Having',
-        composition='Node')
+        composition='Node',
+        fields=[
+            Field('Expr', 'ExpressionHandler', FieldLoader.REQUIRED),
+        ])
 
     gen.add_node(
         name='NamedType',
@@ -808,7 +830,7 @@ def main():
         composition='TableExpression',
         fields=[
             Field('Join', '*Join', FieldLoader.REQUIRED),
-            Field('SampleClause', 'SampleClause'),
+            Field('SampleClause', '*SampleClause'),
         ])
 
     gen.add_node(

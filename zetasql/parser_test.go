@@ -75,38 +75,40 @@ func runTest(t *testing.T, path string, input string) {
 			expectedDump = elements[1] + "\n"
 			expectedUnparse = elements[2]
 		default:
-			t.Fatalf("Test case %s must have three sections, but found %d:",
+			t.Logf("Test case %s must have three sections, but found %d:",
 				name, len(elements))
+			continue
 		}
 		t.Run(name, func(t *testing.T) {
 			l := lexer.NewLexer(input).WithoutComment()
 			p := parser.NewParser()
 
-			var dump, errMsg, unparsed string
+			var (
+				dump, errMsg, unparsed   string
+				okErr, okDump, okUnparse bool
+			)
 
 			r, err := p.Parse(l)
 			if err != nil {
-				//rec, serr := p.Error(err, l)
-				//fmt.Println("errors:", serr)
-				//fmt.Println("error formatted:", errMsg)
 				errMsg = errors.FormatError(err, string(input))
 			}
 
 			if expectedError == "" {
-				assert.Nil(t, err)
+				okErr = assert.Nil(t, err)
 			} else {
-				if !assert.Equal(t, expectedError, errMsg) {
-					fmt.Println("Input:")
-					fmt.Println(string(input))
-					fmt.Println("---")
-					fmt.Println("Raw")
+				okErr = assert.Equal(t, expectedError, errMsg)
+				if !okErr {
+					t.Log("Input:")
+					t.Log(string(input))
+					t.Log("---")
+					t.Log("Raw")
 					if perr, ok := err.(*errors.Error); ok {
-						fmt.Println(perr.String())
+						t.Log(perr.String())
 					} else {
-						fmt.Println(perr)
+						t.Log(perr)
 					}
 					//fmt.Println("recovered:", rec)
-					fmt.Println("original error:", err)
+					t.Log("original error:", err)
 					//fmt.Println("errors:", serr)
 				}
 			}
@@ -114,29 +116,36 @@ func runTest(t *testing.T, path string, input string) {
 			if err == nil {
 				dump = r.(ast.NodeStringer).DebugString("")
 			}
-			if expectedDump != dump {
-				fmt.Println("Input:")
-				fmt.Println(string(input))
-				fmt.Println("---")
-				fmt.Println("Dump:")
-				fmt.Println(dump)
-				fmt.Println("---")
-			}
 
 			if err == nil {
 				unparsed = ast.Unparse(r.(ast.NodeHandler))
 			}
-			if unparsed != expectedUnparse {
-				fmt.Println("Unparsed:")
-				fmt.Println(unparsed)
-				fmt.Println("---")
-				fmt.Println("Expected:")
-				fmt.Println(expectedUnparse)
-				fmt.Println("---")
-			}
 
-			assert.Equal(t, expectedDump, dump)
-			assert.Equal(t, expectedUnparse, unparsed)
+			okDump = assert.Equal(t, expectedDump, dump)
+			okUnparse = assert.Equal(t, expectedUnparse, unparsed)
+
+			if !okErr || !okDump || !okUnparse {
+				t.Logf("Input: %s", string(input))
+				if err != nil {
+					t.Logf("Error: %s", err.Error())
+				}
+				if expectedDump != dump {
+					t.Log("Input:")
+					t.Log(string(input))
+					t.Log("---")
+					t.Log("Dump:")
+					t.Log(dump)
+					t.Log("---")
+				}
+				if unparsed != expectedUnparse {
+					t.Log("Unparsed:")
+					t.Log(unparsed)
+					t.Log("---")
+					t.Log("Expected:")
+					t.Log(expectedUnparse)
+					t.Log("---")
+				}
+			}
 
 		})
 	}
@@ -147,7 +156,9 @@ func getInput(section string) string {
 	i := 0
 
 	for ; i < len(lines); i++ {
-		if !strings.HasPrefix(lines[i], "# ") {
+		if !strings.HasPrefix(lines[i], "# ") &&
+			lines[i] != "" &&
+			!strings.HasPrefix(lines[i], "[") {
 			break
 		}
 	}
