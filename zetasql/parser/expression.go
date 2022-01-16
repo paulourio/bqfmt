@@ -100,3 +100,12 @@ func NewFormatClause(format, expr, tz Attrib) (Attrib, error) {
 
 	return UpdateLoc(f, format)
 }
+
+func NewIntervalExpression(interval, expr, name, to Attrib) (Attrib, error) {
+	e, err := ast.NewIntervalExpr(expr, name, to)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(e, interval)
+}

@@ -209,6 +209,10 @@ const (
 	BoolKind TypeKind = iota
 	IntegerKind
 	FloatingPointKind
+	DateKind
+	DateTimeKind
+	TimeKind
+	TimestampKind
 	OtherKind
 )
 

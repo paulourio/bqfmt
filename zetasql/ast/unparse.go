@@ -682,6 +682,22 @@ func (u *unparser) VisitArrayElement(n *ArrayElement, d interface{}) {
 	u.printCloseParenIfNeeded(n)
 }
 
+func (u *unparser) VisitDateOrTimeLiteral(
+	n *DateOrTimeLiteral, d interface{}) {
+	switch n.TypeKind {
+	case DateKind:
+		u.print("DATE")
+	case DateTimeKind:
+		u.print("DATETIME")
+	case TimeKind:
+		u.print("TIME")
+	case TimestampKind:
+		u.print("TIMESTAMP")
+	}
+
+	n.StringLiteral.Accept(u, d)
+}
+
 func (u *unparser) VisitNullLiteral(n *NullLiteral, d interface{}) {
 	u.print("NULL")
 }

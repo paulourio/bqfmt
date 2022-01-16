@@ -682,7 +682,7 @@ def main():
         composition='Expression',
         fields=[
             Field('StringLiteral', '*StringLiteral', FieldLoader.REQUIRED),
-            Field('TypeKind', 'TypeKind')
+            Field('TypeKind', 'TypeKind', FieldLoader.REQUIRED, scalar=True)
         ])
 
     gen.add_node(

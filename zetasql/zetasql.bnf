@@ -656,27 +656,9 @@ PrecedingOrFollowing:
 
 IntervalExpression:
       interval Expression Identifier
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewIntervalExpr($1, $2, nil)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewIntervalExpression($0, $1, $2, nil) >>
     | interval Expression Identifier to Identifier
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewIntervalExpr($1, $2, $3)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewIntervalExpression($0, $1, $2, $4) >>
     ;
 
 Type:
@@ -828,6 +810,7 @@ Expression1:
     | FloatingPointLiteral
     | NumericLiteral
     | BigNumericLiteral
+    | DateOrTimeLiteral
     | JSONLiteral
     | ParenthesizedExpression
     | ArrayConstructor
@@ -839,6 +822,7 @@ Expression1:
       << NewArrayElement($0, $1, $2, $3) >>
     | Expression1 "." Identifier
       << ExpandPathExpressionOrNewDotIdentifier($0, $1, $2) >>
+    | IntervalExpression
     | Identifier
       << ast.NewPathExpression($0) >>
     ;
@@ -936,6 +920,18 @@ BigNumericLiteral:
 BigNumericPrefix:
       bignumeric
     | bigdecimal
+    ;
+
+DateOrTimeLiteral:
+      DateOrTimeLiteralKind StringLiteral
+      << NewDateOrTimeLiteral($0, $1) >>
+    ;
+
+DateOrTimeLiteralKind:
+      date       << WrapWithLoc(ast.DateKind, $0) >>
+    | datetime   << WrapWithLoc(ast.DateTimeKind, $0) >>
+    | time       << WrapWithLoc(ast.TimeKind, $0) >>
+    | timestamp  << WrapWithLoc(ast.TimestampKind, $0) >>
     ;
 
 JSONLiteral:

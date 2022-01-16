@@ -30,6 +30,10 @@ func NewNumericLiteral(prefix, str Attrib) (Attrib, error) {
 	return UpdateLoc(value, prefix)
 }
 
+func NewDateOrTimeLiteral(kind, str Attrib) (Attrib, error) {
+	return ast.NewDateOrTimeLiteral(str, kind)
+}
+
 func NewNullLiteral(null Attrib) (Attrib, error) {
 	lit, err := ast.NewNullLiteral()
 	if err != nil {

@@ -4253,16 +4253,11 @@ func (n *DateOrTimeLiteral) InitTypeKind(d interface{}) error {
 
 func (n *DateOrTimeLiteral) initTypeKind(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-	case NodeHandler:
-		n.TypeKind = d.(TypeKind)
-		n.Expression.AddChild(t)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initTypeKind(t.Value)
 	default:
 		n.TypeKind = d.(TypeKind)
-		n.Expression.AddChild(d.(NodeHandler))
 	}
 
 	return nil
