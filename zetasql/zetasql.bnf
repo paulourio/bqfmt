@@ -23,7 +23,7 @@ unterminated_triple_quoted_raw_bytes_literal:   _raw_bytes_prefix(_sq3text_0|_dq
             messages for unterminated strings and bytes.
 
     Here we accept arbitrary escapes instead of trying to narrowing it
-    down just de valid set.  The actual validation of the escapes, and
+    down just the valid set.  The actual validation of the escapes, and
     of things like UTF-8 structure, is done in the parser.
  */
 _sqtext:      _sqtext_0 _sq ;
@@ -210,7 +210,6 @@ illegal_character: . ;
 <<
 import (
     "github.com/paulourio/bqfmt/zetasql/ast"
-	  "github.com/paulourio/bqfmt/zetasql/errors"
 )
 >>
 
@@ -262,13 +261,7 @@ QueryPrimaryOrSetOperation:
 QueryPrimary:
       Select
     | "(" Query ")"
-      <<
-      func() (Attrib, error) {
-          q := $1.(*ast.Query)
-          q.SetParenthesized(true)
-          return WrapWithLoc(q, $0, $2)
-      }()
-      >>
+      << SetQueryParenthesized($0, $1, $2) >>
     ;
 
 Select:
@@ -372,17 +365,7 @@ OptWhereClause:
 
 WhereClause:
       where Expression
-      <<
-      func() (Attrib, error) {
-          f, err := ast.NewWhereClause($1)
-          if err != nil {
-              return nil, err
-          }
-
-          UpdateLoc(f, $0)
-          return f, nil
-      }()
-      >>
+      << NewWhereClause($0, $1) >>
     ;
 
 OptAllOrDistinct:
@@ -530,16 +513,7 @@ TablePathExpressionBase:
 
 UnnestExpression:
       unnest "(" Expression ")"
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewUnnestExpression($2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0, $3)
-      }()
-      >>
+      << NewUnnestExpression($0, $2, $3) >>
     | unnest "(" select
       <<
       NewSyntaxError($2,
@@ -551,38 +525,12 @@ UnnestExpression:
 
 TableSubquery:
       "(" Query ")" OptPivotOrUnpivotClauseAndAlias OptSampleClause
-      <<
-      func() (Attrib, error) {
-          p := $3.(*pivotOrUnpivotAndAlias)
-
-          t, err := ast.NewTableSubquery(
-              $1, p.Alias, p.PivotClause, p.UnpivotClause, $4)
-          if err != nil {
-              return nil, err
-          }
-
-          t.Subquery.IsNested = true
-
-          UpdateLoc(t, $0)
-          UpdateLoc(t, $2)
-
-          return t, nil
-      }()
-      >>
+      << NewTableSubquery($0, $1, $2, $3, $4) >>
     ;
 
 OptPivotOrUnpivotClauseAndAlias:
       as Alias
-      <<
-      func() (Attrib, error) {
-          a, err := UpdateLoc($1, $0)
-          if err != nil {
-              return nil, err
-          }
-
-          return &pivotOrUnpivotAndAlias{Alias: a}, nil
-      }()
-      >>
+      << PivotUnpivotAliasWithAlias($0, $1) >>
     | Alias
       << &pivotOrUnpivotAndAlias{Alias: $0}, nil >>
     | empty
@@ -591,16 +539,7 @@ OptPivotOrUnpivotClauseAndAlias:
 
 OptWithOffsetAndAlias:
       with offset OptAsAlias
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewWithOffset($2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewWithOffset($0, $1, $2) >>
     | empty
     ;
 
@@ -622,16 +561,7 @@ OptOrderByClause:
 
 OrderByClausePrefix:
       order by OrderingExpression
-      <<
-      func() (Attrib, error) {
-          c, err := ast.NewOrderBy($2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(c, $0)
-      }()
-      >>
+      << NewOrderBy($0, $2) >>
     | OrderByClausePrefix "," OrderingExpression
       << WithExtraChild($0, $2) >>
     ;
@@ -649,54 +579,18 @@ OptAscOrDesc:
 
 OptNullOrder:
       nulls first
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewNullOrder(true)
-          if err != nil {
-            return nil, err
-          }
-
-          return UpdateLoc(e, $0, $1)
-      }()
-      >>
+      << NewNullOrder($0, $1, true) >>
     | nulls last
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewNullOrder(false)
-          if err != nil {
-            return nil, err
-          }
-
-          return UpdateLoc(e, $0, $1)
-      }()
-      >>
+      << NewNullOrder($0, $1, false) >>
     | empty
     ;
 
 OptLimitOffsetClause:
       limit PossiblyCastIntLiteralOrParameter
       offset PossiblyCastIntLiteralOrParameter
-      <<
-      func() (Attrib, error) {
-          c, err := ast.NewLimitOffset($1, $3)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(c, $0)
-      }()
-      >>
+      << NewLimitOffset($0, $1, $3) >>
     | limit PossiblyCastIntLiteralOrParameter
-      <<
-      func() (Attrib, error) {
-          c, err := ast.NewLimitOffset($1, nil)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(c, $0)
-      }()
-      >>
+      << NewLimitOffset($0, $1, nil) >>
     | empty
     ;
 
@@ -709,16 +603,7 @@ WindowSpecification:
       OptOrderByClause
       OptWindowFrameClause
       ")"
-      <<
-      func() (Attrib, error) {
-          w, err := ast.NewWindowSpecification($1, $2, $3, $4)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(w, $0, $5)
-      }()
-      >>
+      << NewWindowSpecification($0, $1, $2, $3, $4, $5) >>
     ;
 
 OptIdentifier:
@@ -737,16 +622,7 @@ PartitionByClause:
 
 PartitionByClausePrefix:
       partition by Expression
-      <<
-      func() (Attrib, error) {
-          c, err := ast.NewPartitionBy($2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(c, $0)
-      }()
-      >>
+      << NewPartitionBy($0, $2) >>
     | PartitionByClausePrefix "," Expression
       << WithExtraChild($0, $2) >>
     ;
@@ -764,38 +640,11 @@ FrameUnit:
 
 WindowFrameBound:
       unbounded preceding
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewWindowFrameExpr(nil, ast.UnboundedPreceding)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0, $1)
-      }()
-      >>
+      << NewWindowFrameExprOnlyWithType($0, $1, ast.UnboundedPreceding) >>
     | unbounded following
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewWindowFrameExpr(nil, ast.UnboundedFollowing)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0, $1)
-      }()
-      >>
+      << NewWindowFrameExprOnlyWithType($0, $1, ast.UnboundedFollowing) >>
     | current row
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewWindowFrameExpr(nil, ast.CurrentRow)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0, $1)
-      }()
-      >>
+      << NewWindowFrameExprOnlyWithType($0, $1, ast.CurrentRow) >>
     | Expression PrecedingOrFollowing
       << ast.NewWindowFrameExpr($0, $1) >>
     ;
@@ -832,21 +681,7 @@ IntervalExpression:
 
 Type:
       RawType OptTypeParameters
-      <<
-      func() (Attrib, error) {
-          switch t := $1.(type) {
-          case nil:
-              return $0, nil
-          case *ast.TypeParameterList:
-            n := $0.(ast.TypeHandler)
-            n.SetTypeParameters(t)
-            n.AddChild(t)
-            return n, nil
-          }
-
-          return nil, errors.ErrMalformedParser
-      }()
-      >>
+      << NewNamedType($0, $1) >>
     ;
 
 RawType:
@@ -862,46 +697,19 @@ TypeName:
 
 ArrayType:
       array "<" Type ">"
-      <<
-      func() (Attrib, error) {
-          t, err := ast.NewArrayType($2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(t, $0, $3)
-      }()
-      >>
+      << NewArrayType($0, $2, $3) >>
     ;
 
 StructType:
       struct "<" ">"
-      <<
-      func() (Attrib, error) {
-          t, err := ast.NewStructType(nil)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(t, $0, $2)
-      }()
-      >>
+      << NewStructType($0, nil, $2) >>
     | StructTypePrefix ">"
       << UpdateLoc($0, $1) >>
     ;
 
 StructTypePrefix:
       struct "<" StructField
-      <<
-      func() (Attrib, error) {
-          t, err := ast.NewStructType($2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(t, $0)
-      }()
-      >>
+      << NewStructType($0, $2, nil) >>
     | StructTypePrefix "," StructField
       << WithExtraChild($0, $2) >>
     ;
@@ -935,16 +743,7 @@ Expression11:
 /* Unary NOT operator */
 Expression10:
       not Expression9
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewUnaryExpression(ast.UnaryNot, $1)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewNotUnaryExpression($0, $1) >>
     | Expression9
     ;
 
@@ -957,16 +756,7 @@ Expression9:
     | Expression9 InOperator Expression8
       << NewInBinaryExpression($1, $0, $2) >>
     | Expression9 BetweenOperator Expression8 and Expression8
-      <<
-      func() (Attrib, error) {
-          b, err := NewBetweenExpression($0, $2, $4, $1)
-          if err != nil {
-              return nil, err
-          }
-
-          return OverrideLoc(b, $1, $4)
-      }()
-      >>
+      << NewBetweenExpression($0, $1, $2, $3, $4) >>
     | Expression9 IsOperator InExpressionRHS
       << NewIsBinaryExpression($1, $0, $2) >>
     | Expression8
@@ -1046,16 +836,7 @@ Expression1:
     | CastExpression
     | FunctionCallExpressionWithClauses
     | Expression1 "[" Expression1 "]"
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewArrayElement($0, $2)
-          if err != nil {
-              return nil, err
-          }
-
-          return OverrideLoc(e, $1, $3)
-      }()
-      >>
+      << NewArrayElement($0, $1, $2, $3) >>
     | Expression1 "." Identifier
       << ExpandPathExpressionOrNewDotIdentifier($0, $1, $2) >>
     | Identifier
@@ -1134,16 +915,7 @@ BooleanLiteral:
 
 NullLiteral:
       null
-      <<
-      func() (Attrib, error) {
-          lit, err := ast.NewNullLiteral()
-          if err != nil {
-              return nil, err
-          }
-
-          return InitLiteral(lit, $0)
-      }()
-      >>
+      << NewNullLiteral($0) >>
     ;
 
 NumericLiteral:
@@ -1168,21 +940,7 @@ BigNumericPrefix:
 
 JSONLiteral:
       json string_literal
-      <<
-      func() (Attrib, error) {
-          lit, err := ast.NewJSONLiteral()
-          if err != nil {
-              return nil, err
-          }
-
-          value, err := InitLiteral(lit, $1)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(value, $0)
-      }()
-      >>
+      << NewJSONLiteral($0, $1) >>
     ;
 
 MaybeDashedPathExpression:
@@ -1227,17 +985,7 @@ KeywordAsIdentifier:
 
 ParenthesizedExpression:
       "(" Expression ")"
-      <<
-      func() (Attrib, error) {
-          e := $1.(ast.ExpressionHandler)
-          e.SetParenthesized(true)
-
-          // Do not include the location in the parentheses. Semantic
-          // error messages about this expression should point at the
-          // start of the expression, not at the opening parentheses.
-          return WrapWithLoc(e, $0, $2)
-      }()
-      >>
+      << SetExpressionParenthesized($0, $1, $2) >>
     ;
 
 OptSampleClause:
@@ -1247,19 +995,7 @@ OptSampleClause:
 
 SampleClause:
       tablesample Identifier "(" SampleSize ")" OptSampleClauseSuffix
-      <<
-      func() (Attrib, error) {
-          s, err := ast.NewSampleClause($1, $2, $3)
-          if err != nil {
-              return nil, err
-          }
-
-          UpdateLoc(s, $0)
-          UpdateLoc(s, $4)
-
-          return s, nil
-      }()
-      >>
+      << NewSampleClause($0, $1, $3, $4, $5) >>
     ;
 
 SampleSize:
@@ -1279,40 +1015,13 @@ SampleSizeUnit:
 
 OptSampleClauseSuffix:
       RepeatableClause
-      << ast.NewSampleSuffix(nil, $0) >>
+      << NewSampleClauseSuffix(nil, nil, nil, $0) >>
     | with weight OptRepeatableClause
-      <<
-      func() (Attrib, error) {
-          s, err := ast.NewSampleSuffix(nil, $2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(s, $0)
-      }()
-      >>
+      << NewSampleClauseSuffix($0, nil, nil, $1) >>
     | with weight Alias OptRepeatableClause
-      <<
-      func() (Attrib, error) {
-          s, err := ast.NewSampleSuffix($2, $3)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(s, $0)
-      }()
-      >>
+      << NewSampleClauseSuffix($0, nil, $1, $2) >>
     | with weight as Alias OptRepeatableClause
-      <<
-      func() (Attrib, error) {
-          s, err := ast.NewSampleSuffix($3, $4)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(s, $0)
-      }()
-      >>
+      << NewSampleClauseSuffix($0, $1, $2, $3) >>
     | empty
     ;
 
@@ -1323,17 +1032,7 @@ OptRepeatableClause:
 
 RepeatableClause:
       repeatable "(" PossiblyCastIntLiteralOrParameter ")"
-      <<
-      func() (Attrib, error) {
-          c, err := ast.NewRepeatableClause($2)
-          if err != nil {
-              return nil, err
-          }
-
-          UpdateLoc(c, $0, $3)
-          return c, nil
-      }()
-      >>
+      << NewRepeatableClause($0, $2, $3) >>
     ;
 
 PossiblyCastIntLiteralOrParameter:
@@ -1343,17 +1042,7 @@ PossiblyCastIntLiteralOrParameter:
 
 CastIntLiteralOrParameter:
       cast "(" IntLiteralOrParameter as Type OptFormat ")"
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewCastExpression($2, $4, $5, false)
-          if err != nil {
-              return nil, err
-          }
-
-          UpdateLoc(e, $0, $6)
-          return e, nil
-      }()
-      >>
+      << NewCastIntLiteralOrParam($0, $2, $4, $5, $6) >>
     ;
 
 IntLiteralOrParameter:
@@ -1367,41 +1056,14 @@ ParameterExpression:
 
 NamedParameterExpression:
       "@" Identifier
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewParameterExpr($0)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewParameterExpr($0, $1) >>
     | "@" KeywordAsIdentifier
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewParameterExpr($0)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewParameterExpr($0, $1) >>
     ;
 
 OptFormat:
       format Expression OptAtTimeZone
-      <<
-      func() (Attrib, error) {
-          f, err := ast.NewFormatClause($1, $2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(f, $0)
-      }()
-      >>
+      << NewFormatClause($0, $1, $2) >>
     | empty
     ;
 

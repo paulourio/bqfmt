@@ -12,14 +12,6 @@ import (
 	"github.com/paulourio/bqfmt/zetasql/token"
 )
 
-// pivotOrUnpivotAndAlias is a temporary holder of information when
-// constructing a table path expression.
-type pivotOrUnpivotAndAlias struct {
-	Alias         Attrib
-	PivotClause   Attrib
-	UnpivotClause Attrib
-}
-
 // OverrideLoc resets the location of a node and use the given tokens
 // as reference instead.
 func OverrideLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
@@ -392,36 +384,6 @@ func NewInBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 	bin.ExpandLoc(loc.StartLoc(), loc.EndLoc())
 
 	return bin, nil
-}
-
-func NewBetweenExpression(inLHS, inLow, inHigh, inOp Attrib) (Attrib, error) {
-	lhs, loc := getExpressionHandler(inLHS)
-	low, _ := getExpressionHandler(inLHS)
-	op := inOp.(*ast.Wrapped)
-	isNot := op.Value.(ast.NotKeyword) == ast.NotKeywordPresent
-
-	if !lhs.IsAllowedInComparison() {
-		return nil, zerrors.NewSyntaxError(
-			op.Loc,
-			"expression to left of BETWEEN must be parenthesized")
-	}
-
-	// Test the middle operand for unparenthesized operators with lower
-	// or equal precedence.
-	if !low.IsAllowedInComparison() {
-		return nil, zerrors.NewSyntaxError(
-			low.GetLoc(),
-			"expression in BETWEEN must be parenthesized")
-	}
-
-	between, err := ast.NewBetweenExpression(inLHS, inLow, inHigh, isNot)
-	if err != nil {
-		return nil, err
-	}
-
-	between.ExpandLoc(loc.StartLoc(), loc.EndLoc())
-
-	return between, nil
 }
 
 func NewIsBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {

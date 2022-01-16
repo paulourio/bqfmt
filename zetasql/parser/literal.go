@@ -29,3 +29,26 @@ func NewNumericLiteral(prefix, str Attrib) (Attrib, error) {
 
 	return UpdateLoc(value, prefix)
 }
+
+func NewNullLiteral(null Attrib) (Attrib, error) {
+	lit, err := ast.NewNullLiteral()
+	if err != nil {
+		return nil, err
+	}
+
+	return InitLiteral(lit, null)
+}
+
+func NewJSONLiteral(json, content Attrib) (Attrib, error) {
+	lit, err := ast.NewJSONLiteral()
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := InitLiteral(lit, content)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(value, json)
+}

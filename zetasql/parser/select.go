@@ -218,6 +218,48 @@ func NewWithClauseEntry(alias, query, parens Attrib) (Attrib, error) {
 	return UpdateLoc(e, parens)
 }
 
+func NewWhereClause(where, expr Attrib) (Attrib, error) {
+	f, err := ast.NewWhereClause(expr)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(f, where)
+}
+
+func NewWindowSpecification(
+	open, identifier, partition, order, window, close Attrib,
+) (Attrib, error) {
+	w, err := ast.NewWindowSpecification(identifier, partition, order, window)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(w, open, close)
+}
+
+func NewPartitionBy(partition, expr Attrib) (Attrib, error) {
+	c, err := ast.NewPartitionBy(expr)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(c, partition)
+}
+
+// NewWindowFrameExprOnlyWithType returns WindowFrameExpr for boundary
+// types that require no additional expression, such as CURRENT ROW,
+// UNBOUNDED PRECEDING, and UNBOUNDED FOLLOWING.
+func NewWindowFrameExprOnlyWithType(
+	a, b Attrib, boundary ast.BoundaryType) (Attrib, error) {
+	e, err := ast.NewWindowFrameExpr(nil, boundary)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(e, a, b)
+}
+
 type allOrDistinctKeyword int
 
 const (

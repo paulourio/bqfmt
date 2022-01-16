@@ -1,4 +1,4 @@
-package zetasql_test
+package parser_test
 
 import (
 	"errors"

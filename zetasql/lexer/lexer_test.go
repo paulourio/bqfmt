@@ -1,4 +1,4 @@
-package zetasql_test
+package lexer_test
 
 import (
 	"fmt"

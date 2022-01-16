@@ -1,0 +1,28 @@
+
+select * from (((select 1)))
+--
+QueryStatement [0-28]
+  Query [0-28]
+    Select [0-28]
+      SelectList [7-8]
+        SelectColumn [7-8]
+          Star(*) [7-8]
+      FromClause [9-28]
+        TableSubquery [14-28]
+          Query [15-27]
+            Query [16-26]
+              Query [17-25]
+                Select [17-25]
+                  SelectList [24-25]
+                    SelectColumn [24-25]
+                      IntLiteral(1) [24-25]
+--
+SELECT
+  *
+FROM
+  (((
+    SELECT
+      1
+    ))
+  )
+==

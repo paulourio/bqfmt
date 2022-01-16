@@ -192,7 +192,6 @@ func computeLineCol(lines []string, offset int) (line, col int) {
 	col = offset
 	col++
 	line++
-	// fmt.Printf("computeLineCol(offset=%d) -> %d:%d\n", offset, line, col)
 
 	return
 }

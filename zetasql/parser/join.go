@@ -143,6 +143,56 @@ func NewParenthesizedJoin(lhs, sample, open, close Attrib) (Attrib, error) {
 	return UpdateLoc(join, open, close)
 }
 
+func NewSampleClause(
+	tablesample, method, size, close, suffix Attrib) (Attrib, error) {
+	s, err := ast.NewSampleClause(method, size, suffix)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(s, tablesample, close)
+}
+
+func NewSampleClauseSuffix(
+	with, as, alias, repeatable Attrib) (Attrib, error) {
+	// REPEATABLE (...)
+	if with == nil {
+		return ast.NewSampleSuffix(nil, repeatable)
+	}
+
+	// WITH WEIGHT AS id REPEATABLE (...)
+	if as != nil {
+		a, err := UpdateLoc(alias, as)
+		if err != nil {
+			return nil, err
+		}
+
+		s, err := ast.NewSampleSuffix(a, repeatable)
+		if err != nil {
+			return nil, err
+		}
+
+		return UpdateLoc(s, with)
+	}
+
+	// WITH WEIGHT id REPEATABLE (...)
+	s, err := ast.NewSampleSuffix(alias, repeatable)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(s, with)
+}
+
+func NewRepeatableClause(repeatable, expr, close Attrib) (Attrib, error) {
+	c, err := ast.NewRepeatableClause(expr)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(c, repeatable, close)
+}
+
 func IsTransformationNeeded(expr Attrib) bool {
 	if join, ok := expr.(*ast.Join); ok {
 		return join.TransformationNeeded
