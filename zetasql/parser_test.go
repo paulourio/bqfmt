@@ -1,6 +1,7 @@
 package zetasql_test
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/paulourio/bqfmt/zetasql/ast"
-	"github.com/paulourio/bqfmt/zetasql/errors"
+	zerrors "github.com/paulourio/bqfmt/zetasql/errors"
 	"github.com/paulourio/bqfmt/zetasql/lexer"
 	"github.com/paulourio/bqfmt/zetasql/parser"
 	"github.com/stretchr/testify/assert"
@@ -17,10 +18,12 @@ import (
 
 func TestParser(t *testing.T) {
 	testPath := "./testdata/"
+
 	st, err := os.Stat(testPath)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !st.IsDir() {
 		t.Fatalf("%s must be a directory of .test files", testPath)
 	}
@@ -58,12 +61,14 @@ func runTest(t *testing.T, path string, input string) {
 	for i, testCase := range cases {
 		name := fmt.Sprintf("%s:Case#%d", path, i+1)
 		elements := strings.Split(testCase+"\n", "\n--\n")
+
 		var (
 			input           []byte
 			expectedDump    string
 			expectedUnparse string
 			expectedError   string
 		)
+
 		switch len(elements) {
 		case 2:
 			// Syntax error test case
@@ -79,6 +84,7 @@ func runTest(t *testing.T, path string, input string) {
 				name, len(elements))
 			continue
 		}
+
 		t.Run(name, func(t *testing.T) {
 			l := lexer.NewLexer(input).WithoutComment()
 			p := parser.NewParser()
@@ -90,7 +96,7 @@ func runTest(t *testing.T, path string, input string) {
 
 			r, err := p.Parse(l)
 			if err != nil {
-				errMsg = errors.FormatError(err, string(input))
+				errMsg = zerrors.FormatError(err, string(input))
 			}
 
 			if expectedError == "" {
@@ -102,14 +108,16 @@ func runTest(t *testing.T, path string, input string) {
 					t.Log(string(input))
 					t.Log("---")
 					t.Log("Raw")
-					if perr, ok := err.(*errors.Error); ok {
+
+					var perr *zerrors.Error
+
+					if errors.As(err, &perr) {
 						t.Log(perr.String())
 					} else {
 						t.Log(perr)
 					}
-					//fmt.Println("recovered:", rec)
+
 					t.Log("original error:", err)
-					//fmt.Println("errors:", serr)
 				}
 			}
 

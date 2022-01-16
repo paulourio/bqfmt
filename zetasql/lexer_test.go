@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/paulourio/bqfmt/zetasql/lexer"
 	"github.com/paulourio/bqfmt/zetasql/token"
+	"github.com/stretchr/testify/assert"
 )
 
 type lexerTestCase struct {

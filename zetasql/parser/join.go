@@ -24,6 +24,7 @@ func NewJoin(lhs, rhs, clauses, typ, joinKw Attrib) (Attrib, error) {
 	if (joinType == ast.FullJoin || joinType == ast.RightJoin) &&
 		lhsNode.Kind() == ast.JoinKind {
 		joinInput := lhsNode.(*ast.Join)
+
 		for {
 			if joinInput.JoinType == ast.CommaJoin {
 				return nil, errors.NewSyntaxError(
@@ -36,6 +37,7 @@ func NewJoin(lhs, rhs, clauses, typ, joinKw Attrib) (Attrib, error) {
 							"place of the comma join",
 						joinType))
 			}
+
 			if joinInput.LHS.Kind() == ast.JoinKind {
 				// Look deeper only if the left input is an unparenthesized
 				// join.
@@ -53,6 +55,7 @@ func NewJoin(lhs, rhs, clauses, typ, joinKw Attrib) (Attrib, error) {
 
 	if clauses != nil {
 		clauseList, clauseLoc = getOnOrUsingClauseList(clauses)
+
 		n, err := UpdateLoc(join, clauseLoc)
 		if err != nil {
 			return nil, err
@@ -61,7 +64,7 @@ func NewJoin(lhs, rhs, clauses, typ, joinKw Attrib) (Attrib, error) {
 		join = n.(*ast.Join)
 	}
 
-	if clauseList == nil {
+	if clauseList == nil { //nolint:gocritic
 		// Nothing.
 	} else if len(clauseList.List) == 1 {
 		switch c := clauseList.List[0].(type) {
@@ -79,7 +82,7 @@ func NewJoin(lhs, rhs, clauses, typ, joinKw Attrib) (Attrib, error) {
 			return nil, fmt.Errorf(
 				"%w: cannot create join with ClauseList of type %#v",
 				errors.ErrMalformedParser,
-				reflect.TypeOf(c))
+				reflect.TypeOf(clauseList.List[0]))
 		}
 	} else {
 		err := join.InitClauseList(clauseList)

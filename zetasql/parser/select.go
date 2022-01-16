@@ -141,6 +141,20 @@ func NewSelectExprAsAlias(expr, as, alias Attrib) (Attrib, error) {
 	return ast.NewSelectColumn(expr, a)
 }
 
+func NewFromClause(from, contents Attrib) (Attrib, error) {
+	node, err := TransformJoinExpression(contents)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := ast.NewFromClause(node)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(f, from)
+}
+
 func NewGroupBy(group, item Attrib) (Attrib, error) {
 	g, err := ast.NewGroupBy(item)
 	if err != nil {

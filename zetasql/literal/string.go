@@ -34,6 +34,7 @@ func ParseString(s string) (string, error) {
 	}
 
 	offset := 0 // Offset to control the error position.
+
 	if isRawLiteral {
 		// Strip off the prefix 'r' from the raw string content before
 		// parsing.
@@ -70,6 +71,7 @@ func ParseBytes(s string) ([]byte, error) {
 	}
 
 	offset := 0 // Offset to control the error position.
+
 	if isRawBytesLiteral {
 		// Strip off the prefix 'r' from the raw string content before
 		// parsing.
@@ -196,6 +198,7 @@ func (u *unescaper) consumeRegularChar() {
 		// i.e. '\r', '\n', '\r\n' are replaced with '\n'.
 		u.out = append(u.out, '\n')
 		u.pos++
+
 		if u.pos < len(u.data) && u.data[u.pos] == '\n' {
 			u.pos++
 		}
@@ -235,6 +238,7 @@ func (u *unescaper) consumeEscapedSequence() error {
 		// literally in the string.
 		u.out = append(u.out, rune(u.data[u.pos]), rune(u.data[u.pos+1]))
 		u.pos += 2
+
 		return nil
 	}
 
@@ -291,6 +295,7 @@ func (u *unescaper) consumeEscapedSequence() error {
 	}
 
 	u.pos++
+
 	return nil
 }
 
@@ -468,6 +473,7 @@ func (u *unescaper) consumeUnicodeLongForm() error {
 	for _, byt := range values[:n] {
 		cp = (cp << 8) + uint32(byt)
 	}
+
 	if cp > 0x0010FFFF {
 		return &UnescapeError{
 			Msg: `Illegal escape sequence: Value of \U` +
@@ -506,26 +512,13 @@ func isOctalDigit(c byte) bool {
 	return c >= '0' && c <= '7'
 }
 
-func isHexDigit(c byte) bool {
-	return c >= '0' && c <= '9' ||
-		c >= 'A' && c <= 'F' ||
-		c >= 'a' && c <= 'f'
-}
-
-func hexDigitToRune(c byte) rune {
-	if c > '9' {
-		c += 9
-	}
-
-	return rune(c & 0xf)
-}
-
 func maybeTripleQuotedStringLiteral(s string) bool {
 	if len(s) >= 6 &&
 		(strings.HasPrefix(s, "'''") && strings.HasSuffix(s, "'''") ||
 			strings.HasPrefix(s, `"""`) && strings.HasSuffix(s, `"""`)) {
 		return true
 	}
+
 	return false
 }
 
@@ -535,6 +528,7 @@ func maybeStringLiteral(s string) bool {
 		(s[0] == '\'' || s[0] == '"') {
 		return true
 	}
+
 	return false
 }
 
@@ -545,6 +539,7 @@ func maybeRawStringLiteral(s string) bool {
 		(s[1] == '\'' || s[1] == '"') {
 		return true
 	}
+
 	return false
 }
 
@@ -555,6 +550,7 @@ func maybeBytesLiteral(s string) bool {
 		(s[1] == '\'' || s[1] == '"') {
 		return true
 	}
+
 	return false
 }
 
@@ -567,5 +563,6 @@ func maybeRawBytesLiteral(s string) bool {
 			return true
 		}
 	}
+
 	return false
 }

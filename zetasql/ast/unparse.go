@@ -114,6 +114,7 @@ func (u *unparser) VisitOrderBy(n *OrderBy, d interface{}) {
 	u.println("")
 	u.print("ORDER BY")
 	u.incDepth()
+
 	for i, item := range n.OrderingExpression {
 		if i > 0 {
 			u.print(",")
@@ -121,6 +122,7 @@ func (u *unparser) VisitOrderBy(n *OrderBy, d interface{}) {
 
 		item.Accept(u, d)
 	}
+
 	u.decDepth()
 }
 
@@ -135,6 +137,7 @@ func (u *unparser) VisitOrderingExpression(
 		u.print("ASC")
 	case NoOrderingSpec:
 		/* nothing */
+		break
 	}
 
 	if n.NullOrder != nil {
@@ -154,6 +157,7 @@ func (u *unparser) VisitLimitOffset(n *LimitOffset, d interface{}) {
 	u.println("")
 	u.print("LIMIT")
 	n.Limit.Accept(u, d)
+
 	if n.Offset != nil {
 		u.print("OFFSET")
 		n.Offset.Accept(u, d)
@@ -227,6 +231,7 @@ func (u *unparser) VisitGroupBy(n *GroupBy, d interface{}) {
 	u.println("")
 	u.print("GROUP BY")
 	u.incDepth()
+
 	for i, item := range n.GroupingItems {
 		if i > 0 {
 			u.print(",")
@@ -234,12 +239,14 @@ func (u *unparser) VisitGroupBy(n *GroupBy, d interface{}) {
 
 		item.Expression.Accept(u, d)
 	}
+
 	u.decDepth()
 }
 
 func (u *unparser) VisitSelectList(n *SelectList, d interface{}) {
 	u.println("")
 	u.incDepth()
+
 	for i, col := range n.Columns {
 		if i > 0 {
 			u.println(",")
@@ -247,6 +254,7 @@ func (u *unparser) VisitSelectList(n *SelectList, d interface{}) {
 
 		col.Accept(u, d)
 	}
+
 	u.decDepth()
 }
 
@@ -269,7 +277,7 @@ func (u *unparser) VisitBinaryExpression(n *BinaryExpression, d interface{}) {
 	n.LHS.Accept(u, d)
 
 	if n.IsNot {
-		switch n.Op {
+		switch n.Op { //nolint:exhaustive
 		case BinaryIs:
 			u.print("IS NOT ")
 		case BinaryLike:
@@ -333,10 +341,12 @@ func (u *unparser) VisitJoin(n *Join, d interface{}) {
 		u.println("")
 		n.ClauseList.Accept(u, d)
 	}
+
 	if n.OnClause != nil {
 		u.println("")
 		n.OnClause.Accept(u, d)
 	}
+
 	if n.UsingClause != nil {
 		u.println("")
 		n.UsingClause.Accept(u, d)
@@ -358,12 +368,20 @@ func (u *unparser) VisitParenthesizedJoin(
 	}
 }
 
+func (u *unparser) VisitUnnestExpression(
+	n *UnnestExpression, d interface{}) {
+	u.print("UNNEST(")
+	n.Expression.Accept(u, d)
+	u.print(")")
+}
+
 func (u *unparser) VisitSampleClause(n *SampleClause, d interface{}) {
 	u.print("TABLESAMPLE")
 	n.SampleMethod.Accept(u, d)
 	u.print("(")
 	n.SampleSize.Accept(u, d)
 	u.print(")")
+
 	if n.SampleSuffix != nil {
 		n.SampleSuffix.Accept(u, d)
 	}
@@ -372,6 +390,7 @@ func (u *unparser) VisitSampleClause(n *SampleClause, d interface{}) {
 func (u *unparser) VisitSampleSize(n *SampleSize, d interface{}) {
 	n.Size.Accept(u, d)
 	u.print(n.Unit.String())
+
 	if n.PartitionBy != nil {
 		n.PartitionBy.Accept(u, d)
 	}
@@ -402,6 +421,7 @@ func (u *unparser) VisitUsingClause(n *UsingClause, d interface{}) {
 	u.println("")
 	u.print("USING(")
 	u.incDepth()
+
 	for i, key := range n.Keys {
 		if i > 0 {
 			u.print(",")
@@ -409,6 +429,7 @@ func (u *unparser) VisitUsingClause(n *UsingClause, d interface{}) {
 
 		key.Accept(u, d)
 	}
+
 	u.decDepth()
 	u.print(")")
 }
@@ -573,6 +594,7 @@ func (u *unparser) VisitJSONLiteral(n *JSONLiteral, d interface{}) {
 
 func (u *unparser) VisitNamedType(n *NamedType, d interface{}) {
 	n.Name.Accept(u, d)
+
 	if n.TypeParameters() != nil {
 		n.TypeParameters().Accept(u, d)
 	}
@@ -669,6 +691,7 @@ func (u *unparser) VisitCaseValueExpression(
 	u.print("CASE")
 	n.Arguments[0].Accept(u, d)
 	u.incDepth()
+
 	args := n.Arguments[1:]
 	for len(args) >= 2 {
 		u.println("")
@@ -678,11 +701,13 @@ func (u *unparser) VisitCaseValueExpression(
 		args[1].Accept(u, d)
 		args = args[2:]
 	}
+
 	if len(args) == 1 {
 		u.println("")
 		u.print("ELSE")
 		args[0].Accept(u, d)
 	}
+
 	u.decDepth()
 	u.println("")
 	u.print("END")
@@ -692,6 +717,7 @@ func (u *unparser) VisitCaseNoValueExpression(
 	n *CaseNoValueExpression, d interface{}) {
 	u.print("CASE")
 	u.incDepth()
+
 	args := n.Arguments
 	for len(args) >= 2 {
 		u.println("")
@@ -701,11 +727,13 @@ func (u *unparser) VisitCaseNoValueExpression(
 		args[1].Accept(u, d)
 		args = args[2:]
 	}
+
 	if len(args) == 1 {
 		u.println("")
 		u.print("ELSE")
 		args[0].Accept(u, d)
 	}
+
 	u.decDepth()
 	u.println("")
 	u.print("END")
@@ -780,7 +808,7 @@ type unparseFormatter struct {
 // Format formats the string automatically according to the context.
 // 1. Inserts necessary space between tokens.
 // 2. Calls FlushLine() when a line reachs column limit and it is at
-//    some point appropiate to break.
+//    some point appropriate to break.
 // Param s should not contain any leading or trailing whitespace, such
 // as ' ' and '\n'.
 func (u *unparseFormatter) Format(s string) {
@@ -803,6 +831,7 @@ func (u *unparseFormatter) Format(s string) {
 	if u.buffer.Len() == 0 {
 		u.writeIndent()
 		u.writeRunes(data)
+
 		return
 	}
 
@@ -826,6 +855,7 @@ func (u *unparseFormatter) Format(s string) {
 			} else {
 				u.writeRunes(data)
 			}
+
 			return
 		}
 
@@ -890,6 +920,7 @@ func (u *unparseFormatter) lastIsSeparator() bool {
 	}
 
 	lastTok := buf[i+1:]
+
 	return wordSeparators[lastTok]
 }
 
@@ -897,16 +928,13 @@ func (u *unparseFormatter) addUnary(s string) {
 	if u.lastWasSingleCharUnary && u.last == '-' && s == "-" {
 		u.lastWasSingleCharUnary = false
 	}
+
 	u.Format(s)
 	u.lastWasSingleCharUnary = len(s) == 1
 }
 
 func (u *unparseFormatter) writeIndent() {
 	u.buffer.WriteString(strings.Repeat(" ", u.depth*2))
-}
-
-func (u *unparseFormatter) writeString(d string) {
-	u.writeRunes([]rune(d))
 }
 
 func (u *unparseFormatter) writeRunes(d []rune) {

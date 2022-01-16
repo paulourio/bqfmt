@@ -10,15 +10,18 @@ import (
 )
 
 func FormatError(err error, sql string) string {
+	var data string
+
 	lines := strings.Split(sql, "\n")
 	desc, line, col := findDescription(err, lines)
-	var data string
+
 	if line <= 0 || line > len(lines)+1 {
 		fmt.Println("FormatError ERROR! line=", line, " col=", col)
 		fmt.Printf("FormatError ERROR! %s\n", err.Error())
 		fmt.Println("Input:")
 		fmt.Println(sql)
 		fmt.Println("~~~")
+
 		line = 1
 		col = 1
 	} else {
@@ -28,6 +31,7 @@ func FormatError(err error, sql string) string {
 			data = lines[line-1]
 		}
 	}
+
 	ind := fmt.Sprintf("%s^", strings.Repeat(" ", col-1))
 
 	return fmt.Sprintf(
@@ -36,56 +40,71 @@ func FormatError(err error, sql string) string {
 }
 
 func findDescription(err error, lines []string) (desc string, line, col int) {
-	switch e := err.(type) {
-	case *Error:
-		if e.Err == nil {
-			desc, line, col = tokenError(lines, e)
+	var (
+		genErr *Error
+		litErr *literal.UnescapeError
+		synErr *SyntaxError
+	)
+
+	if errors.As(err, &genErr) {
+		if genErr.Err == nil {
+			desc, line, col = tokenError(lines, genErr)
 		} else {
-			desc, line, col = findDescription(e.Err, lines)
+			desc, line, col = findDescription(genErr.Err, lines)
 		}
-	case *literal.UnescapeError:
-		desc = e.Error()
-		line, col = computeLineCol(lines, e.Offset)
-	default:
-		var serr *SyntaxError
-		if errors.As(e, &serr) {
-			desc = serr.Error()
-			line, col = computeLineCol(lines, serr.Loc.Start)
-		} else {
-			desc = err.Error()
-		}
+
+		return
 	}
 
-	fmt.Printf("findDescription(%#v) -> %s, %d:%d\n",
-		err, desc, line, col)
+	if errors.As(err, &litErr) {
+		desc = litErr.Error()
+		line, col = computeLineCol(lines, litErr.Offset)
+
+		return
+	}
+
+	if errors.As(err, &synErr) {
+		desc = synErr.Error()
+		line, col = computeLineCol(lines, synErr.Loc.Start)
+	} else {
+		desc = err.Error()
+	}
+
 	return
 }
 
 func tokenError(lines []string, err *Error) (desc string, line, col int) {
+	tokDesc := describeUnexpectedToken(err.ErrorToken)
+
 	if len(err.ExpectedTokens) > 0 {
-		expected := "" // strings.Join(err.ExpectedTokens, ", ")
+		expected := ""
 		if isExpected("JOIN", err.ExpectedTokens) {
 			expected = "keyword JOIN"
 		}
+
 		tok := strings.ToUpper(string(err.ErrorToken.Lit))
-		if token.IsReservedKeyword(tok) {
+		if token.IsReservedKeyword(tok) { //nolint:gocritic
 			desc = fmt.Sprintf("Unexpected keyword %s", tok)
 		} else if expected != "" {
 			desc = fmt.Sprintf("Expected %s but got %s", expected,
-				DescribeToken(err.ErrorToken))
+				tokDesc)
 		} else {
 			desc = fmt.Sprintf("Unexpected %s",
-				DescribeToken(err.ErrorToken))
+				tokDesc)
 		}
 	} else {
-		desc = fmt.Sprintf("Unexpected %s", DescribeToken(err.ErrorToken))
+		desc = fmt.Sprintf("Unexpected %s", tokDesc)
 	}
+
 	line = err.ErrorToken.Pos.Line
 	col = err.ErrorToken.Pos.Column
 
 	switch err.ErrorToken.Type {
-	case token.TokMap.Type("$"):
+	case token.INVALID:
+		desc = "Unexpected unknown/invalid token"
+	case token.EOF, token.TokMap.Type("$"):
 		line++
+
 		col = 1
 		desc = "Unexpected end of statement"
 	case token.TokMap.Type("unterminated_escaped_identifier"):
@@ -115,22 +134,35 @@ func tokenError(lines []string, err *Error) (desc string, line, col int) {
 			string(err.ErrorToken.Lit))
 	default:
 		if isExpected("$", err.ExpectedTokens) {
-			value := string(err.ErrorToken.Lit)
-			if !strings.HasPrefix(value, `'`) &&
-				!strings.HasPrefix(value, `"`) {
-				value = fmt.Sprintf("%q", value)
-			}
-			desc = fmt.Sprintf("Expected end of input but got %s %s",
-				strings.ReplaceAll(
-					token.TokMap.Id(err.ErrorToken.Type),
-					"_", " "),
-				value,
-			)
+			desc = fmt.Sprintf("Expected end of input but got %s",
+				describeUnexpectedToken(err.ErrorToken))
 		}
 	}
 
 	desc = "Syntax error: " + desc
+
 	return
+}
+
+func describeUnexpectedToken(tok *token.Token) string {
+	name := strings.ReplaceAll(token.TokMap.Id(tok.Type), "_", " ")
+	value := string(tok.Lit)
+	nameEqualsValue := name == value
+
+	if tok.IsReservedKeyword() {
+		return fmt.Sprintf("keyword %s", strings.ToUpper(value))
+	}
+
+	if !strings.HasPrefix(value, `'`) &&
+		!strings.HasPrefix(value, `"`) {
+		value = fmt.Sprintf("%q", value)
+	}
+
+	if nameEqualsValue {
+		return value
+	}
+
+	return fmt.Sprintf("%s %s", name, value)
 }
 
 func isExpected(elem string, expected []string) bool {
@@ -160,7 +192,7 @@ func computeLineCol(lines []string, offset int) (line, col int) {
 	col = offset
 	col++
 	line++
-	fmt.Printf("computeLineCol(offset=%d) -> %d:%d\n", offset, line, col)
+	// fmt.Printf("computeLineCol(offset=%d) -> %d:%d\n", offset, line, col)
 
 	return
 }

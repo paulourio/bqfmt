@@ -64,14 +64,22 @@ func (n *{{ node.name }}) init{{ field.name }}(d interface{}) error {
 	case nil:
 	{% if not field.scalar -%}
 	case NodeHandler:
+		{% if field.type == 'interface{}' -%}
+		n.{{ field.name }} = d
+		{% else -%}
 		n.{{ field.name }} = d.({{ field.type }}) {# Cannot cast `t` here #}
+		{% endif -%}
 		n.{{ node.composition }}.AddChild(t)
 	{% endif -%}
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.init{{ field.name }}(t.Value)
 	default:
+		{% if field.type == 'interface{}' -%}
+		n.{{ field.name }} = d
+		{% else -%}
 		n.{{ field.name }} = d.({{ field.type }})
+		{% endif -%}
 		{% if not field.scalar -%}
 		n.{{ node.composition }}.AddChild(d.(NodeHandler))
 		{% endif -%}
@@ -190,13 +198,16 @@ func (o *Operation) VisitNodeHandler(n NodeHandler, d interface{}) {
 		c.Accept(o.visitor, d)
 	}
 }
-func (o *Operation) VisitTableExpressionHandler(n TableExpressionHandler, d interface{}) {
+func (o *Operation) VisitTableExpressionHandler(
+	n TableExpressionHandler, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitQueryExpressionHandler(n QueryExpressionHandler, d interface{}) {
+func (o *Operation) VisitQueryExpressionHandler(
+	n QueryExpressionHandler, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitExpressionHandler(n ExpressionHandler, d interface{}) {
+func (o *Operation) VisitExpressionHandler(
+	n ExpressionHandler, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
 func (o *Operation) VisitTypeHandler(n TypeHandler, d interface{}) {
@@ -210,7 +221,9 @@ func (o *Operation) VisitStatementHandler(n StatementHandler, d interface{}) {
 }
 
 {% for node in nodes -%}
-func (o *Operation) Visit{{ node.name }}(n *{{ node.name }}, d interface{}) {
+func (o *Operation) Visit{{ node.name }}(
+		{%- if node.name|length > 16 -%}{{ '\n\t' }}{%- endif -%}
+		n *{{ node.name }}, d interface{}) {
 	o.visitor.Visit{{ node.composition }}Handler(n, d)
 }
 {% endfor %}
@@ -222,7 +235,7 @@ const (
 	{{ node.name }}Kind{% if loop.first %} NodeKind = iota{% endif %}
 {%- endfor -%})
 
-func (k NodeKind) String() string {
+func (k NodeKind) String() string { //nolint:cyclop
 	switch k {
 	{%- for node in nodes %}
 	case {{ node.name }}Kind:

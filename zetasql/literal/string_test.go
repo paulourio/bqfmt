@@ -6,9 +6,8 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/paulourio/bqfmt/zetasql/literal"
+	"github.com/stretchr/testify/assert"
 )
 
 type stringTestCase struct {
@@ -552,10 +551,11 @@ func TestParseingOfAllEscapeCharacters(t *testing.T) {
 	}
 
 	for e := byte(0); e < 255; e++ {
-		if contains(validEscapes, e) {
+		if contains(validEscapes, e) { //nolint:gocritic
 			if e == '\'' {
 				testParseString(t, fmt.Sprintf(`"a\%c0010ffff"`, e))
 			}
+
 			testParseString(t, fmt.Sprintf(`'a\%c0010ffff'`, e))
 			testParseString(t, fmt.Sprintf(`'''a\%c0010ffff'''`, e))
 		} else if unicode.IsDigit(rune(e)) {
@@ -656,6 +656,7 @@ func TestValidRawString(t *testing.T) {
 		`f\(abc',(.*),def\ \?`,
 		`a\\"b`,
 	}
+
 	for i, input := range cases {
 		name := fmt.Sprintf("#%d", i+1)
 		t.Run(name, func(t *testing.T) {
@@ -669,14 +670,10 @@ func testParseString(t *testing.T, input string) bool {
 	return assert.Nil(t, err)
 }
 
-func testParseBytes(t *testing.T, input string) bool {
-	_, err := literal.ParseBytes(input)
-	return assert.Nil(t, err)
-}
-
 func testInvalidString(t *testing.T, input string, expected interface{}) bool {
 	r, err := literal.ParseString(input)
 	assert.Equal(t, "", r)
+
 	switch e := expected.(type) {
 	case error:
 		return assert.Equal(t, e, err)
@@ -685,6 +682,7 @@ func testInvalidString(t *testing.T, input string, expected interface{}) bool {
 		if err != nil {
 			msg = err.Error()
 		}
+
 		return assert.Contains(t, msg, e)
 	default:
 		panic("unexpected type")
@@ -696,12 +694,16 @@ func testRawStringValue(t *testing.T, unquoted string) {
 	if strings.Contains(unquoted, `"`) {
 		quote = '\''
 	}
+
 	r, err := literal.ParseString(
 		fmt.Sprintf(`r%c%s%c`, quote, unquoted, quote))
+
 	assert.Nil(t, err)
 	assert.Equal(t, unquoted, r)
+
 	r, err = literal.ParseString(
 		fmt.Sprintf(`r%c%s%c`, quote, unquoted, quote))
+
 	assert.Nil(t, err)
 	assert.Equal(t, unquoted, r)
 }

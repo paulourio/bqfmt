@@ -286,7 +286,7 @@ func (n *BinaryExpression) SingleNodeDebugString() string {
 	var kind string = n.Op.String()
 
 	if n.IsNot {
-		switch n.Op {
+		switch n.Op { //nolint:exhaustive
 		case BinaryIs:
 			kind = "IS NOT"
 		case BinaryLike:
@@ -314,6 +314,7 @@ func (n *Join) SingleNodeDebugString() string {
 	if n.JoinType == DefaultJoin {
 		return n.kind.String()
 	}
+
 	return fmt.Sprintf("%s(%v)", n.kind.String(), n.JoinType)
 }
 

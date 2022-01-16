@@ -20,21 +20,17 @@ linters:
     - errname
     - errorlint
     - exhaustive
-    - exhaustivestruct
     - exportloopref
-    - forbidigo
     - gci
     - goconst
     - gocritic
     - godox
-    - gomnd
     - gosec
     - gosimple
     - govet
     - ineffassign
     - lll
     - misspell
-    - paralleltest
     - staticcheck
     - structcheck
     - testpackage
@@ -47,3 +43,6 @@ linters-settings:
 
   lll:
     line-length: 80
+
+  cyclop:
+    max-complexity: 30

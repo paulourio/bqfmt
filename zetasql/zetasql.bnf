@@ -401,21 +401,7 @@ OptSelectAsClause:
 
 OptFromClause:
       from FromClauseContents
-      <<
-      func() (Attrib, error) {
-          node, err := TransformJoinExpression($1)
-          if err != nil {
-              return nil, err
-          }
-
-          f, err := ast.NewFromClause(node)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(f, $0)
-      }()
-      >>
+      << NewFromClause($0, $1) >>
     | empty
     ;
 
@@ -553,6 +539,13 @@ UnnestExpression:
 
           return UpdateLoc(e, $0, $3)
       }()
+      >>
+    | unnest "(" select
+      <<
+      NewSyntaxError($2,
+          "The argument to UNNEST is an expression, not a query; to use a "+
+          "query as an expression, the query must be wrapped with "+
+          "additional parentheses to make it a scalar subquery expression")
       >>
     ;
 

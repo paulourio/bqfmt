@@ -1,5 +1,9 @@
 package token
 
+func (t *Token) IsReservedKeyword() bool {
+	return IsReservedKeyword(string(t.Lit))
+}
+
 func IsReservedKeyword(value string) bool {
 	return reservedKeywords[value]
 }

@@ -1937,7 +1937,7 @@ ERROR: Syntax error: Unexpected "/" [at 3:14]
 
 select /* unclosed block comment
 --
-ERROR: Syntax error: Unexpected unknown/invalid token "/* unclosed block comment" [at 1:8]
+ERROR: Syntax error: Unclosed comment [at 1:8]
 select /* unclosed block comment
        ^
 ==

@@ -1571,13 +1571,13 @@ func (n *TablePathExpression) initPivotClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
-		n.PivotClause = d.(interface{})
+		n.PivotClause = d
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initPivotClause(t.Value)
 	default:
-		n.PivotClause = d.(interface{})
+		n.PivotClause = d
 		n.TableExpression.AddChild(d.(NodeHandler))
 	}
 
@@ -1592,13 +1592,13 @@ func (n *TablePathExpression) initUnpivotClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
-		n.UnpivotClause = d.(interface{})
+		n.UnpivotClause = d
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initUnpivotClause(t.Value)
 	default:
-		n.UnpivotClause = d.(interface{})
+		n.UnpivotClause = d
 		n.TableExpression.AddChild(d.(NodeHandler))
 	}
 
@@ -5769,13 +5769,13 @@ func (n *TableSubquery) initPivotClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
-		n.PivotClause = d.(interface{})
+		n.PivotClause = d
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initPivotClause(t.Value)
 	default:
-		n.PivotClause = d.(interface{})
+		n.PivotClause = d
 		n.TableExpression.AddChild(d.(NodeHandler))
 	}
 
@@ -5790,13 +5790,13 @@ func (n *TableSubquery) initUnpivotClause(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case NodeHandler:
-		n.UnpivotClause = d.(interface{})
+		n.UnpivotClause = d
 		n.TableExpression.AddChild(t)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initUnpivotClause(t.Value)
 	default:
-		n.UnpivotClause = d.(interface{})
+		n.UnpivotClause = d
 		n.TableExpression.AddChild(d.(NodeHandler))
 	}
 
@@ -7552,13 +7552,16 @@ func (o *Operation) VisitNodeHandler(n NodeHandler, d interface{}) {
 		c.Accept(o.visitor, d)
 	}
 }
-func (o *Operation) VisitTableExpressionHandler(n TableExpressionHandler, d interface{}) {
+func (o *Operation) VisitTableExpressionHandler(
+	n TableExpressionHandler, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitQueryExpressionHandler(n QueryExpressionHandler, d interface{}) {
+func (o *Operation) VisitQueryExpressionHandler(
+	n QueryExpressionHandler, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitExpressionHandler(n ExpressionHandler, d interface{}) {
+func (o *Operation) VisitExpressionHandler(
+	n ExpressionHandler, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
 func (o *Operation) VisitTypeHandler(n TypeHandler, d interface{}) {
@@ -7598,7 +7601,8 @@ func (o *Operation) VisitAlias(n *Alias, d interface{}) {
 func (o *Operation) VisitPathExpression(n *PathExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitTablePathExpression(n *TablePathExpression, d interface{}) {
+func (o *Operation) VisitTablePathExpression(
+	n *TablePathExpression, d interface{}) {
 	o.visitor.VisitTableExpressionHandler(n, d)
 }
 func (o *Operation) VisitFromClause(n *FromClause, d interface{}) {
@@ -7631,7 +7635,8 @@ func (o *Operation) VisitGroupingItem(n *GroupingItem, d interface{}) {
 func (o *Operation) VisitGroupBy(n *GroupBy, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitOrderingExpression(n *OrderingExpression, d interface{}) {
+func (o *Operation) VisitOrderingExpression(
+	n *OrderingExpression, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
 func (o *Operation) VisitOrderBy(n *OrderBy, d interface{}) {
@@ -7694,13 +7699,16 @@ func (o *Operation) VisitFunctionCall(n *FunctionCall, d interface{}) {
 func (o *Operation) VisitArrayConstructor(n *ArrayConstructor, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitStructConstructorArg(n *StructConstructorArg, d interface{}) {
+func (o *Operation) VisitStructConstructorArg(
+	n *StructConstructorArg, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitStructConstructorWithParens(n *StructConstructorWithParens, d interface{}) {
+func (o *Operation) VisitStructConstructorWithParens(
+	n *StructConstructorWithParens, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitStructConstructorWithKeyword(n *StructConstructorWithKeyword, d interface{}) {
+func (o *Operation) VisitStructConstructorWithKeyword(
+	n *StructConstructorWithKeyword, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
 func (o *Operation) VisitInExpression(n *InExpression, d interface{}) {
@@ -7709,34 +7717,41 @@ func (o *Operation) VisitInExpression(n *InExpression, d interface{}) {
 func (o *Operation) VisitInList(n *InList, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitBetweenExpression(n *BetweenExpression, d interface{}) {
+func (o *Operation) VisitBetweenExpression(
+	n *BetweenExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
 func (o *Operation) VisitNumericLiteral(n *NumericLiteral, d interface{}) {
 	o.visitor.VisitLeafHandler(n, d)
 }
-func (o *Operation) VisitBigNumericLiteral(n *BigNumericLiteral, d interface{}) {
+func (o *Operation) VisitBigNumericLiteral(
+	n *BigNumericLiteral, d interface{}) {
 	o.visitor.VisitLeafHandler(n, d)
 }
 func (o *Operation) VisitBytesLiteral(n *BytesLiteral, d interface{}) {
 	o.visitor.VisitLeafHandler(n, d)
 }
-func (o *Operation) VisitDateOrTimeLiteral(n *DateOrTimeLiteral, d interface{}) {
+func (o *Operation) VisitDateOrTimeLiteral(
+	n *DateOrTimeLiteral, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitCaseValueExpression(n *CaseValueExpression, d interface{}) {
+func (o *Operation) VisitCaseValueExpression(
+	n *CaseValueExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitCaseNoValueExpression(n *CaseNoValueExpression, d interface{}) {
+func (o *Operation) VisitCaseNoValueExpression(
+	n *CaseNoValueExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
 func (o *Operation) VisitArrayElement(n *ArrayElement, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitBitwiseShiftExpression(n *BitwiseShiftExpression, d interface{}) {
+func (o *Operation) VisitBitwiseShiftExpression(
+	n *BitwiseShiftExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitDotGeneralizedField(n *DotGeneralizedField, d interface{}) {
+func (o *Operation) VisitDotGeneralizedField(
+	n *DotGeneralizedField, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
 func (o *Operation) VisitDotIdentifier(n *DotIdentifier, d interface{}) {
@@ -7745,13 +7760,16 @@ func (o *Operation) VisitDotIdentifier(n *DotIdentifier, d interface{}) {
 func (o *Operation) VisitDotStar(n *DotStar, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitDotStarWithModifiers(n *DotStarWithModifiers, d interface{}) {
+func (o *Operation) VisitDotStarWithModifiers(
+	n *DotStarWithModifiers, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitExpressionSubquery(n *ExpressionSubquery, d interface{}) {
+func (o *Operation) VisitExpressionSubquery(
+	n *ExpressionSubquery, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitExtractExpression(n *ExtractExpression, d interface{}) {
+func (o *Operation) VisitExtractExpression(
+	n *ExtractExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
 func (o *Operation) VisitIntervalExpr(n *IntervalExpr, d interface{}) {
@@ -7760,10 +7778,12 @@ func (o *Operation) VisitIntervalExpr(n *IntervalExpr, d interface{}) {
 func (o *Operation) VisitNullOrder(n *NullOrder, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitOnOrUsingClauseList(n *OnOrUsingClauseList, d interface{}) {
+func (o *Operation) VisitOnOrUsingClauseList(
+	n *OnOrUsingClauseList, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitParenthesizedJoin(n *ParenthesizedJoin, d interface{}) {
+func (o *Operation) VisitParenthesizedJoin(
+	n *ParenthesizedJoin, d interface{}) {
 	o.visitor.VisitTableExpressionHandler(n, d)
 }
 func (o *Operation) VisitPartitionBy(n *PartitionBy, d interface{}) {
@@ -7781,7 +7801,8 @@ func (o *Operation) VisitStarModifiers(n *StarModifiers, d interface{}) {
 func (o *Operation) VisitStarReplaceItem(n *StarReplaceItem, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitStarWithModifiers(n *StarWithModifiers, d interface{}) {
+func (o *Operation) VisitStarWithModifiers(
+	n *StarWithModifiers, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
 func (o *Operation) VisitTableSubquery(n *TableSubquery, d interface{}) {
@@ -7808,13 +7829,15 @@ func (o *Operation) VisitWindowFrameExpr(n *WindowFrameExpr, d interface{}) {
 func (o *Operation) VisitLikeExpression(n *LikeExpression, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitWindowSpecification(n *WindowSpecification, d interface{}) {
+func (o *Operation) VisitWindowSpecification(
+	n *WindowSpecification, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
 func (o *Operation) VisitWithOffset(n *WithOffset, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
-func (o *Operation) VisitTypeParameterList(n *TypeParameterList, d interface{}) {
+func (o *Operation) VisitTypeParameterList(
+	n *TypeParameterList, d interface{}) {
 	o.visitor.VisitNodeHandler(n, d)
 }
 func (o *Operation) VisitSampleClause(n *SampleClause, d interface{}) {
@@ -7841,7 +7864,8 @@ func (o *Operation) VisitFormatClause(n *FormatClause, d interface{}) {
 func (o *Operation) VisitParameterExpr(n *ParameterExpr, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
-func (o *Operation) VisitAnalyticFunctionCall(n *AnalyticFunctionCall, d interface{}) {
+func (o *Operation) VisitAnalyticFunctionCall(
+	n *AnalyticFunctionCall, d interface{}) {
 	o.visitor.VisitExpressionHandler(n, d)
 }
 
@@ -7941,7 +7965,7 @@ const (
 	AnalyticFunctionCallKind
 )
 
-func (k NodeKind) String() string {
+func (k NodeKind) String() string { //nolint:cyclop
 	switch k {
 	case QueryStatementKind:
 		return "QueryStatement"

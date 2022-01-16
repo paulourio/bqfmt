@@ -1,12 +1,13 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
 
 	"github.com/paulourio/bqfmt/zetasql/ast"
-	"github.com/paulourio/bqfmt/zetasql/errors"
+	zerrors "github.com/paulourio/bqfmt/zetasql/errors"
 	"github.com/paulourio/bqfmt/zetasql/literal"
 	"github.com/paulourio/bqfmt/zetasql/token"
 )
@@ -53,6 +54,7 @@ func OverrideLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
 
 		if first {
 			first = false
+
 			n.SetStartLoc(start)
 			n.SetEndLoc(end)
 		} else {
@@ -83,7 +85,7 @@ func UpdateLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
 		default:
 			return nil, fmt.Errorf(
 				"%w: cannot UpdateLoc with type %v",
-				errors.ErrMalformedParser,
+				zerrors.ErrMalformedParser,
 				reflect.TypeOf(t))
 		}
 	}
@@ -104,6 +106,7 @@ func WithExtraChild(a Attrib, c Attrib) (ast.NodeHandler, error) {
 // WithExtraChildren adds a child node to the node.
 func WithExtraChildren(a Attrib, children ...Attrib) (ast.NodeHandler, error) {
 	node := a.(ast.NodeHandler)
+
 	for _, c := range children {
 		if c != nil {
 			n, loc := getNodeHandler(c)
@@ -154,7 +157,7 @@ func List(a ...Attrib) Attrib {
 	w, err := WrapWithLoc(r, l...)
 	if err != nil {
 		panic(fmt.Errorf("%w: failed to created %v wrapped with %v",
-			errors.ErrMalformedParser, reflect.TypeOf(r), reflect.TypeOf(l)))
+			zerrors.ErrMalformedParser, reflect.TypeOf(r), reflect.TypeOf(l)))
 	}
 
 	return w
@@ -179,10 +182,15 @@ func NewStringLiteral(a Attrib) (Attrib, error) {
 
 	value, err := literal.ParseString(string(tok.Lit))
 	if err != nil {
-		if unescapeErr, ok := err.(*literal.UnescapeError); ok {
+		var litErr *literal.UnescapeError
+
+		// If the string contains invalid escape sequences, we need to
+		// adjust the string offset error to raise with offset computed
+		// for the global input.
+		if errors.As(err, &litErr) {
 			return nil, &literal.UnescapeError{
-				Msg:    unescapeErr.Msg,
-				Offset: tok.Offset + unescapeErr.Offset,
+				Msg:    litErr.Msg,
+				Offset: tok.Offset + litErr.Offset,
 			}
 		}
 
@@ -204,7 +212,9 @@ func NewBytesLiteral(a Attrib) (Attrib, error) {
 
 	value, err := literal.ParseBytes(string(tok.Lit))
 	if err != nil {
-		if unescapeErr, ok := err.(*literal.UnescapeError); ok {
+		var unescapeErr *literal.UnescapeError
+
+		if errors.As(err, &unescapeErr) {
 			return nil, &literal.UnescapeError{
 				Msg:    unescapeErr.Msg,
 				Offset: tok.Offset + unescapeErr.Offset,
@@ -226,11 +236,11 @@ func NewDashedIdentifier(lhs Attrib, rhs Attrib) (*ast.Identifier, error) {
 	expected := len(a.Lit) + 1
 
 	if actual != expected {
-		return nil, errors.ErrInvalidDashedIdentifier
+		return nil, zerrors.ErrInvalidDashedIdentifier
 	}
 
 	if a.Lit[0] == '`' || b.Lit[0] == '`' {
-		return nil, errors.ErrInvalidDashedIdentifier
+		return nil, zerrors.ErrInvalidDashedIdentifier
 	}
 
 	values := a.Lit
@@ -348,7 +358,7 @@ func NewLikeBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 	isNot := op.Value.(ast.NotKeyword) == ast.NotKeywordPresent
 
 	if !lhs.IsAllowedInComparison() {
-		return nil, errors.NewSyntaxError(
+		return nil, zerrors.NewSyntaxError(
 			op.Loc,
 			"expression to left of LIKE must be parenthesized")
 	}
@@ -369,7 +379,7 @@ func NewInBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 	isNot := op.Value.(ast.NotKeyword) == ast.NotKeywordPresent
 
 	if !lhs.IsAllowedInComparison() {
-		return nil, errors.NewSyntaxError(
+		return nil, zerrors.NewSyntaxError(
 			op.Loc,
 			"expression to left of IN must be parenthesized")
 	}
@@ -391,7 +401,7 @@ func NewBetweenExpression(inLHS, inLow, inHigh, inOp Attrib) (Attrib, error) {
 	isNot := op.Value.(ast.NotKeyword) == ast.NotKeywordPresent
 
 	if !lhs.IsAllowedInComparison() {
-		return nil, errors.NewSyntaxError(
+		return nil, zerrors.NewSyntaxError(
 			op.Loc,
 			"expression to left of BETWEEN must be parenthesized")
 	}
@@ -399,7 +409,7 @@ func NewBetweenExpression(inLHS, inLow, inHigh, inOp Attrib) (Attrib, error) {
 	// Test the middle operand for unparenthesized operators with lower
 	// or equal precedence.
 	if !low.IsAllowedInComparison() {
-		return nil, errors.NewSyntaxError(
+		return nil, zerrors.NewSyntaxError(
 			low.GetLoc(),
 			"expression in BETWEEN must be parenthesized")
 	}
@@ -420,7 +430,7 @@ func NewIsBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 	isNot := op.Value.(ast.NotKeyword) == ast.NotKeywordPresent
 
 	if !lhs.IsAllowedInComparison() {
-		return nil, errors.NewSyntaxError(
+		return nil, zerrors.NewSyntaxError(
 			op.Loc,
 			"expression to left of IS must be parenthesized")
 	}
@@ -453,19 +463,19 @@ func NewTablePathExpression(
 	default:
 		return nil, fmt.Errorf(
 			"%w: NewTablePathExperession path/unnest with type %#v",
-			errors.ErrMalformedParser,
+			zerrors.ErrMalformedParser,
 			reflect.TypeOf(base))
 	}
 
 	if offset != nil {
 		if p.PivotClause != nil {
-			return nil, errors.NewSyntaxError(
+			return nil, zerrors.NewSyntaxError(
 				mustGetLoc(offset),
 				"PIVOT and WITH OFFSET cannot be combined")
 		}
 
 		if p.UnpivotClause != nil {
-			return nil, errors.NewSyntaxError(
+			return nil, zerrors.NewSyntaxError(
 				mustGetLoc(offset),
 				"UNPIVOT and WITH OFFSET cannot be combined")
 		}
@@ -473,6 +483,14 @@ func NewTablePathExpression(
 
 	return ast.NewTablePathExpression(
 		path, unnest, p.Alias, offset, p.PivotClause, p.UnpivotClause, sample)
+}
+
+func NewSyntaxError(pos Attrib, msg string) (Attrib, error) {
+	tok := pos.(*token.Token)
+	start := tok.Offset
+	end := start + len(tok.Lit)
+
+	return nil, zerrors.NewSyntaxError(ast.Loc{Start: start, End: end}, msg)
 }
 
 func IsUnparenthesizedNotExpression(a Attrib) (r bool) {
@@ -494,7 +512,7 @@ func getExpressionHandler(v interface{}) (ast.ExpressionHandler, ast.Loc) {
 	}
 
 	panic(fmt.Errorf("%w: could not get ExpressionHandler from %v",
-		errors.ErrMalformedParser, reflect.TypeOf(v)))
+		zerrors.ErrMalformedParser, reflect.TypeOf(v)))
 }
 
 func getNodeHandler(v interface{}) (ast.NodeHandler, ast.Loc) {
@@ -508,7 +526,7 @@ func getNodeHandler(v interface{}) (ast.NodeHandler, ast.Loc) {
 	}
 
 	panic(fmt.Errorf("%w: could not get NodeHandler from %v",
-		errors.ErrMalformedParser, reflect.TypeOf(v)))
+		zerrors.ErrMalformedParser, reflect.TypeOf(v)))
 }
 
 // Try get a loc from attribute, but panic if fail.
@@ -528,5 +546,5 @@ func mustGetLoc(a Attrib) ast.Loc {
 	}
 
 	panic(fmt.Errorf("%w: could not extract Loc from %v",
-		errors.ErrMalformedParser, reflect.TypeOf(a)))
+		zerrors.ErrMalformedParser, reflect.TypeOf(a)))
 }
