@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/paulourio/bqfmt/zetasql/ast"
@@ -26,7 +27,7 @@ func main() {
 		return
 	}
 
-	input, err := os.ReadFile(path)
+	input, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}

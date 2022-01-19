@@ -10,7 +10,7 @@ func SetQueryParenthesized(open, query, close Attrib) (Attrib, error) {
 	return WrapWithLoc(q, open, close)
 }
 
-func ValidateParenthesizedSubQuery(expr Attrib) (Attrib, error) {
+func ValidateParenthesizedSubquery(expr Attrib) (Attrib, error) {
 	n := expr.(ast.NodeHandler)
 	if n.Kind() != ast.ExpressionSubqueryKind {
 		return NewSyntaxError(
@@ -22,6 +22,51 @@ func ValidateParenthesizedSubQuery(expr Attrib) (Attrib, error) {
 	e := n.(*ast.ExpressionSubquery)
 	e.Query.SetParenthesized(true)
 	return e, nil
+}
+
+func ExtractQueryFromSubquery(expr Attrib) (Attrib, error) {
+	subquery := expr.(*ast.ExpressionSubquery)
+
+	if subquery.Query == nil {
+		return NewInternalError(expr, "expected query child of subquery")
+	}
+
+	return subquery.Query, nil
+}
+
+func NewSubqueryOrInList(open, expr, close Attrib) (Attrib, error) {
+	node := expr.(ast.NodeHandler)
+
+	if subquery, ok := node.(*ast.ExpressionSubquery); ok {
+		if subquery.Modifier == ast.NoSubqueryModifier {
+			// To match Bison and JavaCC parser, we prefer interpreting
+			// IN ((Query)) as IN (Query) with a parenthesized Query,
+			// not a value IN list containing a scalar expression query.
+			// Return the contained Query, wrapped in another Query to
+			// replace the parentheses.
+			query := subquery.Query
+
+			if query == nil {
+				return NewInternalError(
+					expr, "expected query child of parenthesized subquery")
+			}
+
+			query.SetParenthesized(true)
+
+			return ast.NewQuery(nil, query, nil, nil)
+		} else {
+			// The ExpressionSubquery is an EXISTS or ARRAY subquery,
+			// which is a scalar expression and is not interpreted as
+			// a Query. Treat this as an InList with a single element.
+			// Do not include the paretheses in the location, to match
+			// the JavaCC parser.
+			return ast.NewInList(subquery)
+		}
+	} else {
+		// Do not include the parentheses in the location, to match the
+		// JavaCC parser.
+		return ast.NewInList(expr)
+	}
 }
 
 func NewTableSubquery(

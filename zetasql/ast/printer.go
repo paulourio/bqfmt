@@ -18,7 +18,7 @@ func Sprint(node NodeHandler, opts *PrintOptions) string {
 
 	if opts == nil {
 		opts = &PrintOptions{
-			SoftMaxColumns:          40,
+			SoftMaxColumns:          80,
 			NewlineBeforeClause:     true,
 			AlignLogicalWithClauses: true,
 			Indentation:             2,
@@ -130,6 +130,7 @@ type formatter struct {
 	opts                   *PrintOptions
 	buffer                 strings.Builder
 	formatted              strings.Builder
+	maxLength              int
 	depth                  int
 	last                   rune
 	lastWasSingleCharUnary bool
@@ -159,9 +160,17 @@ func (p *printer) decDepth() {
 // nest returns a new printer with the same options to perform printing
 // on a nested section of the tree.
 func (p *printer) nest() *printer {
+	currSize := len(p.fmt.buffer.String())
+	capacity := p.fmt.opts.SoftMaxColumns - currSize
+
+	if capacity < 40 {
+		capacity = 40
+	}
+
 	n := &printer{
 		fmt: &formatter{
-			opts: p.fmt.opts,
+			opts:      p.fmt.opts,
+			maxLength: capacity,
 		},
 	}
 
@@ -685,6 +694,35 @@ func (p *printer) VisitBinaryExpression(n *BinaryExpression, d interface{}) {
 	p.printCloseParenIfNeeded(n)
 }
 
+func (p *printer) VisitInExpression(n *InExpression, d interface{}) {
+	pp := p.nest()
+
+	pp2 := pp.nest()
+
+	n.LHS.Accept(pp2, d)
+	pp.print(pp2.unnest())
+
+	if n.InList != nil {
+		pp2 = pp.nest()
+		n.InList.Accept(pp2, d)
+		pp.print(pp2.unnest())
+	}
+
+	if n.Query != nil {
+		pp2 = pp.nest()
+		n.Query.Accept(pp2, d)
+		pp.print(pp2.unnest())
+	}
+
+	if n.UnnestExpr != nil {
+		pp2 = pp.nest()
+		n.UnnestExpr.Accept(pp2, d)
+		pp.print(pp2.unnest())
+	}
+
+	p.print(pp.unnest())
+}
+
 func (p *printer) VisitCastExpression(n *CastExpression, d interface{}) {
 	pp := p.nest()
 	pp.print(p.keyword("CAST") + "(")
@@ -971,6 +1009,22 @@ func (p *printer) VisitTablePathExpression(
 	if n.Alias != nil {
 		n.Alias.Accept(p, d)
 	}
+
+	if n.WithOffset != nil {
+		n.WithOffset.Accept(p, d)
+	}
+
+	// TODO PivotClause
+	// TODO UnpivotClause
+	// TODO SampleClause
+}
+
+func (p *printer) VisitWithOffset(n *WithOffset, d interface{}) {
+	p.print(p.keyword("WITH OFFSET"))
+
+	if n.Alias != nil {
+		n.Alias.Accept(p, d)
+	}
 }
 
 func (p *printer) VisitPathExpression(n *PathExpression, d interface{}) {
@@ -1246,6 +1300,26 @@ func (p *printer) VisitStructConstructorArg(
 	p.print(pp.unnest())
 }
 
+func (p *printer) VisitInList(n *InList, d interface{}) {
+	pp := p.nest()
+
+	pp.print("(")
+
+	for i, elem := range n.List {
+		if i > 0 {
+			pp.print(",")
+		}
+
+		pp2 := pp.nest()
+		elem.Accept(pp2, d)
+		pp.print(pp2.unnest())
+	}
+
+	pp.print(")")
+
+	p.print(pp.unnest())
+}
+
 func estimateSQLSize(n NodeHandler) int {
 	return len(Sprint(n, onelinePrintConfig))
 }
@@ -1286,7 +1360,7 @@ func (p *formatter) Format(s string) {
 	// At the end we check whether the buffer should be flushed to
 	// the formatted buffer.
 	defer func() {
-		if p.buffer.Len() >= p.opts.SoftMaxColumns &&
+		if p.buffer.Len() >= p.maxLength &&
 			p.lastIsSeparator() {
 			p.FlushLine()
 		}

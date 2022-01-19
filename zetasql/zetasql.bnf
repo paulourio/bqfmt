@@ -291,7 +291,8 @@ QueryPrimary:
 QueryPrimaryMaybeExpression:
       Select
     | Expression
-      << ValidateParenthesizedSubQuery($0) >>
+      /* We require that Expression is an ExpressionSubquery. */
+      << ValidateParenthesizedSubquery($0) >>
     ;
 
 Select:
@@ -765,18 +766,34 @@ Expression10:
 Expression9:
       Expression9 ComparativeOperator Expression8
       << ast.NewBinaryExpression($1, $0, $2, false) >>
-    | Expression9 LikeOperator Expression8
+    | Expression9 LikeOperator ParenthesizedInRHS
       << NewLikeBinaryExpression($1, $0, $2) >>
-    | Expression9 InOperator Expression8
+    | Expression9 InOperator UnnestExpression
+      << NewInBinaryExpression($1, $0, $2) >>
+    | Expression9 InOperator ParenthesizedInRHS
       << NewInBinaryExpression($1, $0, $2) >>
     | Expression9 BetweenOperator Expression8 and Expression8
       << NewBetweenExpression($0, $1, $2, $3, $4) >>
-    | Expression9 IsOperator InExpressionRHS
+    | Expression9 IsOperator IsExpressionRHS
       << NewIsBinaryExpression($1, $0, $2) >>
     | Expression8
     ;
 
-InExpressionRHS:
+/* This rule contains a hack to word around the fact that (Query) and
+   (Expression) are ambiguous. The reason they are ambiguous is that
+   all ZetaSQL queries can be parenthesized. So you cannot write
+   something like IN ((SELECT 1)), which could be an IN subquery that
+   happens to be parenthesized, or it could be a subquery expression.
+ */
+ParenthesizedInRHS:
+      BareExpressionSubquery
+      << ExtractQueryFromSubquery($0) >>
+    | "(" Expression1 ")"
+      << NewSubqueryOrInList($0, $1, $2) >>
+    | InListTwoOrMorePrefix ")"
+    ;
+
+IsExpressionRHS:
       NullLiteral
     | BooleanLiteral
     ;
@@ -1029,6 +1046,20 @@ BareExpressionSubquery:
 ParenthesizedExpression:
       "(" Expression ")"
       << SetExpressionParenthesized($0, $1, $2) >>
+    ;
+
+InListTwoOrMore:
+      /* Reference implementation do not include the closing parenthesis
+         in the location. */
+      InListTwoOrMorePrefix ")"
+      << UpdateLoc($0, $1) >>
+    ;
+
+InListTwoOrMorePrefix:
+      "(" Expression8 "," Expression8
+      << NewInList($0, $1, $3) >>
+    | InListTwoOrMorePrefix "," Expression8
+      << WithExtraChild($0, $2) >>
     ;
 
 OptSampleClause:

@@ -3655,14 +3655,12 @@ func (n *StructConstructorArg) InitAlias(d interface{}) error {
 func (n *StructConstructorArg) initAlias(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
-		return fmt.Errorf("StructConstructorArg.Alias: %w",
-			ErrMissingRequiredField)
-	case *Wrapped:
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
-		return n.initAlias(t.Value)
 	case NodeHandler:
 		n.Alias = d.(*Alias)
 		n.Node.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initAlias(t.Value)
 	default:
 		n.Alias = d.(*Alias)
 		n.Node.AddChild(d.(NodeHandler))

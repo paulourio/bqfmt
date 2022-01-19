@@ -3,7 +3,6 @@ package parser
 import (
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 
 	"github.com/paulourio/bqfmt/zetasql/ast"
@@ -86,17 +85,17 @@ func UpdateLoc(node Attrib, tokens ...Attrib) (ast.NodeHandler, error) {
 }
 
 // WithExtraChild adds a child node to the node.
-func WithExtraChild(a Attrib, c Attrib) (ast.NodeHandler, error) {
-	node := a.(ast.NodeHandler)
-	child, loc := getNodeHandler(c)
-	node.AddChild(child)
-	node.ExpandLoc(loc.Start, loc.End)
+func WithExtraChild(a Attrib, c Attrib) (Attrib, error) {
+	node, locLeft := getNodeHandler(a)
+	child, locRight := getNodeHandler(c)
 
-	return node, nil
+	node.AddChild(child)
+
+	return WrapWithLoc(node, locLeft, locRight)
 }
 
 // WithExtraChildren adds a child node to the node.
-func WithExtraChildren(a Attrib, children ...Attrib) (ast.NodeHandler, error) {
+func WithExtraChildren(a Attrib, children ...Attrib) (Attrib, error) {
 	node := a.(ast.NodeHandler)
 
 	for _, c := range children {
@@ -112,9 +111,13 @@ func WithExtraChildren(a Attrib, children ...Attrib) (ast.NodeHandler, error) {
 
 // WrapWithLoc returns a value wrapped with a location range [min, max)
 // inferred from a given list of tokens.
-func WrapWithLoc(a Attrib, tokens ...Attrib) (*ast.Wrapped, error) {
-	start := math.MaxInt
+func WrapWithLoc(elem Attrib, tokens ...Attrib) (Attrib, error) {
+	start := maxInt
 	end := 0
+
+	if elem == nil {
+		return elem, nil
+	}
 
 	for _, t := range tokens {
 		if t == nil {
@@ -122,6 +125,11 @@ func WrapWithLoc(a Attrib, tokens ...Attrib) (*ast.Wrapped, error) {
 		}
 
 		loc := mustGetLoc(t)
+
+		if loc.Start == -1 || loc.End == -1 {
+			// Skip invalid location.
+			continue
+		}
 
 		if loc.Start < start {
 			start = loc.Start
@@ -132,7 +140,19 @@ func WrapWithLoc(a Attrib, tokens ...Attrib) (*ast.Wrapped, error) {
 		}
 	}
 
-	return ast.WrapWithLoc(a, start, end)
+	// Do not wrap when the [start, end) is invalid
+	if start >= end {
+		return elem, nil
+	}
+
+	// Check if we really need to wrap the elem.
+	if node, ok := elem.(ast.NodeHandler); ok {
+		if node.StartLoc() == start && node.EndLoc() == end {
+			return node, nil
+		}
+	}
+
+	return ast.WrapWithLoc(elem, start, end)
 }
 
 // List casts a list of parser attributes to a generic list.
@@ -366,7 +386,8 @@ func NewLikeBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 }
 
 func NewInBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
-	lhs, loc := getExpressionHandler(inLHS)
+	lhs, locStart := getExpressionHandler(inLHS)
+	rhs, locEnd := unwrap(inRHS)
 	op := inOp.(*ast.Wrapped)
 	isNot := op.Value.(ast.NotKeyword) == ast.NotKeywordPresent
 
@@ -376,14 +397,38 @@ func NewInBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 			"expression to left of IN must be parenthesized")
 	}
 
-	bin, err := ast.NewBinaryExpression(inOp, lhs, inRHS, isNot)
+	var (
+		expr *ast.InExpression
+		err  error
+	)
+
+	switch r := rhs.(type) {
+	case *ast.InList:
+		expr, err = ast.NewInExpression(lhs, r, nil, nil, isNot)
+	case *ast.Query:
+		expr, err = ast.NewInExpression(lhs, nil, r, nil, isNot)
+	case *ast.UnnestExpression:
+		expr, err = ast.NewInExpression(lhs, nil, nil, r, isNot)
+	default:
+		return NewInternalError(
+			inRHS,
+			fmt.Sprintf("unexpected type %v", reflect.TypeOf(rhs)))
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	bin.ExpandLoc(loc.StartLoc(), loc.EndLoc())
+	return WrapWithLoc(expr, locStart, locEnd)
+}
 
-	return bin, nil
+func NewInList(open, a, b Attrib) (Attrib, error) {
+	node, err := ast.NewInList(List(a, b))
+	if err != nil {
+		return nil, err
+	}
+
+	return WrapWithLoc(node, open)
 }
 
 func NewIsBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
@@ -447,14 +492,6 @@ func NewTablePathExpression(
 		path, unnest, p.Alias, offset, p.PivotClause, p.UnpivotClause, sample)
 }
 
-func NewSyntaxError(pos Attrib, msg string) (Attrib, error) {
-	tok := pos.(*token.Token)
-	start := tok.Offset
-	end := start + len(tok.Lit)
-
-	return nil, zerrors.NewSyntaxError(ast.Loc{Start: start, End: end}, msg)
-}
-
 func IsUnparenthesizedNotExpression(a Attrib) (r bool) {
 	if n, ok := a.(*ast.UnaryExpression); ok {
 		r = !n.IsParenthesized() && n.Op != ast.UnaryNot
@@ -510,3 +547,13 @@ func mustGetLoc(a Attrib) ast.Loc {
 	panic(fmt.Errorf("%w: could not extract Loc from %v",
 		zerrors.ErrMalformedParser, reflect.TypeOf(a)))
 }
+
+func unwrap(elem Attrib) (Attrib, ast.Loc) {
+	if wrap, ok := elem.(*ast.Wrapped); ok {
+		return wrap.Value, wrap.Loc
+	}
+
+	return elem, ast.Loc{Start: -1, End: -1}
+}
+
+var maxInt = int(^uint(0) >> 1) // largest int
