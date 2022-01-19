@@ -65,6 +65,16 @@ func NewUnnestExpression(unnest, expr, close Attrib) (Attrib, error) {
 	return UpdateLoc(e, unnest, close)
 }
 
+func NewExpressionSubquery(
+	modifierTok, open, query, close, modifier Attrib) (Attrib, error) {
+	e, err := ast.NewExpressionSubquery(query, modifier)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(e, modifierTok, open, close)
+}
+
 func NewNotUnaryExpression(not, expr Attrib) (Attrib, error) {
 	e, err := ast.NewUnaryExpression(ast.UnaryNot, expr)
 	if err != nil {
@@ -108,4 +118,26 @@ func NewIntervalExpression(interval, expr, name, to Attrib) (Attrib, error) {
 	}
 
 	return UpdateLoc(e, interval)
+}
+
+func NewWindowFrameClause(unit, start, end Attrib) (Attrib, error) {
+	return ast.NewWindowFrame(start, end, unit)
+}
+
+func NewAndExpr(lhs, rhs Attrib) (Attrib, error) {
+	if left, ok := lhs.(*ast.AndExpr); ok && !left.IsParenthesized() {
+		// Embrace and extend the lhs node to flatten a series of ANDs.
+		return WithExtraChild(left, rhs)
+	}
+
+	return ast.NewAndExpr(List(lhs, rhs))
+}
+
+func NewOrExpr(lhs, rhs Attrib) (Attrib, error) {
+	if left, ok := lhs.(*ast.OrExpr); ok && !left.IsParenthesized() {
+		// Embrace and extend the lhs node to flatten a series of ORs.
+		return WithExtraChild(left, rhs)
+	}
+
+	return ast.NewOrExpr(List(lhs, rhs))
 }

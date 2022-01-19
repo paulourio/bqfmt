@@ -107,6 +107,7 @@ else:       ('e'|'E')('l'|'L')('s'|'S')('e'|'E') ;
 end:        ('e'|'E')('n'|'N')('d'|'D') ;
 except:     ('e'|'E')('x'|'X')('c'|'C')('e'|'E')('p'|'P')('t'|'T') ;
 extract:    ('e'|'E')('x'|'X')('t'|'T')('r'|'R')('a'|'A')('c'|'C')('t'|'T') ;
+exists:     ('e'|'E')('x'|'X')('i'|'I')('s'|'S')('t'|'T')('s'|'S');
 first:      ('f'|'F')('i'|'I')('r'|'R')('s'|'S')('t'|'T') ;
 following:  ('f'|'F')('o'|'O')('l'|'L')('l'|'L')('o'|'O')('w'|'W')('i'|'I')('n'|'N')('g'|'G') ;
 format:     ('f'|'F')('o'|'O')('r'|'R')('m'|'M')('a'|'A')('t'|'T') ;
@@ -254,14 +255,43 @@ Query:
       << ast.NewQuery(nil, $0, $1, $2) >>
     ;
 
+/* Query variant to resolve ambiguous case.
+   Difference from Query: where the other rule allows preffix (Query),
+   this rules uses Expression to parse the same thing instead, and then
+   errors out if the parsed entity is not an expression subquery.
+
+   Keep in sync with Query.
+ */
+QueryMaybeExpression:
+      WithClause
+      QueryPrimaryOrSetOperationMaybeExpression
+      OptOrderByClause
+      OptLimitOffsetClause
+      << ast.NewQuery($0, $1, $2, $3) >>
+    | QueryPrimaryOrSetOperationMaybeExpression
+      OptOrderByClause
+      OptLimitOffsetClause
+      << ast.NewQuery(nil, $0, $1, $2) >>
+    ;
+
 QueryPrimaryOrSetOperation:
       QueryPrimary
+    ;
+
+QueryPrimaryOrSetOperationMaybeExpression:
+      QueryPrimaryMaybeExpression
     ;
 
 QueryPrimary:
       Select
     | "(" Query ")"
       << SetQueryParenthesized($0, $1, $2) >>
+    ;
+
+QueryPrimaryMaybeExpression:
+      Select
+    | Expression
+      << ValidateParenthesizedSubQuery($0) >>
     ;
 
 Select:
@@ -370,7 +400,7 @@ WhereClause:
 
 OptAllOrDistinct:
       all       << WrapWithLoc(AllKeyword, $0) >>
-    | distinct  << WrapWithLoc(DistinctKeyword, $1) >>
+    | distinct  << WrapWithLoc(DistinctKeyword, $0) >>
     | empty     << NoAllOrDistinctKeyword, nil >>
     ;
 
@@ -629,7 +659,9 @@ PartitionByClausePrefix:
 
 OptWindowFrameClause:
       FrameUnit between WindowFrameBound and WindowFrameBound
+      << NewWindowFrameClause($0, $2, $4) >>
     | FrameUnit WindowFrameBound
+      << NewWindowFrameClause($0, $1, nil) >>
     | empty
     ;
 
@@ -711,14 +743,14 @@ Expression:
 /* Binary OR operator */
 Expression12:
       Expression12 or Expression11
-      << ast.NewOrExpr(List($0, $2)) >>
+      << NewOrExpr($0, $2) >>
     | Expression11
     ;
 
 /* Binary AND operator */
 Expression11:
       Expression11 and Expression10
-      << ast.NewAndExpr(List($0, $2)) >>
+      << NewAndExpr($0, $2) >>
     | Expression10
     ;
 
@@ -815,6 +847,7 @@ Expression1:
     | ParenthesizedExpression
     | ArrayConstructor
     | StructConstructor
+    | ExpressionSubquery
     | CaseExpression
     | CastExpression
     | FunctionCallExpressionWithClauses
@@ -977,6 +1010,20 @@ KeywordAsIdentifier:
     | extract
     | with
     | json
+    | left
+    ;
+
+ExpressionSubquery:
+      array "(" Query ")"
+      << NewExpressionSubquery($0, $1, $2, $3, ast.ArraySubqueryModifier) >>
+    | exists "(" Query ")"
+      << NewExpressionSubquery($0, $2, $2, $3, ast.ExistsSubqueryModifier) >>
+    | BareExpressionSubquery
+    ;
+
+BareExpressionSubquery:
+      "(" QueryMaybeExpression ")"
+      << NewExpressionSubquery(nil, $0, $1, $2, ast.NoSubqueryModifier) >>
     ;
 
 ParenthesizedExpression:
@@ -1241,7 +1288,7 @@ FunctionCallExpressionWithArgsPrefix:
     ;
 
 FunctionCallExpressionBase:
-      Expression "(" distinct
+      Expression1 "(" distinct
       <<
       func() (Attrib, error) {
           c, err := ast.NewFunctionCall($0, true)
@@ -1252,7 +1299,7 @@ FunctionCallExpressionBase:
           return UpdateLoc(c, $2)
       }()
       >>
-    | Expression "("
+    | Expression1 "("
       <<
       func() (Attrib, error) {
           c, err := ast.NewFunctionCall($0, false)

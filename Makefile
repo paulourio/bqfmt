@@ -3,6 +3,7 @@ GOCCFLAGS = -a # -debug_parser
 .PHONY: build
 build: generated_types generated_parser
 	go build
+	go build cmd/gofmt/gofmt.go
 
 .PHONY: test
 test: build

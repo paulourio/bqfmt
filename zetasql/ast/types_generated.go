@@ -4854,18 +4854,11 @@ func (n *ExpressionSubquery) InitModifier(d interface{}) error {
 
 func (n *ExpressionSubquery) initModifier(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-		return fmt.Errorf("ExpressionSubquery.Modifier: %w",
-			ErrMissingRequiredField)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initModifier(t.Value)
-	case NodeHandler:
-		n.Modifier = d.(SubqueryModifier)
-		n.Expression.AddChild(t)
 	default:
 		n.Modifier = d.(SubqueryModifier)
-		n.Expression.AddChild(d.(NodeHandler))
 	}
 
 	return nil
@@ -6134,18 +6127,11 @@ func (n *WindowFrame) InitFrameUnit(d interface{}) error {
 
 func (n *WindowFrame) initFrameUnit(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-		return fmt.Errorf("WindowFrame.FrameUnit: %w",
-			ErrMissingRequiredField)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initFrameUnit(t.Value)
-	case NodeHandler:
-		n.FrameUnit = d.(FrameUnit)
-		n.Node.AddChild(t)
 	default:
 		n.FrameUnit = d.(FrameUnit)
-		n.Node.AddChild(d.(NodeHandler))
 	}
 
 	return nil
@@ -6180,14 +6166,12 @@ func (n *WindowFrameExpr) InitExpression(d interface{}) error {
 func (n *WindowFrameExpr) initExpression(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
-		return fmt.Errorf("WindowFrameExpr.Expression: %w",
-			ErrMissingRequiredField)
-	case *Wrapped:
-		n.ExpandLoc(t.Loc.Start, t.Loc.End)
-		return n.initExpression(t.Value)
 	case NodeHandler:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(t)
+	case *Wrapped:
+		n.ExpandLoc(t.Loc.Start, t.Loc.End)
+		return n.initExpression(t.Value)
 	default:
 		n.Expression = d.(ExpressionHandler)
 		n.Node.AddChild(d.(NodeHandler))
@@ -6202,16 +6186,11 @@ func (n *WindowFrameExpr) InitBoundaryType(d interface{}) error {
 
 func (n *WindowFrameExpr) initBoundaryType(d interface{}) error {
 	switch t := d.(type) {
-	case nil:
-	case NodeHandler:
-		n.BoundaryType = d.(BoundaryType)
-		n.Node.AddChild(t)
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
 		return n.initBoundaryType(t.Value)
 	default:
 		n.BoundaryType = d.(BoundaryType)
-		n.Node.AddChild(d.(NodeHandler))
 	}
 
 	return nil

@@ -164,7 +164,7 @@ type SubqueryModifier int
 const (
 	NoSubqueryModifier     SubqueryModifier = iota // (SELECT ...)
 	ArraySubqueryModifier                          // ARRAY(SELECT ...)
-	ExistsSubqueryMedifier                         // EXISTS(SELECT ...)
+	ExistsSubqueryModifier                         // EXISTS(SELECT ...)
 )
 
 type SetOp int
@@ -184,6 +184,23 @@ const (
 	OffsetFollowing
 	UnboundedFollowing
 )
+
+func (t BoundaryType) ToSQL() string {
+	switch t {
+	case UnboundedPreceding:
+		return "UNBOUNDED PRECEDING"
+	case OffsetPreceding:
+		return "PRECEDING"
+	case CurrentRow:
+		return "CURRENT ROW"
+	case OffsetFollowing:
+		return "FOLLOWING"
+	case UnboundedFollowing:
+		return "UNBOUNDED FOLLOWING"
+	}
+
+	panic("unknown boundary type")
+}
 
 type SampleSizeUnit int
 
@@ -216,12 +233,46 @@ const (
 	OtherKind
 )
 
+func (t TypeKind) ToSQL() string {
+	switch t {
+	case BoolKind:
+		return "BOOL"
+	case IntegerKind:
+		return "INT64"
+	case FloatingPointKind:
+		return "FLOAT64"
+	case DateKind:
+		return "DATE"
+	case DateTimeKind:
+		return "DATETIME"
+	case TimeKind:
+		return "TIME"
+	case TimestampKind:
+		return "TIMESTAMP"
+	case OtherKind:
+		panic("cannot generate OtherKind as SQL")
+	}
+
+	panic("unknown type kind")
+}
+
 type FrameUnit int
 
 const (
 	Rows FrameUnit = iota
 	Range
 )
+
+func (u FrameUnit) String() string {
+	switch u {
+	case Rows:
+		return "ROWS"
+	case Range:
+		return "RANGE"
+	}
+
+	panic("unknown frame unit")
+}
 
 type NotKeyword bool
 

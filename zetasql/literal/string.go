@@ -16,6 +16,15 @@ var (
 	ErrInvalidStringLiteral = errors.New("invalid string literal")
 )
 
+type StringStyle int
+
+const (
+	PreferSingleQuote StringStyle = iota
+	PreferDoubleQuote
+	AlwaysSingleQuote
+	AlwaysDoubleQuote
+)
+
 type UnescapeError struct {
 	Msg    string
 	Offset int
@@ -565,4 +574,78 @@ func maybeRawBytesLiteral(s string) bool {
 	}
 
 	return false
+}
+
+func ToStringLiteral(src string) string {
+	return Escape(src, PreferSingleQuote)
+}
+
+func Escape(src string, style StringStyle) string {
+	var quote string
+
+	switch style {
+	case AlwaysSingleQuote:
+		quote = `'`
+	case AlwaysDoubleQuote:
+		quote = `"`
+	case PreferSingleQuote:
+		hasSingle := strings.Contains(src, `'`)
+		hasDouble := strings.Contains(src, `"`)
+
+		if !hasSingle || hasDouble {
+			quote = `'`
+		} else {
+			quote = `"`
+		}
+	case PreferDoubleQuote:
+		hasSingle := strings.Contains(src, `'`)
+		hasDouble := strings.Contains(src, `"`)
+
+		if !hasDouble && hasSingle {
+			quote = `"`
+		} else {
+			quote = `'`
+		}
+	}
+
+	return quote + escape(src, rune(quote[0])) + quote
+}
+
+// escape returns src rewritten using C-style escape sequences.
+// If escape non-zero, only escape the quote character that matches the
+// escape rune.  This allows writing "ab'cd", or 'ab"cd' without extra
+// escaping.
+func escape(src string, escape rune) string {
+	out := make([]rune, 0, len(src))
+
+	for _, c := range src {
+		switch c {
+		case '\a':
+			out = append(out, '\\', '\a')
+		case '\b':
+			out = append(out, '\\', '\b')
+		case '\f':
+			out = append(out, '\\', '\f')
+		case '\n':
+			out = append(out, '\\', '\n')
+		case '\r':
+			out = append(out, '\\', '\r')
+		case '\t':
+			out = append(out, '\\', '\t')
+		case '\v':
+			out = append(out, '\\', '\v')
+		case '\\':
+			out = append(out, '\\', '\\')
+		case '\'', '"', '`':
+			if escape == 0 || c == escape {
+				out = append(out, '\\')
+			}
+
+			out = append(out, c)
+		default:
+			out = append(out, c)
+		}
+	}
+
+	return string(out)
 }

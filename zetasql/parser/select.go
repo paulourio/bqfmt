@@ -11,7 +11,13 @@ func NewSelect(
 	selectTok, allOrDistinct, selectas, selectlist, fromclause, whereclause,
 	groupby, having, qualify, windowclause Attrib,
 ) (Attrib, error) {
-	distinct := allOrDistinct == DistinctKeyword
+	var distinct bool
+
+	if kw, ok := allOrDistinct.(*ast.Wrapped); ok {
+		distinct = kw.Value == DistinctKeyword
+	} else {
+		distinct = allOrDistinct.(allOrDistinctKeyword) == DistinctKeyword
+	}
 
 	s, err := ast.NewSelect(distinct, selectas, selectlist, fromclause,
 		whereclause, groupby, having, qualify, windowclause)

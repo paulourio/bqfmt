@@ -40,7 +40,7 @@ func TestParser(t *testing.T) {
 				}
 				return fs.SkipDir
 			}
-			if strings.HasSuffix(path, ".test") {
+			if strings.HasSuffix(path, "function.test") {
 				fmt.Printf("found %s\n", path)
 				d, err := os.ReadFile(path)
 				if err != nil {

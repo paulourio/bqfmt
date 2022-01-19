@@ -279,9 +279,9 @@ func (u *unparser) VisitBinaryExpression(n *BinaryExpression, d interface{}) {
 	if n.IsNot {
 		switch n.Op { //nolint:exhaustive
 		case BinaryIs:
-			u.print("IS NOT ")
+			u.print("IS NOT")
 		case BinaryLike:
-			u.print("NOT LIKE ")
+			u.print("NOT LIKE")
 		}
 	} else {
 		u.print(n.Op.String())
@@ -693,6 +693,8 @@ func (u *unparser) VisitDateOrTimeLiteral(
 		u.print("TIME")
 	case TimestampKind:
 		u.print("TIMESTAMP")
+	default:
+		panic("unknown type kind for date or time literal")
 	}
 
 	n.StringLiteral.Accept(u, d)

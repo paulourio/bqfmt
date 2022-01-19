@@ -10,6 +10,20 @@ func SetQueryParenthesized(open, query, close Attrib) (Attrib, error) {
 	return WrapWithLoc(q, open, close)
 }
 
+func ValidateParenthesizedSubQuery(expr Attrib) (Attrib, error) {
+	n := expr.(ast.NodeHandler)
+	if n.Kind() != ast.ExpressionSubqueryKind {
+		return NewSyntaxError(
+			expr,
+			"Parenthesized expression cannot be parsed as an expression, "+
+				"struct constructor, or subquery")
+	}
+
+	e := n.(*ast.ExpressionSubquery)
+	e.Query.SetParenthesized(true)
+	return e, nil
+}
+
 func NewTableSubquery(
 	open, query, close, pivotUnpivotAlias, sample Attrib) (Attrib, error) {
 	p := pivotUnpivotAlias.(*pivotOrUnpivotAndAlias)

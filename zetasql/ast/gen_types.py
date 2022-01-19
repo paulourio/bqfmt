@@ -778,6 +778,7 @@ def main():
                 'Modifier',
                 'SubqueryModifier',
                 FieldLoader.REQUIRED,
+                scalar=True,
                 comment=(
                     'Modifier is the syntactic modifier on this '
                     'expression subquery.')),
@@ -939,7 +940,8 @@ def main():
         fields=[
             Field('StartExpr', '*WindowFrameExpr', FieldLoader.REQUIRED),
             Field('EndExpr', '*WindowFrameExpr', FieldLoader.REQUIRED),
-            Field('FrameUnit', 'FrameUnit', FieldLoader.REQUIRED),
+            Field('FrameUnit', 'FrameUnit', FieldLoader.REQUIRED,
+                  scalar=True),
         ])
 
     gen.add_node(
@@ -949,12 +951,15 @@ def main():
             Field(
                 'Expression',
                 'ExpressionHandler',
-                FieldLoader.REQUIRED,
+                FieldLoader.OPTIONAL,
                 comment=(
                     'Expression specifies the boundary as a logical or '
                     'physical offset to current row. It is present when '
                     'BoundaryType is OffsetPreceding or OffsetFollowing.')),
-            Field('BoundaryType', 'BoundaryType'),
+            Field('BoundaryType',
+                  'BoundaryType',
+                  FieldLoader.REQUIRED,
+                  scalar=True),
         ])
 
     gen.add_node(
