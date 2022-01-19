@@ -1173,6 +1173,79 @@ func (p *printer) VisitArrayElement(n *ArrayElement, d interface{}) {
 	p.print(pp.unnest())
 }
 
+func (p *printer) VisitStructConstructorWithKeyword(
+	n *StructConstructorWithKeyword, d interface{}) {
+	pp := p.nest()
+
+	if n.StructType != nil {
+		n.StructType.Accept(pp, d)
+	} else {
+		pp.print(pp.keyword("STRUCT"))
+	}
+
+	pp.print("(")
+
+	pp2 := pp.nest()
+
+	for i, field := range n.Fields {
+		if i > 0 {
+			pp2.println(",")
+		}
+
+		pp3 := pp.nest()
+		field.Accept(pp3, d)
+		pp2.print(pp3.unnest())
+	}
+
+	pp.print(pp2.unnest())
+	pp.print(")")
+
+	p.print(pp.unnest())
+}
+
+func (p *printer) VisitStructType(n *StructType, d interface{}) {
+	root := p.nest()
+	pp := root.nest()
+
+	for i, field := range n.StructFields {
+		if i > 0 {
+			pp.print(",")
+		}
+
+		pp2 := pp.nest()
+		field.Accept(pp2, d)
+		pp.print(pp2.unnest())
+	}
+
+	root.print(root.keyword("STRUCT") + "<" + pp.unnest() + ">")
+	p.print(root.unnest())
+}
+
+func (p *printer) VisitStructField(n *StructField, d interface{}) {
+	root := p.nest()
+
+	n.Name.Accept(root, d)
+
+	pp := root.nest()
+
+	n.Type.Accept(pp, d)
+	root.print(pp.unnest())
+	p.print(root.unnest())
+}
+
+func (p *printer) VisitStructConstructorArg(
+	n *StructConstructorArg, d interface{}) {
+	pp := p.nest()
+
+	n.Expression.Accept(pp, d)
+
+	if n.Alias != nil {
+		n.Alias.Accept(pp, d)
+	}
+
+	p.print(pp.unnest())
+}
+
 func estimateSQLSize(n NodeHandler) int {
 	return len(Sprint(n, onelinePrintConfig))
 }

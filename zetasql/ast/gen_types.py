@@ -574,7 +574,7 @@ def main():
         composition='Node',
         fields=[
             Field('Expression', 'ExpressionHandler', FieldLoader.REQUIRED),
-            Field('Alias', '*Alias', FieldLoader.REQUIRED),
+            Field('Alias', '*Alias', FieldLoader.OPTIONAL),
         ])
 
     gen.add_node(

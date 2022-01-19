@@ -1411,7 +1411,7 @@ ArrayConstructorPrefix:
     ;
 
 StructConstructor:
-      StructConstructorPrefix ")"
+      StructConstructorPrefixWithKeyword ")"
       << UpdateLoc($0, $1) >>
     | StructConstructorPrefixWithKeywordNoArg ")"
       << UpdateLoc($0, $1) >>
@@ -1419,14 +1419,11 @@ StructConstructor:
       << UpdateLoc($0, $1) >>
     ;
 
-StructConstructorPrefix:
-      StructConstructorPrefixWithKeyword
-    | StructConstructorPrefixWithKeywordNoArg
-    | StructConstructorPrefixWithoutKeyword
-    ;
-
 StructConstructorPrefixWithKeyword:
       StructConstructorPrefixWithKeywordNoArg StructConstructorArg
+      << WithExtraChild($0, $1) >>
+    | StructConstructorPrefixWithKeyword "," StructConstructorArg
+      << WithExtraChild($0, $2) >>
     ;
 
 StructConstructorPrefixWithKeywordNoArg:
@@ -1465,16 +1462,8 @@ StructConstructorArg:
     ;
 
 OptAsAliasWithRequiredAs:
-      as Identifier
-      <<
-      func() (Attrib, error) {
-          a, err := ast.NewAlias($1)
-          if err != nil {
-              return nil, err
-          }
-          return UpdateLoc(a, $0)
-      }()
-      >>
+      as Alias
+      << UpdateLoc($1, $0) >>
     | empty
     ;
 

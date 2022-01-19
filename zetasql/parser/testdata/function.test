@@ -1,0 +1,20 @@
+
+select foo and bar(xyz)
+--
+QueryStatement [0-23]
+  Query [0-23]
+    Select [0-23]
+      SelectList [7-23]
+        SelectColumn [7-23]
+          AndExpr [7-23]
+            PathExpression [7-10]
+              Identifier(foo) [7-10]
+            FunctionCall [15-23]
+              PathExpression [15-18]
+                Identifier(bar) [15-18]
+              PathExpression [19-22]
+                Identifier(xyz) [19-22]
+--
+SELECT
+  foo AND bar(xyz)
+==
