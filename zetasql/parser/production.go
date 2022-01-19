@@ -385,7 +385,7 @@ func NewLikeBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 	return bin, nil
 }
 
-func NewInBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
+func NewInExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 	lhs, locStart := getExpressionHandler(inLHS)
 	rhs, locEnd := unwrap(inRHS)
 	op := inOp.(*ast.Wrapped)

@@ -769,9 +769,9 @@ Expression9:
     | Expression9 LikeOperator ParenthesizedInRHS
       << NewLikeBinaryExpression($1, $0, $2) >>
     | Expression9 InOperator UnnestExpression
-      << NewInBinaryExpression($1, $0, $2) >>
+      << NewInExpression($1, $0, $2) >>
     | Expression9 InOperator ParenthesizedInRHS
-      << NewInBinaryExpression($1, $0, $2) >>
+      << NewInExpression($1, $0, $2) >>
     | Expression9 BetweenOperator Expression8 and Expression8
       << NewBetweenExpression($0, $1, $2, $3, $4) >>
     | Expression9 IsOperator IsExpressionRHS
