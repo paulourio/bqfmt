@@ -335,35 +335,6 @@ func ExpandPathExpressionOrNewDotIdentifier(
 	}
 }
 
-func NewFunctionCall(
-	expr, nulls, orderby, limit, closetok Attrib,
-) (Attrib, error) {
-	f := expr.(*ast.FunctionCall)
-
-	if nulls != nil {
-		err := f.InitNullHandlingModifier(nulls)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if orderby != nil {
-		err := f.InitOrderBy(orderby)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if limit != nil {
-		err := f.InitLimitOffset(limit)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return UpdateLoc(f, closetok)
-}
-
 func NewLikeBinaryExpression(inOp, inLHS, inRHS Attrib) (Attrib, error) {
 	lhs, loc := getExpressionHandler(inLHS)
 	op := inOp.(*ast.Wrapped)

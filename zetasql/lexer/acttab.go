@@ -105,7 +105,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S21
-		Accept: 92,
+		Accept: 91,
 		Ignore: "",
 	},
 	ActionRow{ // S22
@@ -349,7 +349,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S82
-		Accept: 94,
+		Accept: 93,
 		Ignore: "",
 	},
 	ActionRow{ // S83
@@ -485,7 +485,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S116
-		Accept: 96,
+		Accept: 95,
 		Ignore: "",
 	},
 	ActionRow{ // S117
@@ -1221,7 +1221,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S300
-		Accept: 91,
+		Accept: 90,
 		Ignore: "",
 	},
 	ActionRow{ // S301
@@ -1285,7 +1285,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S316
-		Accept: 99,
+		Accept: 98,
 		Ignore: "",
 	},
 	ActionRow{ // S317
@@ -1321,7 +1321,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S325
-		Accept: 85,
+		Accept: 100,
 		Ignore: "",
 	},
 	ActionRow{ // S326
@@ -1493,7 +1493,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S368
-		Accept: 95,
+		Accept: 94,
 		Ignore: "",
 	},
 	ActionRow{ // S369
@@ -1609,7 +1609,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S397
-		Accept: 98,
+		Accept: 97,
 		Ignore: "",
 	},
 	ActionRow{ // S398
@@ -1665,7 +1665,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S411
-		Accept: 100,
+		Accept: 99,
 		Ignore: "",
 	},
 	ActionRow{ // S412
@@ -1821,7 +1821,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S450
-		Accept: 97,
+		Accept: 96,
 		Ignore: "",
 	},
 	ActionRow{ // S451
@@ -1949,7 +1949,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S482
-		Accept: 86,
+		Accept: 85,
 		Ignore: "",
 	},
 	ActionRow{ // S483
@@ -1961,7 +1961,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S485
-		Accept: 93,
+		Accept: 92,
 		Ignore: "",
 	},
 	ActionRow{ // S486
@@ -2073,7 +2073,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S513
-		Accept: 89,
+		Accept: 88,
 		Ignore: "",
 	},
 	ActionRow{ // S514
@@ -2165,7 +2165,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S536
-		Accept: 88,
+		Accept: 87,
 		Ignore: "",
 	},
 	ActionRow{ // S537
@@ -2313,7 +2313,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S573
-		Accept: 90,
+		Accept: 89,
 		Ignore: "",
 	},
 	ActionRow{ // S574
@@ -2321,7 +2321,7 @@ var ActTab = ActionTable{
 		Ignore: "",
 	},
 	ActionRow{ // S575
-		Accept: 87,
+		Accept: 86,
 		Ignore: "",
 	},
 }

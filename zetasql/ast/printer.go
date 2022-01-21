@@ -26,7 +26,7 @@ func Sprint(node NodeHandler, opts *PrintOptions) string {
 			IdentifierStyle:         LowerCase,
 			KeywordStyle:            UpperCase,
 			TypeStyle:               UpperCase,
-			StringStyle:             PreferSingleQuote,
+			StringStyle:             AsIsStringStyle,
 			MultilineStringStyle:    AlwaysSingleQuote,
 		}
 	}
@@ -186,6 +186,18 @@ func (p *printer) unnest() string {
 	aligned := alignNested(trimmed)
 	aligned = "\v" + aligned
 	aligned = strings.ReplaceAll(aligned, "\n", "\n\v")
+
+	return aligned
+}
+
+// unnest flushes the buffer and returns the strings with alignment
+// symbols at the beginning of each line.
+func (p *printer) unnestWithDepth(d int) string {
+	trimmed := p.String()
+	aligned := alignNested(trimmed)
+	aligned = "\v" + aligned
+	alignment := strings.Repeat("\v", d)
+	aligned = strings.ReplaceAll(aligned, "\n", "\n"+alignment)
 
 	return aligned
 }
@@ -552,7 +564,9 @@ func (p *printer) VisitSelectList(n *SelectList, d interface{}) {
 			pp.println(",")
 		}
 
-		col.Accept(pp, d)
+		pp2 := pp.nest()
+		col.Accept(pp2, d)
+		pp.print(strings.Trim(pp2.String(), "\v"))
 	}
 
 	p.print(pp.unnestLeft())
@@ -774,15 +788,22 @@ func (p *printer) VisitFunctionCall(n *FunctionCall, d interface{}) {
 		pp.print(pp.keyword("DISTINCT"))
 	}
 
+	pp2 := pp.nest()
+
 	for i, arg := range n.Arguments {
 		if i > 0 {
-			pp.print(",")
+			pp2.print(",")
 		}
 
-		pp2 := p.nest()
-		arg.Accept(pp2, d)
-		pp.print(pp2.unnest())
+		pp3 := pp2.nest()
+		arg.Accept(pp3, d)
+		pp2.print(strings.Trim(pp3.String(), "\n"))
 	}
+
+	fmt.Printf("\n==== ARGS:\n%v\n====\n%s\n====\n",
+		debugContent(pp2.String()), alignNested(pp2.String()))
+
+	pp.print(pp2.unnest())
 
 	switch n.NullHandlingModifier {
 	case DefaultNullHandling:
@@ -802,6 +823,9 @@ func (p *printer) VisitFunctionCall(n *FunctionCall, d interface{}) {
 
 	pp.print(")")
 	pp.printCloseParenIfNeeded(n)
+
+	fmt.Printf("\n==== FUNCTION:\n%v\n====\n%s\n====\n",
+		debugContent(pp.String()), alignNested(pp.String()))
 
 	p.print(pp.unnest())
 }
@@ -988,6 +1012,61 @@ func (p *printer) VisitCaseNoValueExpression(
 
 	pp.println("")
 	pp.print(pp.keyword("END"))
+
+	p.print(pp.unnest())
+}
+
+func (p *printer) VisitCaseValueExpression(
+	n *CaseValueExpression, d interface{}) {
+	pp := p.nest()
+
+	pp.print(pp.keyword("CASE"))
+
+	pp2 := pp.nest()
+	n.Arguments[0].Accept(pp2, d)
+	pp.print(pp2.unnest())
+
+	args := n.Arguments[1:]
+	for len(args) >= 2 {
+		ctx := map[string]int{
+			"alignBinaryOp": 1,
+		}
+
+		pp.println("")
+		pp.print(pp.keyword("WHEN"))
+
+		pp2 := pp.nest()
+		args[0].Accept(pp2, ctx)
+		pp.print("\v" + strings.Trim(pp2.String(), "\n"))
+
+		// count := strings.Count(pp.fmt.buffer.String(), "\v")
+		// if count == 1 {
+		// 	pp.print("\v")
+		// }
+
+		pp.print("\v" + pp.keyword("THEN"))
+
+		pp2 = pp.nest()
+		args[1].Accept(pp2, d)
+		pp.print(pp2.unnestWithDepth(3))
+
+		args = args[2:]
+	}
+
+	if len(args) == 1 {
+		pp.println("")
+		pp.print(" ")
+		// count := strings.Count(pp.fmt.buffer.String(), "\v")
+		pp.print("\v\v")
+		pp.print(pp.keyword("ELSE") + " \v")
+		args[0].Accept(pp, d)
+	}
+
+	pp.println("")
+	pp.print(pp.keyword("END"))
+
+	fmt.Printf("\n==== CASEVALUE:\n%v\n====\n%s\n====\n",
+		debugContent(pp.String()), alignNested(pp.String()))
 
 	p.print(pp.unnest())
 }

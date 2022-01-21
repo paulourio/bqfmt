@@ -39,8 +39,8 @@ func New{{ node.name }}(
 	if err != nil {
 		return nil, err
 	}
-
 	{% endfor %}
+
 	return nn, err
 }
 
@@ -53,8 +53,8 @@ func (n *{{ node.name }}) Init{{ field.name }}(d interface{}) error {
 	}
 
 	n.{{ field.name }} = make([]{{ field.type }}, 0, defaultCapacity)
+	{%- endif %}
 
-	{% endif -%}
 	return n.init{{ field.name }}(d)
 }
 
@@ -162,6 +162,26 @@ func (n *{{ node.name }}) AddChildren(children []NodeHandler) {
 {%- endfor %}
 
 {% endfor -%}
+
+{% for node in nodes -%}
+func (n *{{ node.name }}) String() string {
+	{% if node.composition == 'Leaf' -%}
+	return fmt.Sprintf("{{ node.name }}(%v)", n.Image())
+	{% else -%}
+	return fmt.Sprintf("{{ node.name }}(
+		{%- for _ in node.fields -%}
+			{{- '%v' -}}
+			{{- ', ' if not loop.last else '' -}}
+		{%- endfor -%}
+		)",
+		{% for field in node.fields -%}
+		n.{{ field.name }}{{ ',' }}
+		{% endfor %}
+	)
+	{%- endif %}
+}
+
+{% endfor %}
 
 type Visitor interface {
 	// Visit by type composition. These one are called when the visit

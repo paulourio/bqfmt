@@ -738,6 +738,7 @@ func NewQueryStatement(
 }
 
 func (n *QueryStatement) InitQuery(d interface{}) error {
+
 	return n.initQuery(d)
 }
 
@@ -775,17 +776,14 @@ func NewQuery(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitQueryExpr(queryexpr)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitOrderBy(orderby)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitLimitOffset(limitoffset)
 	if err != nil {
 		return nil, err
@@ -795,6 +793,7 @@ func NewQuery(
 }
 
 func (n *Query) InitWithClause(d interface{}) error {
+
 	return n.initWithClause(d)
 }
 
@@ -816,6 +815,7 @@ func (n *Query) initWithClause(d interface{}) error {
 }
 
 func (n *Query) InitQueryExpr(d interface{}) error {
+
 	return n.initQueryExpr(d)
 }
 
@@ -839,6 +839,7 @@ func (n *Query) initQueryExpr(d interface{}) error {
 }
 
 func (n *Query) InitOrderBy(d interface{}) error {
+
 	return n.initOrderBy(d)
 }
 
@@ -860,6 +861,7 @@ func (n *Query) initOrderBy(d interface{}) error {
 }
 
 func (n *Query) InitLimitOffset(d interface{}) error {
+
 	return n.initLimitOffset(d)
 }
 
@@ -881,6 +883,7 @@ func (n *Query) initLimitOffset(d interface{}) error {
 }
 
 func (n *Query) InitIsNested(d interface{}) error {
+
 	return n.initIsNested(d)
 }
 
@@ -917,42 +920,34 @@ func NewSelect(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitSelectAs(selectas)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitSelectList(selectlist)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitFromClause(fromclause)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitWhereClause(whereclause)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitGroupBy(groupby)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitHaving(having)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitQualify(qualify)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitWindowClause(windowclause)
 	if err != nil {
 		return nil, err
@@ -962,6 +957,7 @@ func NewSelect(
 }
 
 func (n *Select) InitDistinct(d interface{}) error {
+
 	return n.initDistinct(d)
 }
 
@@ -978,6 +974,7 @@ func (n *Select) initDistinct(d interface{}) error {
 }
 
 func (n *Select) InitSelectAs(d interface{}) error {
+
 	return n.initSelectAs(d)
 }
 
@@ -999,6 +996,7 @@ func (n *Select) initSelectAs(d interface{}) error {
 }
 
 func (n *Select) InitSelectList(d interface{}) error {
+
 	return n.initSelectList(d)
 }
 
@@ -1022,6 +1020,7 @@ func (n *Select) initSelectList(d interface{}) error {
 }
 
 func (n *Select) InitFromClause(d interface{}) error {
+
 	return n.initFromClause(d)
 }
 
@@ -1043,6 +1042,7 @@ func (n *Select) initFromClause(d interface{}) error {
 }
 
 func (n *Select) InitWhereClause(d interface{}) error {
+
 	return n.initWhereClause(d)
 }
 
@@ -1064,6 +1064,7 @@ func (n *Select) initWhereClause(d interface{}) error {
 }
 
 func (n *Select) InitGroupBy(d interface{}) error {
+
 	return n.initGroupBy(d)
 }
 
@@ -1085,6 +1086,7 @@ func (n *Select) initGroupBy(d interface{}) error {
 }
 
 func (n *Select) InitHaving(d interface{}) error {
+
 	return n.initHaving(d)
 }
 
@@ -1106,6 +1108,7 @@ func (n *Select) initHaving(d interface{}) error {
 }
 
 func (n *Select) InitQualify(d interface{}) error {
+
 	return n.initQualify(d)
 }
 
@@ -1127,6 +1130,7 @@ func (n *Select) initQualify(d interface{}) error {
 }
 
 func (n *Select) InitWindowClause(d interface{}) error {
+
 	return n.initWindowClause(d)
 }
 
@@ -1227,7 +1231,6 @@ func NewSelectColumn(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitAlias(alias)
 	if err != nil {
 		return nil, err
@@ -1237,6 +1240,7 @@ func NewSelectColumn(
 }
 
 func (n *SelectColumn) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -1260,6 +1264,7 @@ func (n *SelectColumn) initExpression(d interface{}) error {
 }
 
 func (n *SelectColumn) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -1306,6 +1311,7 @@ func NewIdentifier(
 }
 
 func (n *Identifier) InitIDString(d interface{}) error {
+
 	return n.initIDString(d)
 }
 
@@ -1338,6 +1344,7 @@ func NewAlias(
 }
 
 func (n *Alias) InitIdentifier(d interface{}) error {
+
 	return n.initIdentifier(d)
 }
 
@@ -1445,32 +1452,26 @@ func NewTablePathExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitUnnestExpr(unnestexpr)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitAlias(alias)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitWithOffset(withoffset)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitPivotClause(pivotclause)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitUnpivotClause(unpivotclause)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitSampleClause(sampleclause)
 	if err != nil {
 		return nil, err
@@ -1480,6 +1481,7 @@ func NewTablePathExpression(
 }
 
 func (n *TablePathExpression) InitPathExpr(d interface{}) error {
+
 	return n.initPathExpr(d)
 }
 
@@ -1501,6 +1503,7 @@ func (n *TablePathExpression) initPathExpr(d interface{}) error {
 }
 
 func (n *TablePathExpression) InitUnnestExpr(d interface{}) error {
+
 	return n.initUnnestExpr(d)
 }
 
@@ -1522,6 +1525,7 @@ func (n *TablePathExpression) initUnnestExpr(d interface{}) error {
 }
 
 func (n *TablePathExpression) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -1543,6 +1547,7 @@ func (n *TablePathExpression) initAlias(d interface{}) error {
 }
 
 func (n *TablePathExpression) InitWithOffset(d interface{}) error {
+
 	return n.initWithOffset(d)
 }
 
@@ -1564,6 +1569,7 @@ func (n *TablePathExpression) initWithOffset(d interface{}) error {
 }
 
 func (n *TablePathExpression) InitPivotClause(d interface{}) error {
+
 	return n.initPivotClause(d)
 }
 
@@ -1585,6 +1591,7 @@ func (n *TablePathExpression) initPivotClause(d interface{}) error {
 }
 
 func (n *TablePathExpression) InitUnpivotClause(d interface{}) error {
+
 	return n.initUnpivotClause(d)
 }
 
@@ -1606,6 +1613,7 @@ func (n *TablePathExpression) initUnpivotClause(d interface{}) error {
 }
 
 func (n *TablePathExpression) InitSampleClause(d interface{}) error {
+
 	return n.initSampleClause(d)
 }
 
@@ -1643,6 +1651,7 @@ func NewFromClause(
 }
 
 func (n *FromClause) InitTableExpression(d interface{}) error {
+
 	return n.initTableExpression(d)
 }
 
@@ -1682,6 +1691,7 @@ func NewWhereClause(
 }
 
 func (n *WhereClause) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -1714,6 +1724,7 @@ func NewBooleanLiteral() (*BooleanLiteral, error) {
 }
 
 func (n *BooleanLiteral) InitValue(d interface{}) error {
+
 	return n.initValue(d)
 }
 
@@ -1812,17 +1823,14 @@ func NewBinaryExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitLHS(lhs)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitRHS(rhs)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitIsNot(isnot)
 	if err != nil {
 		return nil, err
@@ -1832,6 +1840,7 @@ func NewBinaryExpression(
 }
 
 func (n *BinaryExpression) InitOp(d interface{}) error {
+
 	return n.initOp(d)
 }
 
@@ -1848,6 +1857,7 @@ func (n *BinaryExpression) initOp(d interface{}) error {
 }
 
 func (n *BinaryExpression) InitLHS(d interface{}) error {
+
 	return n.initLHS(d)
 }
 
@@ -1871,6 +1881,7 @@ func (n *BinaryExpression) initLHS(d interface{}) error {
 }
 
 func (n *BinaryExpression) InitRHS(d interface{}) error {
+
 	return n.initRHS(d)
 }
 
@@ -1894,6 +1905,7 @@ func (n *BinaryExpression) initRHS(d interface{}) error {
 }
 
 func (n *BinaryExpression) InitIsNot(d interface{}) error {
+
 	return n.initIsNot(d)
 }
 
@@ -1919,6 +1931,7 @@ func NewStringLiteral() (*StringLiteral, error) {
 }
 
 func (n *StringLiteral) InitStringValue(d interface{}) error {
+
 	return n.initStringValue(d)
 }
 
@@ -2028,7 +2041,6 @@ func NewGroupingItem(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitRollup(rollup)
 	if err != nil {
 		return nil, err
@@ -2038,6 +2050,7 @@ func NewGroupingItem(
 }
 
 func (n *GroupingItem) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -2059,6 +2072,7 @@ func (n *GroupingItem) initExpression(d interface{}) error {
 }
 
 func (n *GroupingItem) InitRollup(d interface{}) error {
+
 	return n.initRollup(d)
 }
 
@@ -2160,12 +2174,10 @@ func NewOrderingExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitNullOrder(nullorder)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitOrderingSpec(orderingspec)
 	if err != nil {
 		return nil, err
@@ -2175,6 +2187,7 @@ func NewOrderingExpression(
 }
 
 func (n *OrderingExpression) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -2198,6 +2211,7 @@ func (n *OrderingExpression) initExpression(d interface{}) error {
 }
 
 func (n *OrderingExpression) InitNullOrder(d interface{}) error {
+
 	return n.initNullOrder(d)
 }
 
@@ -2219,6 +2233,7 @@ func (n *OrderingExpression) initNullOrder(d interface{}) error {
 }
 
 func (n *OrderingExpression) InitOrderingSpec(d interface{}) error {
+
 	return n.initOrderingSpec(d)
 }
 
@@ -2314,7 +2329,6 @@ func NewLimitOffset(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitOffset(offset)
 	if err != nil {
 		return nil, err
@@ -2324,6 +2338,7 @@ func NewLimitOffset(
 }
 
 func (n *LimitOffset) InitLimit(d interface{}) error {
+
 	return n.initLimit(d)
 }
 
@@ -2347,6 +2362,7 @@ func (n *LimitOffset) initLimit(d interface{}) error {
 }
 
 func (n *LimitOffset) InitOffset(d interface{}) error {
+
 	return n.initOffset(d)
 }
 
@@ -2411,6 +2427,7 @@ func NewOnClause(
 }
 
 func (n *OnClause) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -2446,7 +2463,6 @@ func NewWithClauseEntry(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitQuery(query)
 	if err != nil {
 		return nil, err
@@ -2456,6 +2472,7 @@ func NewWithClauseEntry(
 }
 
 func (n *WithClauseEntry) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -2479,6 +2496,7 @@ func (n *WithClauseEntry) initAlias(d interface{}) error {
 }
 
 func (n *WithClauseEntry) InitQuery(d interface{}) error {
+
 	return n.initQuery(d)
 }
 
@@ -2515,12 +2533,10 @@ func NewJoin(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitRHS(rhs)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitJoinType(jointype)
 	if err != nil {
 		return nil, err
@@ -2530,6 +2546,7 @@ func NewJoin(
 }
 
 func (n *Join) InitLHS(d interface{}) error {
+
 	return n.initLHS(d)
 }
 
@@ -2553,6 +2570,7 @@ func (n *Join) initLHS(d interface{}) error {
 }
 
 func (n *Join) InitRHS(d interface{}) error {
+
 	return n.initRHS(d)
 }
 
@@ -2576,6 +2594,7 @@ func (n *Join) initRHS(d interface{}) error {
 }
 
 func (n *Join) InitJoinType(d interface{}) error {
+
 	return n.initJoinType(d)
 }
 
@@ -2592,6 +2611,7 @@ func (n *Join) initJoinType(d interface{}) error {
 }
 
 func (n *Join) InitOnClause(d interface{}) error {
+
 	return n.initOnClause(d)
 }
 
@@ -2613,6 +2633,7 @@ func (n *Join) initOnClause(d interface{}) error {
 }
 
 func (n *Join) InitUsingClause(d interface{}) error {
+
 	return n.initUsingClause(d)
 }
 
@@ -2634,6 +2655,7 @@ func (n *Join) initUsingClause(d interface{}) error {
 }
 
 func (n *Join) InitClauseList(d interface{}) error {
+
 	return n.initClauseList(d)
 }
 
@@ -2655,6 +2677,7 @@ func (n *Join) initClauseList(d interface{}) error {
 }
 
 func (n *Join) InitContainsCommaJoin(d interface{}) error {
+
 	return n.initContainsCommaJoin(d)
 }
 
@@ -2676,6 +2699,7 @@ func (n *Join) initContainsCommaJoin(d interface{}) error {
 }
 
 func (n *Join) InitTransformationNeeded(d interface{}) error {
+
 	return n.initTransformationNeeded(d)
 }
 
@@ -2847,6 +2871,7 @@ func NewHaving(
 }
 
 func (n *Having) InitExpr(d interface{}) error {
+
 	return n.initExpr(d)
 }
 
@@ -2886,6 +2911,7 @@ func NewNamedType(
 }
 
 func (n *NamedType) InitName(d interface{}) error {
+
 	return n.initName(d)
 }
 
@@ -2925,6 +2951,7 @@ func NewArrayType(
 }
 
 func (n *ArrayType) InitElementType(d interface{}) error {
+
 	return n.initElementType(d)
 }
 
@@ -2995,6 +3022,7 @@ func (n *StructType) initStructFields(d interface{}) error {
 }
 
 func (n *StructType) InitTypeParameterList(d interface{}) error {
+
 	return n.initTypeParameterList(d)
 }
 
@@ -3048,7 +3076,6 @@ func NewStructField(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitType(typ)
 	if err != nil {
 		return nil, err
@@ -3058,6 +3085,7 @@ func NewStructField(
 }
 
 func (n *StructField) InitName(d interface{}) error {
+
 	return n.initName(d)
 }
 
@@ -3079,6 +3107,7 @@ func (n *StructField) initName(d interface{}) error {
 }
 
 func (n *StructField) InitType(d interface{}) error {
+
 	return n.initType(d)
 }
 
@@ -3116,17 +3145,14 @@ func NewCastExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitType(typ)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitFormat(format)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitIsSafeCast(issafecast)
 	if err != nil {
 		return nil, err
@@ -3136,6 +3162,7 @@ func NewCastExpression(
 }
 
 func (n *CastExpression) InitExpr(d interface{}) error {
+
 	return n.initExpr(d)
 }
 
@@ -3159,6 +3186,7 @@ func (n *CastExpression) initExpr(d interface{}) error {
 }
 
 func (n *CastExpression) InitType(d interface{}) error {
+
 	return n.initType(d)
 }
 
@@ -3182,6 +3210,7 @@ func (n *CastExpression) initType(d interface{}) error {
 }
 
 func (n *CastExpression) InitFormat(d interface{}) error {
+
 	return n.initFormat(d)
 }
 
@@ -3203,6 +3232,7 @@ func (n *CastExpression) initFormat(d interface{}) error {
 }
 
 func (n *CastExpression) InitIsSafeCast(d interface{}) error {
+
 	return n.initIsSafeCast(d)
 }
 
@@ -3231,7 +3261,6 @@ func NewSelectAs(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitAsMode(asmode)
 	if err != nil {
 		return nil, err
@@ -3241,6 +3270,7 @@ func NewSelectAs(
 }
 
 func (n *SelectAs) InitTypeName(d interface{}) error {
+
 	return n.initTypeName(d)
 }
 
@@ -3262,6 +3292,7 @@ func (n *SelectAs) initTypeName(d interface{}) error {
 }
 
 func (n *SelectAs) InitAsMode(d interface{}) error {
+
 	return n.initAsMode(d)
 }
 
@@ -3357,7 +3388,6 @@ func NewFunctionCall(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitDistinct(distinct)
 	if err != nil {
 		return nil, err
@@ -3367,6 +3397,7 @@ func NewFunctionCall(
 }
 
 func (n *FunctionCall) InitFunction(d interface{}) error {
+
 	return n.initFunction(d)
 }
 
@@ -3421,6 +3452,7 @@ func (n *FunctionCall) initArguments(d interface{}) error {
 }
 
 func (n *FunctionCall) InitOrderBy(d interface{}) error {
+
 	return n.initOrderBy(d)
 }
 
@@ -3442,6 +3474,7 @@ func (n *FunctionCall) initOrderBy(d interface{}) error {
 }
 
 func (n *FunctionCall) InitLimitOffset(d interface{}) error {
+
 	return n.initLimitOffset(d)
 }
 
@@ -3463,6 +3496,7 @@ func (n *FunctionCall) initLimitOffset(d interface{}) error {
 }
 
 func (n *FunctionCall) InitNullHandlingModifier(d interface{}) error {
+
 	return n.initNullHandlingModifier(d)
 }
 
@@ -3480,6 +3514,7 @@ func (n *FunctionCall) initNullHandlingModifier(d interface{}) error {
 }
 
 func (n *FunctionCall) InitDistinct(d interface{}) error {
+
 	return n.initDistinct(d)
 }
 
@@ -3532,6 +3567,7 @@ func NewArrayConstructor(
 }
 
 func (n *ArrayConstructor) InitType(d interface{}) error {
+
 	return n.initType(d)
 }
 
@@ -3616,7 +3652,6 @@ func NewStructConstructorArg(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitAlias(alias)
 	if err != nil {
 		return nil, err
@@ -3626,6 +3661,7 @@ func NewStructConstructorArg(
 }
 
 func (n *StructConstructorArg) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -3649,6 +3685,7 @@ func (n *StructConstructorArg) initExpression(d interface{}) error {
 }
 
 func (n *StructConstructorArg) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -3753,6 +3790,7 @@ func NewStructConstructorWithKeyword(
 }
 
 func (n *StructConstructorWithKeyword) InitStructType(d interface{}) error {
+
 	return n.initStructType(d)
 }
 
@@ -3840,22 +3878,18 @@ func NewInExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitInList(inlist)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitQuery(query)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitUnnestExpr(unnestexpr)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitIsNot(isnot)
 	if err != nil {
 		return nil, err
@@ -3865,6 +3899,7 @@ func NewInExpression(
 }
 
 func (n *InExpression) InitLHS(d interface{}) error {
+
 	return n.initLHS(d)
 }
 
@@ -3888,6 +3923,7 @@ func (n *InExpression) initLHS(d interface{}) error {
 }
 
 func (n *InExpression) InitInList(d interface{}) error {
+
 	return n.initInList(d)
 }
 
@@ -3909,6 +3945,7 @@ func (n *InExpression) initInList(d interface{}) error {
 }
 
 func (n *InExpression) InitQuery(d interface{}) error {
+
 	return n.initQuery(d)
 }
 
@@ -3930,6 +3967,7 @@ func (n *InExpression) initQuery(d interface{}) error {
 }
 
 func (n *InExpression) InitUnnestExpr(d interface{}) error {
+
 	return n.initUnnestExpr(d)
 }
 
@@ -3951,6 +3989,7 @@ func (n *InExpression) initUnnestExpr(d interface{}) error {
 }
 
 func (n *InExpression) InitIsNot(d interface{}) error {
+
 	return n.initIsNot(d)
 }
 
@@ -4048,17 +4087,14 @@ func NewBetweenExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitLow(low)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitHigh(high)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitIsNot(isnot)
 	if err != nil {
 		return nil, err
@@ -4068,6 +4104,7 @@ func NewBetweenExpression(
 }
 
 func (n *BetweenExpression) InitLHS(d interface{}) error {
+
 	return n.initLHS(d)
 }
 
@@ -4091,6 +4128,7 @@ func (n *BetweenExpression) initLHS(d interface{}) error {
 }
 
 func (n *BetweenExpression) InitLow(d interface{}) error {
+
 	return n.initLow(d)
 }
 
@@ -4114,6 +4152,7 @@ func (n *BetweenExpression) initLow(d interface{}) error {
 }
 
 func (n *BetweenExpression) InitHigh(d interface{}) error {
+
 	return n.initHigh(d)
 }
 
@@ -4137,6 +4176,7 @@ func (n *BetweenExpression) initHigh(d interface{}) error {
 }
 
 func (n *BetweenExpression) InitIsNot(d interface{}) error {
+
 	return n.initIsNot(d)
 }
 
@@ -4180,6 +4220,7 @@ func NewBytesLiteral() (*BytesLiteral, error) {
 }
 
 func (n *BytesLiteral) InitBytesValue(d interface{}) error {
+
 	return n.initBytesValue(d)
 }
 
@@ -4213,7 +4254,6 @@ func NewDateOrTimeLiteral(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitTypeKind(typekind)
 	if err != nil {
 		return nil, err
@@ -4223,6 +4263,7 @@ func NewDateOrTimeLiteral(
 }
 
 func (n *DateOrTimeLiteral) InitStringLiteral(d interface{}) error {
+
 	return n.initStringLiteral(d)
 }
 
@@ -4246,6 +4287,7 @@ func (n *DateOrTimeLiteral) initStringLiteral(d interface{}) error {
 }
 
 func (n *DateOrTimeLiteral) InitTypeKind(d interface{}) error {
+
 	return n.initTypeKind(d)
 }
 
@@ -4408,7 +4450,6 @@ func NewArrayElement(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitPosition(position)
 	if err != nil {
 		return nil, err
@@ -4418,6 +4459,7 @@ func NewArrayElement(
 }
 
 func (n *ArrayElement) InitArray(d interface{}) error {
+
 	return n.initArray(d)
 }
 
@@ -4441,6 +4483,7 @@ func (n *ArrayElement) initArray(d interface{}) error {
 }
 
 func (n *ArrayElement) InitPosition(d interface{}) error {
+
 	return n.initPosition(d)
 }
 
@@ -4477,12 +4520,10 @@ func NewBitwiseShiftExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitRHS(rhs)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitIsLeftShift(isleftshift)
 	if err != nil {
 		return nil, err
@@ -4492,6 +4533,7 @@ func NewBitwiseShiftExpression(
 }
 
 func (n *BitwiseShiftExpression) InitLHS(d interface{}) error {
+
 	return n.initLHS(d)
 }
 
@@ -4515,6 +4557,7 @@ func (n *BitwiseShiftExpression) initLHS(d interface{}) error {
 }
 
 func (n *BitwiseShiftExpression) InitRHS(d interface{}) error {
+
 	return n.initRHS(d)
 }
 
@@ -4538,6 +4581,7 @@ func (n *BitwiseShiftExpression) initRHS(d interface{}) error {
 }
 
 func (n *BitwiseShiftExpression) InitIsLeftShift(d interface{}) error {
+
 	return n.initIsLeftShift(d)
 }
 
@@ -4571,7 +4615,6 @@ func NewDotGeneralizedField(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitPath(path)
 	if err != nil {
 		return nil, err
@@ -4581,6 +4624,7 @@ func NewDotGeneralizedField(
 }
 
 func (n *DotGeneralizedField) InitExpr(d interface{}) error {
+
 	return n.initExpr(d)
 }
 
@@ -4604,6 +4648,7 @@ func (n *DotGeneralizedField) initExpr(d interface{}) error {
 }
 
 func (n *DotGeneralizedField) InitPath(d interface{}) error {
+
 	return n.initPath(d)
 }
 
@@ -4639,7 +4684,6 @@ func NewDotIdentifier(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitName(name)
 	if err != nil {
 		return nil, err
@@ -4649,6 +4693,7 @@ func NewDotIdentifier(
 }
 
 func (n *DotIdentifier) InitExpr(d interface{}) error {
+
 	return n.initExpr(d)
 }
 
@@ -4672,6 +4717,7 @@ func (n *DotIdentifier) initExpr(d interface{}) error {
 }
 
 func (n *DotIdentifier) InitName(d interface{}) error {
+
 	return n.initName(d)
 }
 
@@ -4711,6 +4757,7 @@ func NewDotStar(
 }
 
 func (n *DotStar) InitExpr(d interface{}) error {
+
 	return n.initExpr(d)
 }
 
@@ -4746,7 +4793,6 @@ func NewDotStarWithModifiers(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitModifiers(modifiers)
 	if err != nil {
 		return nil, err
@@ -4756,6 +4802,7 @@ func NewDotStarWithModifiers(
 }
 
 func (n *DotStarWithModifiers) InitExpr(d interface{}) error {
+
 	return n.initExpr(d)
 }
 
@@ -4779,6 +4826,7 @@ func (n *DotStarWithModifiers) initExpr(d interface{}) error {
 }
 
 func (n *DotStarWithModifiers) InitModifiers(d interface{}) error {
+
 	return n.initModifiers(d)
 }
 
@@ -4814,7 +4862,6 @@ func NewExpressionSubquery(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitModifier(modifier)
 	if err != nil {
 		return nil, err
@@ -4824,6 +4871,7 @@ func NewExpressionSubquery(
 }
 
 func (n *ExpressionSubquery) InitQuery(d interface{}) error {
+
 	return n.initQuery(d)
 }
 
@@ -4847,6 +4895,7 @@ func (n *ExpressionSubquery) initQuery(d interface{}) error {
 }
 
 func (n *ExpressionSubquery) InitModifier(d interface{}) error {
+
 	return n.initModifier(d)
 }
 
@@ -4876,12 +4925,10 @@ func NewExtractExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitRHS(rhs)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitTimeZone(timezone)
 	if err != nil {
 		return nil, err
@@ -4891,6 +4938,7 @@ func NewExtractExpression(
 }
 
 func (n *ExtractExpression) InitLHS(d interface{}) error {
+
 	return n.initLHS(d)
 }
 
@@ -4914,6 +4962,7 @@ func (n *ExtractExpression) initLHS(d interface{}) error {
 }
 
 func (n *ExtractExpression) InitRHS(d interface{}) error {
+
 	return n.initRHS(d)
 }
 
@@ -4937,6 +4986,7 @@ func (n *ExtractExpression) initRHS(d interface{}) error {
 }
 
 func (n *ExtractExpression) InitTimeZone(d interface{}) error {
+
 	return n.initTimeZone(d)
 }
 
@@ -4971,12 +5021,10 @@ func NewIntervalExpr(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitDatePartName(datepartname)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitDatePartNameTo(datepartnameto)
 	if err != nil {
 		return nil, err
@@ -4986,6 +5034,7 @@ func NewIntervalExpr(
 }
 
 func (n *IntervalExpr) InitIntervalValue(d interface{}) error {
+
 	return n.initIntervalValue(d)
 }
 
@@ -5009,6 +5058,7 @@ func (n *IntervalExpr) initIntervalValue(d interface{}) error {
 }
 
 func (n *IntervalExpr) InitDatePartName(d interface{}) error {
+
 	return n.initDatePartName(d)
 }
 
@@ -5032,6 +5082,7 @@ func (n *IntervalExpr) initDatePartName(d interface{}) error {
 }
 
 func (n *IntervalExpr) InitDatePartNameTo(d interface{}) error {
+
 	return n.initDatePartNameTo(d)
 }
 
@@ -5069,6 +5120,7 @@ func NewNullOrder(
 }
 
 func (n *NullOrder) InitNullsFirst(d interface{}) error {
+
 	return n.initNullsFirst(d)
 }
 
@@ -5164,7 +5216,6 @@ func NewParenthesizedJoin(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitSampleClause(sampleclause)
 	if err != nil {
 		return nil, err
@@ -5174,6 +5225,7 @@ func NewParenthesizedJoin(
 }
 
 func (n *ParenthesizedJoin) InitJoin(d interface{}) error {
+
 	return n.initJoin(d)
 }
 
@@ -5197,6 +5249,7 @@ func (n *ParenthesizedJoin) initJoin(d interface{}) error {
 }
 
 func (n *ParenthesizedJoin) InitSampleClause(d interface{}) error {
+
 	return n.initSampleClause(d)
 }
 
@@ -5298,12 +5351,10 @@ func NewSetOperation(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitOpType(optype)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitDistinct(distinct)
 	if err != nil {
 		return nil, err
@@ -5344,6 +5395,7 @@ func (n *SetOperation) initInputs(d interface{}) error {
 }
 
 func (n *SetOperation) InitOpType(d interface{}) error {
+
 	return n.initOpType(d)
 }
 
@@ -5360,6 +5412,7 @@ func (n *SetOperation) initOpType(d interface{}) error {
 }
 
 func (n *SetOperation) InitDistinct(d interface{}) error {
+
 	return n.initDistinct(d)
 }
 
@@ -5475,7 +5528,6 @@ func NewStarModifiers(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitReplaceItems(replaceitems)
 	if err != nil {
 		return nil, err
@@ -5485,6 +5537,7 @@ func NewStarModifiers(
 }
 
 func (n *StarModifiers) InitExceptList(d interface{}) error {
+
 	return n.initExceptList(d)
 }
 
@@ -5569,7 +5622,6 @@ func NewStarReplaceItem(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitAlias(alias)
 	if err != nil {
 		return nil, err
@@ -5579,6 +5631,7 @@ func NewStarReplaceItem(
 }
 
 func (n *StarReplaceItem) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -5602,6 +5655,7 @@ func (n *StarReplaceItem) initExpression(d interface{}) error {
 }
 
 func (n *StarReplaceItem) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -5641,6 +5695,7 @@ func NewStarWithModifiers(
 }
 
 func (n *StarWithModifiers) InitModifiers(d interface{}) error {
+
 	return n.initModifiers(d)
 }
 
@@ -5679,22 +5734,18 @@ func NewTableSubquery(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitAlias(alias)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitPivotClause(pivotclause)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitUnpivotClause(unpivotclause)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitSampleClause(sampleclause)
 	if err != nil {
 		return nil, err
@@ -5704,6 +5755,7 @@ func NewTableSubquery(
 }
 
 func (n *TableSubquery) InitSubquery(d interface{}) error {
+
 	return n.initSubquery(d)
 }
 
@@ -5727,6 +5779,7 @@ func (n *TableSubquery) initSubquery(d interface{}) error {
 }
 
 func (n *TableSubquery) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -5748,6 +5801,7 @@ func (n *TableSubquery) initAlias(d interface{}) error {
 }
 
 func (n *TableSubquery) InitPivotClause(d interface{}) error {
+
 	return n.initPivotClause(d)
 }
 
@@ -5769,6 +5823,7 @@ func (n *TableSubquery) initPivotClause(d interface{}) error {
 }
 
 func (n *TableSubquery) InitUnpivotClause(d interface{}) error {
+
 	return n.initUnpivotClause(d)
 }
 
@@ -5790,6 +5845,7 @@ func (n *TableSubquery) initUnpivotClause(d interface{}) error {
 }
 
 func (n *TableSubquery) InitSampleClause(d interface{}) error {
+
 	return n.initSampleClause(d)
 }
 
@@ -5823,7 +5879,6 @@ func NewUnaryExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitOperand(operand)
 	if err != nil {
 		return nil, err
@@ -5833,6 +5888,7 @@ func NewUnaryExpression(
 }
 
 func (n *UnaryExpression) InitOp(d interface{}) error {
+
 	return n.initOp(d)
 }
 
@@ -5849,6 +5905,7 @@ func (n *UnaryExpression) initOp(d interface{}) error {
 }
 
 func (n *UnaryExpression) InitOperand(d interface{}) error {
+
 	return n.initOperand(d)
 }
 
@@ -5888,6 +5945,7 @@ func NewUnnestExpression(
 }
 
 func (n *UnnestExpression) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -5990,7 +6048,6 @@ func NewWindowDefinition(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitWindowSpec(windowspec)
 	if err != nil {
 		return nil, err
@@ -6000,6 +6057,7 @@ func NewWindowDefinition(
 }
 
 func (n *WindowDefinition) InitName(d interface{}) error {
+
 	return n.initName(d)
 }
 
@@ -6023,6 +6081,7 @@ func (n *WindowDefinition) initName(d interface{}) error {
 }
 
 func (n *WindowDefinition) InitWindowSpec(d interface{}) error {
+
 	return n.initWindowSpec(d)
 }
 
@@ -6059,12 +6118,10 @@ func NewWindowFrame(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitEndExpr(endexpr)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitFrameUnit(frameunit)
 	if err != nil {
 		return nil, err
@@ -6074,6 +6131,7 @@ func NewWindowFrame(
 }
 
 func (n *WindowFrame) InitStartExpr(d interface{}) error {
+
 	return n.initStartExpr(d)
 }
 
@@ -6097,6 +6155,7 @@ func (n *WindowFrame) initStartExpr(d interface{}) error {
 }
 
 func (n *WindowFrame) InitEndExpr(d interface{}) error {
+
 	return n.initEndExpr(d)
 }
 
@@ -6120,6 +6179,7 @@ func (n *WindowFrame) initEndExpr(d interface{}) error {
 }
 
 func (n *WindowFrame) InitFrameUnit(d interface{}) error {
+
 	return n.initFrameUnit(d)
 }
 
@@ -6148,7 +6208,6 @@ func NewWindowFrameExpr(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitBoundaryType(boundarytype)
 	if err != nil {
 		return nil, err
@@ -6158,6 +6217,7 @@ func NewWindowFrameExpr(
 }
 
 func (n *WindowFrameExpr) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -6179,6 +6239,7 @@ func (n *WindowFrameExpr) initExpression(d interface{}) error {
 }
 
 func (n *WindowFrameExpr) InitBoundaryType(d interface{}) error {
+
 	return n.initBoundaryType(d)
 }
 
@@ -6208,12 +6269,10 @@ func NewLikeExpression(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitInList(inlist)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitIsNot(isnot)
 	if err != nil {
 		return nil, err
@@ -6223,6 +6282,7 @@ func NewLikeExpression(
 }
 
 func (n *LikeExpression) InitLHS(d interface{}) error {
+
 	return n.initLHS(d)
 }
 
@@ -6246,6 +6306,7 @@ func (n *LikeExpression) initLHS(d interface{}) error {
 }
 
 func (n *LikeExpression) InitInList(d interface{}) error {
+
 	return n.initInList(d)
 }
 
@@ -6269,6 +6330,7 @@ func (n *LikeExpression) initInList(d interface{}) error {
 }
 
 func (n *LikeExpression) InitIsNot(d interface{}) error {
+
 	return n.initIsNot(d)
 }
 
@@ -6299,17 +6361,14 @@ func NewWindowSpecification(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitPartitionBy(partitionby)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitOrderBy(orderby)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitWindowFrame(windowframe)
 	if err != nil {
 		return nil, err
@@ -6319,6 +6378,7 @@ func NewWindowSpecification(
 }
 
 func (n *WindowSpecification) InitBaseWindowName(d interface{}) error {
+
 	return n.initBaseWindowName(d)
 }
 
@@ -6340,6 +6400,7 @@ func (n *WindowSpecification) initBaseWindowName(d interface{}) error {
 }
 
 func (n *WindowSpecification) InitPartitionBy(d interface{}) error {
+
 	return n.initPartitionBy(d)
 }
 
@@ -6361,6 +6422,7 @@ func (n *WindowSpecification) initPartitionBy(d interface{}) error {
 }
 
 func (n *WindowSpecification) InitOrderBy(d interface{}) error {
+
 	return n.initOrderBy(d)
 }
 
@@ -6382,6 +6444,7 @@ func (n *WindowSpecification) initOrderBy(d interface{}) error {
 }
 
 func (n *WindowSpecification) InitWindowFrame(d interface{}) error {
+
 	return n.initWindowFrame(d)
 }
 
@@ -6419,6 +6482,7 @@ func NewWithOffset(
 }
 
 func (n *WithOffset) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -6520,12 +6584,10 @@ func NewSampleClause(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitSampleSize(samplesize)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitSampleSuffix(samplesuffix)
 	if err != nil {
 		return nil, err
@@ -6535,6 +6597,7 @@ func NewSampleClause(
 }
 
 func (n *SampleClause) InitSampleMethod(d interface{}) error {
+
 	return n.initSampleMethod(d)
 }
 
@@ -6558,6 +6621,7 @@ func (n *SampleClause) initSampleMethod(d interface{}) error {
 }
 
 func (n *SampleClause) InitSampleSize(d interface{}) error {
+
 	return n.initSampleSize(d)
 }
 
@@ -6581,6 +6645,7 @@ func (n *SampleClause) initSampleSize(d interface{}) error {
 }
 
 func (n *SampleClause) InitSampleSuffix(d interface{}) error {
+
 	return n.initSampleSuffix(d)
 }
 
@@ -6615,12 +6680,10 @@ func NewSampleSize(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitPartitionBy(partitionby)
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitUnit(unit)
 	if err != nil {
 		return nil, err
@@ -6630,6 +6693,7 @@ func NewSampleSize(
 }
 
 func (n *SampleSize) InitSize(d interface{}) error {
+
 	return n.initSize(d)
 }
 
@@ -6653,6 +6717,7 @@ func (n *SampleSize) initSize(d interface{}) error {
 }
 
 func (n *SampleSize) InitPartitionBy(d interface{}) error {
+
 	return n.initPartitionBy(d)
 }
 
@@ -6674,6 +6739,7 @@ func (n *SampleSize) initPartitionBy(d interface{}) error {
 }
 
 func (n *SampleSize) InitUnit(d interface{}) error {
+
 	return n.initUnit(d)
 }
 
@@ -6707,7 +6773,6 @@ func NewSampleSuffix(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitRepeat(repeat)
 	if err != nil {
 		return nil, err
@@ -6717,6 +6782,7 @@ func NewSampleSuffix(
 }
 
 func (n *SampleSuffix) InitWeight(d interface{}) error {
+
 	return n.initWeight(d)
 }
 
@@ -6738,6 +6804,7 @@ func (n *SampleSuffix) initWeight(d interface{}) error {
 }
 
 func (n *SampleSuffix) InitRepeat(d interface{}) error {
+
 	return n.initRepeat(d)
 }
 
@@ -6775,6 +6842,7 @@ func NewWithWeight(
 }
 
 func (n *WithWeight) InitAlias(d interface{}) error {
+
 	return n.initAlias(d)
 }
 
@@ -6812,6 +6880,7 @@ func NewRepeatableClause(
 }
 
 func (n *RepeatableClause) InitArgument(d interface{}) error {
+
 	return n.initArgument(d)
 }
 
@@ -6851,6 +6920,7 @@ func NewQualify(
 }
 
 func (n *Qualify) InitExpression(d interface{}) error {
+
 	return n.initExpression(d)
 }
 
@@ -6886,7 +6956,6 @@ func NewFormatClause(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitTimeZoneExpr(timezoneexpr)
 	if err != nil {
 		return nil, err
@@ -6896,6 +6965,7 @@ func NewFormatClause(
 }
 
 func (n *FormatClause) InitFormat(d interface{}) error {
+
 	return n.initFormat(d)
 }
 
@@ -6919,6 +6989,7 @@ func (n *FormatClause) initFormat(d interface{}) error {
 }
 
 func (n *FormatClause) InitTimeZoneExpr(d interface{}) error {
+
 	return n.initTimeZoneExpr(d)
 }
 
@@ -6956,6 +7027,7 @@ func NewParameterExpr(
 }
 
 func (n *ParameterExpr) InitName(d interface{}) error {
+
 	return n.initName(d)
 }
 
@@ -6989,7 +7061,6 @@ func NewAnalyticFunctionCall(
 	if err != nil {
 		return nil, err
 	}
-
 	err = nn.InitWindowSpec(windowspec)
 	if err != nil {
 		return nil, err
@@ -6999,6 +7070,7 @@ func NewAnalyticFunctionCall(
 }
 
 func (n *AnalyticFunctionCall) InitExpr(d interface{}) error {
+
 	return n.initExpr(d)
 }
 
@@ -7022,6 +7094,7 @@ func (n *AnalyticFunctionCall) initExpr(d interface{}) error {
 }
 
 func (n *AnalyticFunctionCall) InitWindowSpec(d interface{}) error {
+
 	return n.initWindowSpec(d)
 }
 
@@ -7042,6 +7115,635 @@ func (n *AnalyticFunctionCall) initWindowSpec(d interface{}) error {
 	}
 
 	return nil
+}
+
+func (n *QueryStatement) String() string {
+	return fmt.Sprintf("QueryStatement(%v)",
+		n.Query,
+	)
+}
+
+func (n *Query) String() string {
+	return fmt.Sprintf("Query(%v, %v, %v, %v, %v)",
+		n.WithClause,
+		n.QueryExpr,
+		n.OrderBy,
+		n.LimitOffset,
+		n.IsNested,
+	)
+}
+
+func (n *Select) String() string {
+	return fmt.Sprintf("Select(%v, %v, %v, %v, %v, %v, %v, %v, %v)",
+		n.Distinct,
+		n.SelectAs,
+		n.SelectList,
+		n.FromClause,
+		n.WhereClause,
+		n.GroupBy,
+		n.Having,
+		n.Qualify,
+		n.WindowClause,
+	)
+}
+
+func (n *SelectList) String() string {
+	return fmt.Sprintf("SelectList(%v)",
+		n.Columns,
+	)
+}
+
+func (n *SelectColumn) String() string {
+	return fmt.Sprintf("SelectColumn(%v, %v)",
+		n.Expression,
+		n.Alias,
+	)
+}
+
+func (n *IntLiteral) String() string {
+	return fmt.Sprintf("IntLiteral(%v)", n.Image())
+
+}
+
+func (n *Identifier) String() string {
+	return fmt.Sprintf("Identifier(%v)",
+		n.IDString,
+	)
+}
+
+func (n *Alias) String() string {
+	return fmt.Sprintf("Alias(%v)",
+		n.Identifier,
+	)
+}
+
+func (n *PathExpression) String() string {
+	return fmt.Sprintf("PathExpression(%v)",
+		n.Names,
+	)
+}
+
+func (n *TablePathExpression) String() string {
+	return fmt.Sprintf("TablePathExpression(%v, %v, %v, %v, %v, %v, %v)",
+		n.PathExpr,
+		n.UnnestExpr,
+		n.Alias,
+		n.WithOffset,
+		n.PivotClause,
+		n.UnpivotClause,
+		n.SampleClause,
+	)
+}
+
+func (n *FromClause) String() string {
+	return fmt.Sprintf("FromClause(%v)",
+		n.TableExpression,
+	)
+}
+
+func (n *WhereClause) String() string {
+	return fmt.Sprintf("WhereClause(%v)",
+		n.Expression,
+	)
+}
+
+func (n *BooleanLiteral) String() string {
+	return fmt.Sprintf("BooleanLiteral(%v)", n.Image())
+
+}
+
+func (n *AndExpr) String() string {
+	return fmt.Sprintf("AndExpr(%v)",
+		n.Conjuncts,
+	)
+}
+
+func (n *BinaryExpression) String() string {
+	return fmt.Sprintf("BinaryExpression(%v, %v, %v, %v)",
+		n.Op,
+		n.LHS,
+		n.RHS,
+		n.IsNot,
+	)
+}
+
+func (n *StringLiteral) String() string {
+	return fmt.Sprintf("StringLiteral(%v)", n.Image())
+
+}
+
+func (n *Star) String() string {
+	return fmt.Sprintf("Star(%v)", n.Image())
+
+}
+
+func (n *OrExpr) String() string {
+	return fmt.Sprintf("OrExpr(%v)",
+		n.Disjuncts,
+	)
+}
+
+func (n *GroupingItem) String() string {
+	return fmt.Sprintf("GroupingItem(%v, %v)",
+		n.Expression,
+		n.Rollup,
+	)
+}
+
+func (n *GroupBy) String() string {
+	return fmt.Sprintf("GroupBy(%v)",
+		n.GroupingItems,
+	)
+}
+
+func (n *OrderingExpression) String() string {
+	return fmt.Sprintf("OrderingExpression(%v, %v, %v)",
+		n.Expression,
+		n.NullOrder,
+		n.OrderingSpec,
+	)
+}
+
+func (n *OrderBy) String() string {
+	return fmt.Sprintf("OrderBy(%v)",
+		n.OrderingExpression,
+	)
+}
+
+func (n *LimitOffset) String() string {
+	return fmt.Sprintf("LimitOffset(%v, %v)",
+		n.Limit,
+		n.Offset,
+	)
+}
+
+func (n *FloatLiteral) String() string {
+	return fmt.Sprintf("FloatLiteral(%v)", n.Image())
+
+}
+
+func (n *NullLiteral) String() string {
+	return fmt.Sprintf("NullLiteral(%v)", n.Image())
+
+}
+
+func (n *JSONLiteral) String() string {
+	return fmt.Sprintf("JSONLiteral(%v)", n.Image())
+
+}
+
+func (n *OnClause) String() string {
+	return fmt.Sprintf("OnClause(%v)",
+		n.Expression,
+	)
+}
+
+func (n *WithClauseEntry) String() string {
+	return fmt.Sprintf("WithClauseEntry(%v, %v)",
+		n.Alias,
+		n.Query,
+	)
+}
+
+func (n *Join) String() string {
+	return fmt.Sprintf("Join(%v, %v, %v, %v, %v, %v, %v, %v)",
+		n.LHS,
+		n.RHS,
+		n.JoinType,
+		n.OnClause,
+		n.UsingClause,
+		n.ClauseList,
+		n.ContainsCommaJoin,
+		n.TransformationNeeded,
+	)
+}
+
+func (n *UsingClause) String() string {
+	return fmt.Sprintf("UsingClause(%v)",
+		n.Keys,
+	)
+}
+
+func (n *WithClause) String() string {
+	return fmt.Sprintf("WithClause(%v)",
+		n.With,
+	)
+}
+
+func (n *Having) String() string {
+	return fmt.Sprintf("Having(%v)",
+		n.Expr,
+	)
+}
+
+func (n *NamedType) String() string {
+	return fmt.Sprintf("NamedType(%v)",
+		n.Name,
+	)
+}
+
+func (n *ArrayType) String() string {
+	return fmt.Sprintf("ArrayType(%v)",
+		n.ElementType,
+	)
+}
+
+func (n *StructType) String() string {
+	return fmt.Sprintf("StructType(%v, %v)",
+		n.StructFields,
+		n.TypeParameterList,
+	)
+}
+
+func (n *StructField) String() string {
+	return fmt.Sprintf("StructField(%v, %v)",
+		n.Name,
+		n.Type,
+	)
+}
+
+func (n *CastExpression) String() string {
+	return fmt.Sprintf("CastExpression(%v, %v, %v, %v)",
+		n.Expr,
+		n.Type,
+		n.Format,
+		n.IsSafeCast,
+	)
+}
+
+func (n *SelectAs) String() string {
+	return fmt.Sprintf("SelectAs(%v, %v)",
+		n.TypeName,
+		n.AsMode,
+	)
+}
+
+func (n *Rollup) String() string {
+	return fmt.Sprintf("Rollup(%v)",
+		n.Expressions,
+	)
+}
+
+func (n *FunctionCall) String() string {
+	return fmt.Sprintf("FunctionCall(%v, %v, %v, %v, %v, %v)",
+		n.Function,
+		n.Arguments,
+		n.OrderBy,
+		n.LimitOffset,
+		n.NullHandlingModifier,
+		n.Distinct,
+	)
+}
+
+func (n *ArrayConstructor) String() string {
+	return fmt.Sprintf("ArrayConstructor(%v, %v)",
+		n.Type,
+		n.Elements,
+	)
+}
+
+func (n *StructConstructorArg) String() string {
+	return fmt.Sprintf("StructConstructorArg(%v, %v)",
+		n.Expression,
+		n.Alias,
+	)
+}
+
+func (n *StructConstructorWithParens) String() string {
+	return fmt.Sprintf("StructConstructorWithParens(%v)",
+		n.FieldExpressions,
+	)
+}
+
+func (n *StructConstructorWithKeyword) String() string {
+	return fmt.Sprintf("StructConstructorWithKeyword(%v, %v)",
+		n.StructType,
+		n.Fields,
+	)
+}
+
+func (n *InExpression) String() string {
+	return fmt.Sprintf("InExpression(%v, %v, %v, %v, %v)",
+		n.LHS,
+		n.InList,
+		n.Query,
+		n.UnnestExpr,
+		n.IsNot,
+	)
+}
+
+func (n *InList) String() string {
+	return fmt.Sprintf("InList(%v)",
+		n.List,
+	)
+}
+
+func (n *BetweenExpression) String() string {
+	return fmt.Sprintf("BetweenExpression(%v, %v, %v, %v)",
+		n.LHS,
+		n.Low,
+		n.High,
+		n.IsNot,
+	)
+}
+
+func (n *NumericLiteral) String() string {
+	return fmt.Sprintf("NumericLiteral(%v)", n.Image())
+
+}
+
+func (n *BigNumericLiteral) String() string {
+	return fmt.Sprintf("BigNumericLiteral(%v)", n.Image())
+
+}
+
+func (n *BytesLiteral) String() string {
+	return fmt.Sprintf("BytesLiteral(%v)", n.Image())
+
+}
+
+func (n *DateOrTimeLiteral) String() string {
+	return fmt.Sprintf("DateOrTimeLiteral(%v, %v)",
+		n.StringLiteral,
+		n.TypeKind,
+	)
+}
+
+func (n *CaseValueExpression) String() string {
+	return fmt.Sprintf("CaseValueExpression(%v)",
+		n.Arguments,
+	)
+}
+
+func (n *CaseNoValueExpression) String() string {
+	return fmt.Sprintf("CaseNoValueExpression(%v)",
+		n.Arguments,
+	)
+}
+
+func (n *ArrayElement) String() string {
+	return fmt.Sprintf("ArrayElement(%v, %v)",
+		n.Array,
+		n.Position,
+	)
+}
+
+func (n *BitwiseShiftExpression) String() string {
+	return fmt.Sprintf("BitwiseShiftExpression(%v, %v, %v)",
+		n.LHS,
+		n.RHS,
+		n.IsLeftShift,
+	)
+}
+
+func (n *DotGeneralizedField) String() string {
+	return fmt.Sprintf("DotGeneralizedField(%v, %v)",
+		n.Expr,
+		n.Path,
+	)
+}
+
+func (n *DotIdentifier) String() string {
+	return fmt.Sprintf("DotIdentifier(%v, %v)",
+		n.Expr,
+		n.Name,
+	)
+}
+
+func (n *DotStar) String() string {
+	return fmt.Sprintf("DotStar(%v)",
+		n.Expr,
+	)
+}
+
+func (n *DotStarWithModifiers) String() string {
+	return fmt.Sprintf("DotStarWithModifiers(%v, %v)",
+		n.Expr,
+		n.Modifiers,
+	)
+}
+
+func (n *ExpressionSubquery) String() string {
+	return fmt.Sprintf("ExpressionSubquery(%v, %v)",
+		n.Query,
+		n.Modifier,
+	)
+}
+
+func (n *ExtractExpression) String() string {
+	return fmt.Sprintf("ExtractExpression(%v, %v, %v)",
+		n.LHS,
+		n.RHS,
+		n.TimeZone,
+	)
+}
+
+func (n *IntervalExpr) String() string {
+	return fmt.Sprintf("IntervalExpr(%v, %v, %v)",
+		n.IntervalValue,
+		n.DatePartName,
+		n.DatePartNameTo,
+	)
+}
+
+func (n *NullOrder) String() string {
+	return fmt.Sprintf("NullOrder(%v)",
+		n.NullsFirst,
+	)
+}
+
+func (n *OnOrUsingClauseList) String() string {
+	return fmt.Sprintf("OnOrUsingClauseList(%v)",
+		n.List,
+	)
+}
+
+func (n *ParenthesizedJoin) String() string {
+	return fmt.Sprintf("ParenthesizedJoin(%v, %v)",
+		n.Join,
+		n.SampleClause,
+	)
+}
+
+func (n *PartitionBy) String() string {
+	return fmt.Sprintf("PartitionBy(%v)",
+		n.PartitioningExpressions,
+	)
+}
+
+func (n *SetOperation) String() string {
+	return fmt.Sprintf("SetOperation(%v, %v, %v)",
+		n.Inputs,
+		n.OpType,
+		n.Distinct,
+	)
+}
+
+func (n *StarExceptList) String() string {
+	return fmt.Sprintf("StarExceptList(%v)",
+		n.Identifiers,
+	)
+}
+
+func (n *StarModifiers) String() string {
+	return fmt.Sprintf("StarModifiers(%v, %v)",
+		n.ExceptList,
+		n.ReplaceItems,
+	)
+}
+
+func (n *StarReplaceItem) String() string {
+	return fmt.Sprintf("StarReplaceItem(%v, %v)",
+		n.Expression,
+		n.Alias,
+	)
+}
+
+func (n *StarWithModifiers) String() string {
+	return fmt.Sprintf("StarWithModifiers(%v)",
+		n.Modifiers,
+	)
+}
+
+func (n *TableSubquery) String() string {
+	return fmt.Sprintf("TableSubquery(%v, %v, %v, %v, %v)",
+		n.Subquery,
+		n.Alias,
+		n.PivotClause,
+		n.UnpivotClause,
+		n.SampleClause,
+	)
+}
+
+func (n *UnaryExpression) String() string {
+	return fmt.Sprintf("UnaryExpression(%v, %v)",
+		n.Op,
+		n.Operand,
+	)
+}
+
+func (n *UnnestExpression) String() string {
+	return fmt.Sprintf("UnnestExpression(%v)",
+		n.Expression,
+	)
+}
+
+func (n *WindowClause) String() string {
+	return fmt.Sprintf("WindowClause(%v)",
+		n.Windows,
+	)
+}
+
+func (n *WindowDefinition) String() string {
+	return fmt.Sprintf("WindowDefinition(%v, %v)",
+		n.Name,
+		n.WindowSpec,
+	)
+}
+
+func (n *WindowFrame) String() string {
+	return fmt.Sprintf("WindowFrame(%v, %v, %v)",
+		n.StartExpr,
+		n.EndExpr,
+		n.FrameUnit,
+	)
+}
+
+func (n *WindowFrameExpr) String() string {
+	return fmt.Sprintf("WindowFrameExpr(%v, %v)",
+		n.Expression,
+		n.BoundaryType,
+	)
+}
+
+func (n *LikeExpression) String() string {
+	return fmt.Sprintf("LikeExpression(%v, %v, %v)",
+		n.LHS,
+		n.InList,
+		n.IsNot,
+	)
+}
+
+func (n *WindowSpecification) String() string {
+	return fmt.Sprintf("WindowSpecification(%v, %v, %v, %v)",
+		n.BaseWindowName,
+		n.PartitionBy,
+		n.OrderBy,
+		n.WindowFrame,
+	)
+}
+
+func (n *WithOffset) String() string {
+	return fmt.Sprintf("WithOffset(%v)",
+		n.Alias,
+	)
+}
+
+func (n *TypeParameterList) String() string {
+	return fmt.Sprintf("TypeParameterList(%v)",
+		n.Parameters,
+	)
+}
+
+func (n *SampleClause) String() string {
+	return fmt.Sprintf("SampleClause(%v, %v, %v)",
+		n.SampleMethod,
+		n.SampleSize,
+		n.SampleSuffix,
+	)
+}
+
+func (n *SampleSize) String() string {
+	return fmt.Sprintf("SampleSize(%v, %v, %v)",
+		n.Size,
+		n.PartitionBy,
+		n.Unit,
+	)
+}
+
+func (n *SampleSuffix) String() string {
+	return fmt.Sprintf("SampleSuffix(%v, %v)",
+		n.Weight,
+		n.Repeat,
+	)
+}
+
+func (n *WithWeight) String() string {
+	return fmt.Sprintf("WithWeight(%v)",
+		n.Alias,
+	)
+}
+
+func (n *RepeatableClause) String() string {
+	return fmt.Sprintf("RepeatableClause(%v)",
+		n.Argument,
+	)
+}
+
+func (n *Qualify) String() string {
+	return fmt.Sprintf("Qualify(%v)",
+		n.Expression,
+	)
+}
+
+func (n *FormatClause) String() string {
+	return fmt.Sprintf("FormatClause(%v, %v)",
+		n.Format,
+		n.TimeZoneExpr,
+	)
+}
+
+func (n *ParameterExpr) String() string {
+	return fmt.Sprintf("ParameterExpr(%v)",
+		n.Name,
+	)
+}
+
+func (n *AnalyticFunctionCall) String() string {
+	return fmt.Sprintf("AnalyticFunctionCall(%v, %v)",
+		n.Expr,
+		n.WindowSpec,
+	)
 }
 
 type Visitor interface {

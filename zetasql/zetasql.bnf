@@ -768,6 +768,8 @@ Expression9:
       << ast.NewBinaryExpression($1, $0, $2, false) >>
     | Expression9 LikeOperator ParenthesizedInRHS
       << NewLikeBinaryExpression($1, $0, $2) >>
+    | Expression9 LikeOperator Expression8
+      << NewLikeBinaryExpression($1, $0, $2) >>
     | Expression9 InOperator UnnestExpression
       << NewInExpression($1, $0, $2) >>
     | Expression9 InOperator ParenthesizedInRHS
@@ -1027,7 +1029,7 @@ KeywordAsIdentifier:
     | extract
     | with
     | json
-    | left
+    /* | left */
     ;
 
 ExpressionSubquery:

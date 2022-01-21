@@ -1,6 +1,9 @@
 package parser
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/paulourio/bqfmt/zetasql/ast"
 	zerrors "github.com/paulourio/bqfmt/zetasql/errors"
 )
@@ -140,4 +143,47 @@ func NewOrExpr(lhs, rhs Attrib) (Attrib, error) {
 	}
 
 	return ast.NewOrExpr(List(lhs, rhs))
+}
+
+func NewFunctionCall(
+	expr, nulls, orderby, limit, closetok Attrib,
+) (Attrib, error) {
+	f, _ := getFunctionCall(expr)
+
+	if nulls != nil {
+		err := f.InitNullHandlingModifier(nulls)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if orderby != nil {
+		err := f.InitOrderBy(orderby)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if limit != nil {
+		err := f.InitLimitOffset(limit)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return UpdateLoc(f, closetok)
+}
+
+func getFunctionCall(v interface{}) (*ast.FunctionCall, ast.Loc) {
+	switch t := v.(type) {
+	case *ast.FunctionCall:
+		return t, ast.Loc{Start: t.StartLoc(), End: t.EndLoc()}
+	case *ast.Wrapped:
+		// Return the inner node but with the current location.
+		e, _ := getFunctionCall(t.Value)
+		return e, t.Loc
+	}
+
+	panic(fmt.Errorf("%w: could not get FunctionCall from %v",
+		zerrors.ErrMalformedParser, reflect.TypeOf(v)))
 }

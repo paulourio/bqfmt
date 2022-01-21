@@ -12,7 +12,7 @@ import (
 
 const (
 	numProductions = 374
-	numStates      = 8292
+	numStates      = 8277
 	numSymbols     = 309
 )
 

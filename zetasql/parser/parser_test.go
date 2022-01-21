@@ -17,6 +17,8 @@ import (
 )
 
 func TestParser(t *testing.T) {
+	t.Parallel()
+
 	testPath := "./testdata/"
 
 	st, err := os.Stat(testPath)
@@ -40,12 +42,14 @@ func TestParser(t *testing.T) {
 				}
 				return fs.SkipDir
 			}
-			if strings.HasSuffix(path, "function.test") {
+			if strings.HasSuffix(path, ".test") {
 				fmt.Printf("found %s\n", path)
+
 				d, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
 				}
+
 				runTest(t, path, string(d))
 			}
 			return nil
@@ -58,6 +62,7 @@ func TestParser(t *testing.T) {
 
 func runTest(t *testing.T, path string, input string) {
 	cases := strings.Split(input, "\n==\n")
+
 	for i, testCase := range cases {
 		name := fmt.Sprintf("%s:Case#%d", path, i+1)
 		elements := strings.Split(testCase+"\n", "\n--\n")

@@ -260,6 +260,8 @@ var lexerTestCases = []lexerTestCase{
 }
 
 func TestString(t *testing.T) {
+	t.Parallel()
+
 	for _, test := range lexerTestCases {
 		t.Run(fmt.Sprintf("%#v", test.input), func(t *testing.T) {
 			l := lexer.NewLexer([]byte(test.input))

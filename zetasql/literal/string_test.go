@@ -545,6 +545,8 @@ var invalidRawBytesCases = []bytesTestCase{
 }
 
 func TestParseingOfAllEscapeCharacters(t *testing.T) {
+	t.Parallel()
+
 	validEscapes := []byte{
 		'a', 'b', 'f', 'n', 'r', 't', 'v', '\\',
 		'?', '"', '\'', '`', 'u', 'U', 'x', 'X',
@@ -588,6 +590,8 @@ func TestParseingOfAllEscapeCharacters(t *testing.T) {
 	}
 }
 func TestParseHexEscapes(t *testing.T) {
+	t.Parallel()
+
 	for i := 0; i < 256; i++ {
 		lead := fmt.Sprintf("%X", i/16)[0]
 		end := fmt.Sprintf("%x", i%16)[0]
@@ -596,6 +600,7 @@ func TestParseHexEscapes(t *testing.T) {
 		testParseString(t, fmt.Sprintf(`'\X%c%c'`, lead, end))
 		testParseString(t, fmt.Sprintf(`'''\X%c%c'''`, lead, end))
 	}
+
 	runStringTestCases(t, hexTestCases)
 }
 
@@ -608,30 +613,37 @@ func TestParseOctalEscapes(t *testing.T) {
 		testParseString(t, fmt.Sprintf(`"%c%c%c"`, lead, mid, end))
 		testParseString(t, fmt.Sprintf(`'''%c%c%c'''`, lead, mid, end))
 	}
+
 	runStringTestCases(t, octalTestCases)
 }
 
 func TestInvalidBytes(t *testing.T) {
+	t.Parallel()
 	runBytesTestCases(t, invalidBytesCases)
 }
 
 func TestInvalidRawBytes(t *testing.T) {
+	t.Parallel()
 	runBytesTestCases(t, invalidRawBytesCases)
 }
 
 func TestInvalidString(t *testing.T) {
+	t.Parallel()
 	runStringTestCases(t, invalidStringTestCases)
 }
 
 func TestNewlines(t *testing.T) {
+	t.Parallel()
 	runStringTestCases(t, newlineTestCases)
 }
 
 func TestUTF8Unescape(t *testing.T) {
+	t.Parallel()
 	runStringTestCases(t, utf8UnescapeTestCases)
 }
 
 func TestUnescapeString(t *testing.T) {
+	t.Parallel()
 	runBytesTestCases(t, invalidBytesCases)
 }
 
@@ -641,6 +653,8 @@ func TestUnescapeError(t *testing.T) {
 }
 
 func TestValidRawString(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		``,
 		`1`,
