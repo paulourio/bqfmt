@@ -265,11 +265,3 @@ func NewWindowFrameExprOnlyWithType(
 
 	return UpdateLoc(e, a, b)
 }
-
-type allOrDistinctKeyword int
-
-const (
-	NoAllOrDistinctKeyword allOrDistinctKeyword = iota
-	AllKeyword
-	DistinctKeyword
-)

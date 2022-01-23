@@ -17,8 +17,6 @@ import (
 )
 
 func TestParser(t *testing.T) {
-	t.Parallel()
-
 	testPath := "./testdata/"
 
 	st, err := os.Stat(testPath)
@@ -42,7 +40,7 @@ func TestParser(t *testing.T) {
 				}
 				return fs.SkipDir
 			}
-			if strings.HasSuffix(path, ".test") {
+			if strings.HasSuffix(path, "struct.test") {
 				fmt.Printf("found %s\n", path)
 
 				d, err := os.ReadFile(path)
@@ -91,6 +89,8 @@ func runTest(t *testing.T, path string, input string) {
 		}
 
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			l := lexer.NewLexer(input).WithoutComment()
 			p := parser.NewParser()
 

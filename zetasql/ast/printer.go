@@ -26,7 +26,7 @@ func Sprint(node NodeHandler, opts *PrintOptions) string {
 			IdentifierStyle:         LowerCase,
 			KeywordStyle:            UpperCase,
 			TypeStyle:               UpperCase,
-			StringStyle:             AsIsStringStyle,
+			StringStyle:             PreferSingleQuote,
 			MultilineStringStyle:    AlwaysSingleQuote,
 		}
 	}
@@ -364,6 +364,41 @@ func (p *printer) VisitQuery(n *Query, d interface{}) {
 	root.print(pp.unnest())
 
 	p.print(root.unnest())
+}
+
+func (p *printer) VisitExpressionSubquery(
+	n *ExpressionSubquery, d interface{}) {
+	pp := p.nest()
+
+	pp.print(n.Modifier.ToSQL())
+	pp.print("(")
+
+	pp2 := pp.nest()
+	n.Query.Accept(pp2, d)
+	pp.print(pp2.unnest())
+
+	pp.print(")")
+	p.print(pp.unnest())
+}
+
+func (p *printer) VisitSetOperation(n *SetOperation, d interface{}) {
+	p.printOpenParenIfNeeded(n)
+
+	for i, query := range n.Inputs {
+		if i > 0 {
+			p.print(n.OpType.ToSQL())
+
+			if n.Distinct {
+				p.print("DISTINCT")
+			} else {
+				p.print("ALL")
+			}
+		}
+
+		query.Accept(p, d)
+	}
+
+	p.printCloseParenIfNeeded(n)
 }
 
 func (p *printer) VisitPartitionBy(n *PartitionBy, d interface{}) {
@@ -1178,29 +1213,6 @@ func (p *printer) VisitUsingClause(n *UsingClause, d interface{}) {
 	}
 
 	p.print(")")
-}
-
-func (p *printer) VisitExpressionSubquery(
-	n *ExpressionSubquery, d interface{}) {
-	pp := p.nest()
-
-	switch n.Modifier {
-	case ArraySubqueryModifier:
-		pp.print(pp.keyword("ARRAY"))
-	case ExistsSubqueryModifier:
-		pp.print(pp.keyword("EXISTS"))
-	case NoSubqueryModifier:
-	}
-
-	pp.print("(")
-
-	pp2 := pp.nest()
-	n.Query.Accept(pp2, d)
-	pp.print(pp2.unnest())
-
-	pp.print(")")
-
-	p.print(pp.unnest())
 }
 
 func (p *printer) VisitWithClause(n *WithClause, d interface{}) {

@@ -167,6 +167,23 @@ const (
 	ExistsSubqueryModifier                         // EXISTS(SELECT ...)
 )
 
+func (m SubqueryModifier) String() string {
+	return m.ToSQL()
+}
+
+func (m SubqueryModifier) ToSQL() string {
+	switch m {
+	case NoSubqueryModifier:
+		return ""
+	case ArraySubqueryModifier:
+		return "ARRAY"
+	case ExistsSubqueryModifier:
+		return "EXISTS"
+	}
+
+	panic("unknown subquery modifier")
+}
+
 type SetOp int
 
 const (
@@ -174,6 +191,23 @@ const (
 	Except                 // EXCEPT {ALL|DISTINCT}
 	Intersect              // INTERSECT {ALL|DISTINCt}
 )
+
+func (o SetOp) String() string {
+	return o.ToSQL()
+}
+
+func (o SetOp) ToSQL() string {
+	switch o {
+	case Union:
+		return "UNION"
+	case Except:
+		return "EXCEPT"
+	case Intersect:
+		return "INTERSECT"
+	}
+
+	panic("unknown set operation")
+}
 
 type BoundaryType int
 

@@ -69,6 +69,38 @@ func NewSubqueryOrInList(open, expr, close Attrib) (Attrib, error) {
 	}
 }
 
+func NewSetOperation(a, setop, allOrDistinct, b Attrib) (Attrib, error) {
+	var (
+		op ast.SetOp
+		distinct bool
+	)
+
+	if kw, ok := setop.(*ast.Wrapped); ok {
+		op = kw.Value.(ast.SetOp)
+	} else {
+		op = setop.(ast.SetOp)
+	}
+
+	if kw, ok := allOrDistinct.(*ast.Wrapped); ok {
+		distinct = kw.Value == DistinctKeyword
+	} else {
+		distinct = allOrDistinct.(allOrDistinctKeyword) == DistinctKeyword
+	}
+
+	if s, ok := a.(*ast.SetOperation); ok {
+		if s.OpType != op || s.Distinct != distinct {
+			return NewSyntaxError(
+				setop,
+				"Different set operations cannot be used in the same query "+
+				"without using parentheses for grouping")
+		}
+
+		return WithExtraChild(s, b)
+	}
+
+	return ast.NewSetOperation(List(a, b), op, distinct)
+}
+
 func NewTableSubquery(
 	open, query, close, pivotUnpivotAlias, sample Attrib) (Attrib, error) {
 	p := pivotUnpivotAlias.(*pivotOrUnpivotAndAlias)
@@ -148,3 +180,11 @@ func NewCastIntLiteralOrParam(
 
 	return UpdateLoc(e, cast, close)
 }
+
+type allOrDistinctKeyword int
+
+const (
+	NoAllOrDistinctKeyword allOrDistinctKeyword = iota
+	AllKeyword
+	DistinctKeyword
+)

@@ -84,90 +84,229 @@ boolean_literal: ('f'|'F')('a'|'A')('l'|'L')('s'|'S')('e'|'E')
                ;
 
 /* Case-insensitive words */
-all:        ('a'|'A')('l'|'L')('l'|'L') ;
-and:        ('a'|'A')('n'|'N')('d'|'D') ;
-array:      ('a'|'A')('r'|'R')('r'|'R')('a'|'A')('y'|'Y') ;
-as:         ('a'|'A')('s'|'S') ;
-asc:        ('a'|'A')('s'|'S')('c'|'C') ;
-at:         ('a'|'A')('t'|'T') ;
-between:    ('b'|'B')('e'|'E')('t'|'T')('w'|'W')('e'|'E')('e'|'E')('n'|'N') ;
-bigdecimal: ('b'|'B')('i'|'I')('g'|'G')('d'|'D')('e'|'E')('c'|'C')('i'|'I')('m'|'M')('a'|'A')('l'|'L') ;
-bignumeric: ('b'|'B')('i'|'I')('g'|'G')('n'|'N')('u'|'U')('m'|'M')('e'|'E')('r'|'R')('i'|'I')('c'|'C') ;
-by:         ('b'|'B')('y'|'Y') ;
-case:       ('c'|'C')('a'|'A')('s'|'S')('e'|'E') ;
-cast:       ('c'|'C')('a'|'A')('s'|'S')('t'|'T') ;
-cross:      ('c'|'C')('r'|'R')('o'|'O')('s'|'S')('s'|'S') ;
-current:    ('c'|'C')('u'|'U')('r'|'R')('r'|'R')('e'|'E')('n'|'N')('t'|'T') ;
-date:       ('d'|'D')('a'|'A')('t'|'T')('e'|'E') ;
-datetime:   ('d'|'D')('a'|'A')('t'|'T')('e'|'E')('t'|'T')('i'|'I')('m'|'M')('e'|'E') ;
-decimal:    ('d'|'D')('e'|'E')('c'|'C')('i'|'I')('m'|'M')('a'|'A')('l'|'L') ;
-desc:       ('d'|'D')('e'|'E')('s'|'S')('c'|'C') ;
-distinct:   ('d'|'D')('i'|'I')('s'|'S')('t'|'T')('i'|'I')('n'|'N')('c'|'C')('t'|'T') ;
-else:       ('e'|'E')('l'|'L')('s'|'S')('e'|'E') ;
-end:        ('e'|'E')('n'|'N')('d'|'D') ;
-except:     ('e'|'E')('x'|'X')('c'|'C')('e'|'E')('p'|'P')('t'|'T') ;
-extract:    ('e'|'E')('x'|'X')('t'|'T')('r'|'R')('a'|'A')('c'|'C')('t'|'T') ;
-exists:     ('e'|'E')('x'|'X')('i'|'I')('s'|'S')('t'|'T')('s'|'S');
-first:      ('f'|'F')('i'|'I')('r'|'R')('s'|'S')('t'|'T') ;
-following:  ('f'|'F')('o'|'O')('l'|'L')('l'|'L')('o'|'O')('w'|'W')('i'|'I')('n'|'N')('g'|'G') ;
-format:     ('f'|'F')('o'|'O')('r'|'R')('m'|'M')('a'|'A')('t'|'T') ;
-from:       ('f'|'F')('r'|'R')('o'|'O')('m'|'M') ;
-full:       ('f'|'F')('u'|'U')('l'|'L')('l'|'L') ;
-group:      ('g'|'G')('r'|'R')('o'|'O')('u'|'U')('p'|'P') ;
-having:     ('h'|'H')('a'|'A')('v'|'V')('i'|'I')('n'|'N')('g'|'G') ;
-ignore:     ('i'|'I')('g'|'G')('n'|'N')('o'|'O')('r'|'R')('e'|'E') ;
-in:         ('i'|'I')('n'|'N') ;
-inner:      ('i'|'I')('n'|'N')('n'|'N')('e'|'E')('r'|'R') ;
-intersect:  ('i'|'I')('n'|'N')('t'|'T')('e'|'E')('r'|'R')('s'|'S')('e'|'E')('c'|'C')('t'|'T') ;
-interval:   ('i'|'I')('n'|'N')('t'|'T')('e'|'E')('r'|'R')('v'|'V')('a'|'A')('l'|'L') ;
-is:         ('i'|'I')('s'|'S') ;
-join:       ('j'|'J')('o'|'O')('i'|'I')('n'|'N') ;
-json:       ('j'|'J')('s'|'S')('o'|'O')('n'|'N') ;
-last:       ('l'|'L')('a'|'A')('s'|'S')('t'|'T') ;
-left:       ('l'|'L')('e'|'E')('f'|'F')('t'|'T') ;
-like:       ('l'|'L')('i'|'I')('k'|'K')('e'|'E') ;
-limit:      ('l'|'L')('i'|'I')('m'|'M')('i'|'I')('t'|'T') ;
-not:        ('n'|'N')('o'|'O')('t'|'T') ;
-null:       ('n'|'N')('u'|'U')('l'|'L')('l'|'L') ;
-nulls:      ('n'|'N')('u'|'U')('l'|'L')('l'|'L')('s'|'S') ;
-numeric:    ('n'|'N')('u'|'U')('m'|'M')('e'|'E')('r'|'R')('i'|'I')('c'|'C') ;
-offset:     ('o'|'O')('f'|'F')('f'|'F')('s'|'S')('e'|'E')('t'|'T') ;
-on:         ('o'|'O')('n'|'N') ;
-or:         ('o'|'O')('r'|'R') ;
-order:      ('o'|'O')('r'|'R')('d'|'D')('e'|'E')('r'|'R') ;
-outer:      ('o'|'O')('u'|'U')('t'|'T')('e'|'E')('r'|'R') ;
-over:       ('o'|'O')('v'|'V')('e'|'E')('r'|'R') ;
-partition:  ('p'|'P')('a'|'A')('r'|'R')('t'|'T')('i'|'I')('t'|'T')('i'|'I')('o'|'O')('n'|'N') ;
-percent:    ('p'|'P')('e'|'E')('r'|'R')('c'|'C')('e'|'E')('n'|'N')('t'|'T') ;
-preceding:  ('p'|'P')('r'|'R')('e'|'E')('c'|'C')('e'|'E')('d'|'D')('i'|'I')('n'|'N')('g'|'G') ;
-proto:      ('p'|'P')('r'|'R')('o'|'O')('t'|'T')('o'|'O') ;
-qualify:    ('q'|'Q')('u'|'U')('a'|'A')('l'|'L')('i'|'I')('f'|'F')('y'|'Y') ;
-range:      ('r'|'R')('a'|'A')('n'|'N')('g'|'G')('e'|'E') ;
-repeatable: ('r'|'R')('e'|'E')('p'|'P')('e'|'E')('a'|'A')('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E') ;
-replace:    ('r'|'R')('e'|'E')('p'|'P')('l'|'L')('a'|'A')('c'|'C')('e'|'E') ;
-respect:    ('r'|'R')('e'|'E')('s'|'S')('p'|'P')('e'|'E')('c'|'C')('t'|'T') ;
-right:      ('r'|'R')('i'|'I')('g'|'G')('h'|'H')('t'|'T') ;
-rollup:     ('r'|'R')('o'|'O')('l'|'L')('l'|'L')('u'|'U')('p'|'P') ;
-row:        ('r'|'R')('o'|'O')('w'|'W') ;
-rows:       ('r'|'R')('o'|'O')('w'|'W')('s'|'S') ;
-safe_cast:  ('s'|'S')('a'|'A')('f'|'F')('e'|'E')'_'('c'|'C')('a'|'A')('s'|'S')('t'|'T') ;
-select:     ('s'|'S')('e'|'E')('l'|'L')('e'|'E')('c'|'C')('t'|'T') ;
-struct:     ('s'|'S')('t'|'T')('r'|'R')('u'|'U')('c'|'C')('t'|'T') ;
-tablesample: ('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E')('s'|'S')('a'|'A')('m'|'M')('p'|'P')('l'|'L')('e'|'E') ;
-then:       ('t'|'T')('h'|'H')('e'|'E')('n'|'N') ;
-time:       ('t'|'T')('i'|'I')('m'|'M')('e'|'E') ;
-timestamp:  ('t'|'T')('i'|'I')('m'|'M')('e'|'E')('s'|'S')('t'|'T')('a'|'A')('m'|'M')('p'|'P') ;
-to:         ('t'|'T')('o'|'O') ;
-unbounded:  ('u'|'U')('n'|'N')('b'|'B')('o'|'O')('u'|'U')('n'|'N')('d'|'D')('e'|'E')('d'|'D') ;
-union:      ('u'|'U')('n'|'N')('i'|'I')('o'|'O')('n'|'N') ;
-unnest:     ('u'|'U')('n'|'N')('n'|'N')('e'|'E')('s'|'S')('t'|'T') ;
-using:      ('u'|'U')('s'|'S')('i'|'I')('n'|'N')('g'|'G') ;
-weight:     ('w'|'W')('e'|'E')('i'|'I')('g'|'G')('h'|'H')('t'|'T') ;
-when:       ('w'|'W')('h'|'H')('e'|'E')('n'|'N') ;
-where:      ('w'|'W')('h'|'H')('e'|'E')('r'|'R')('e'|'E') ;
-window:     ('w'|'W')('i'|'I')('n'|'N')('d'|'D')('o'|'O')('w'|'W') ;
-with:       ('w'|'W')('i'|'I')('t'|'T')('h'|'H') ;
-zone:       ('z'|'Z')('o'|'O')('n'|'N')('e'|'E') ;
+abort:        ('a'|'A')('b'|'B')('o'|'O')('r'|'R')('t'|'T');
+access:       ('a'|'A')('c'|'C')('c'|'C')('e'|'E')('s'|'S')('s'|'S');
+action:       ('a'|'A')('c'|'C')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+add:          ('a'|'A')('d'|'D')('d'|'D');
+aggregate:    ('a'|'A')('g'|'G')('g'|'G')('r'|'R')('e'|'E')('g'|'G')('a'|'A')('t'|'T')('e'|'E');
+all:          ('a'|'A')('l'|'L')('l'|'L');
+alter:        ('a'|'A')('l'|'L')('t'|'T')('e'|'E')('r'|'R');
+analyze:      ('a'|'A')('n'|'N')('a'|'A')('l'|'L')('y'|'Y')('z'|'Z')('e'|'E');
+and:          ('a'|'A')('n'|'N')('d'|'D');
+anonymization: ('a'|'A')('n'|'N')('o'|'O')('n'|'N')('y'|'Y')('m'|'M')('i'|'I')('z'|'Z')('a'|'A')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+array:        ('a'|'A')('r'|'R')('r'|'R')('a'|'A')('y'|'Y');
+as:           ('a'|'A')('s'|'S');
+asc:          ('a'|'A')('s'|'S')('c'|'C');
+assert:       ('a'|'A')('s'|'S')('s'|'S')('e'|'E')('r'|'R')('t'|'T');
+at:           ('a'|'A')('t'|'T');
+batch:        ('b'|'B')('a'|'A')('t'|'T')('c'|'C')('h'|'H');
+begin:        ('b'|'B')('e'|'E')('g'|'G')('i'|'I')('n'|'N');
+between:      ('b'|'B')('e'|'E')('t'|'T')('w'|'W')('e'|'E')('e'|'E')('n'|'N');
+bigdecimal:   ('b'|'B')('i'|'I')('g'|'G')('d'|'D')('e'|'E')('c'|'C')('i'|'I')('m'|'M')('a'|'A')('l'|'L');
+bignumeric:   ('b'|'B')('i'|'I')('g'|'G')('n'|'N')('u'|'U')('m'|'M')('e'|'E')('r'|'R')('i'|'I')('c'|'C');
+break:        ('b'|'B')('r'|'R')('e'|'E')('a'|'A')('k'|'K');
+by:           ('b'|'B')('y'|'Y');
+call:         ('c'|'C')('a'|'A')('l'|'L')('l'|'L');
+cascade:      ('c'|'C')('a'|'A')('s'|'S')('c'|'C')('a'|'A')('d'|'D')('e'|'E');
+case:         ('c'|'C')('a'|'A')('s'|'S')('e'|'E');
+cast:         ('c'|'C')('a'|'A')('s'|'S')('t'|'T');
+check:        ('c'|'C')('h'|'H')('e'|'E')('c'|'C')('k'|'K');
+clamped:      ('c'|'C')('l'|'L')('a'|'A')('m'|'M')('p'|'P')('e'|'E')('d'|'D');
+clone:        ('c'|'C')('l'|'L')('o'|'O')('n'|'N')('e'|'E');
+cluster:      ('c'|'C')('l'|'L')('u'|'U')('s'|'S')('t'|'T')('e'|'E')('r'|'R');
+column:       ('c'|'C')('o'|'O')('l'|'L')('u'|'U')('m'|'M')('n'|'N');
+columns:      ('c'|'C')('o'|'O')('l'|'L')('u'|'U')('m'|'M')('n'|'N')('s'|'S');
+commit:       ('c'|'C')('o'|'O')('m'|'M')('m'|'M')('i'|'I')('t'|'T');
+connection:   ('c'|'C')('o'|'O')('n'|'N')('n'|'N')('e'|'E')('c'|'C')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+constant:     ('c'|'C')('o'|'O')('n'|'N')('s'|'S')('t'|'T')('a'|'A')('n'|'N')('t'|'T');
+constraint:   ('c'|'C')('o'|'O')('n'|'N')('s'|'S')('t'|'T')('r'|'R')('a'|'A')('i'|'I')('n'|'N')('t'|'T');
+continue:     ('c'|'C')('o'|'O')('n'|'N')('t'|'T')('i'|'I')('n'|'N')('u'|'U')('e'|'E');
+copy:         ('c'|'C')('o'|'O')('p'|'P')('y'|'Y');
+cross:        ('c'|'C')('r'|'R')('o'|'O')('s'|'S')('s'|'S');
+current:      ('c'|'C')('u'|'U')('r'|'R')('r'|'R')('e'|'E')('n'|'N')('t'|'T');
+data:         ('d'|'D')('a'|'A')('t'|'T')('a'|'A');
+database:     ('d'|'D')('a'|'A')('t'|'T')('a'|'A')('b'|'B')('a'|'A')('s'|'S')('e'|'E');
+date:         ('d'|'D')('a'|'A')('t'|'T')('e'|'E');
+datetime:     ('d'|'D')('a'|'A')('t'|'T')('e'|'E')('t'|'T')('i'|'I')('m'|'M')('e'|'E');
+decimal:      ('d'|'D')('e'|'E')('c'|'C')('i'|'I')('m'|'M')('a'|'A')('l'|'L');
+declare:      ('d'|'D')('e'|'E')('c'|'C')('l'|'L')('a'|'A')('r'|'R')('e'|'E');
+definer:      ('d'|'D')('e'|'E')('f'|'F')('i'|'I')('n'|'N')('e'|'E')('r'|'R');
+delete:       ('d'|'D')('e'|'E')('l'|'L')('e'|'E')('t'|'T')('e'|'E');
+desc:         ('d'|'D')('e'|'E')('s'|'S')('c'|'C');
+describe:     ('d'|'D')('e'|'E')('s'|'S')('c'|'C')('r'|'R')('i'|'I')('b'|'B')('e'|'E');
+descriptor:   ('d'|'D')('e'|'E')('s'|'S')('c'|'C')('r'|'R')('i'|'I')('p'|'P')('t'|'T')('o'|'O')('r'|'R');
+deterministic: ('d'|'D')('e'|'E')('t'|'T')('e'|'E')('r'|'R')('m'|'M')('i'|'I')('n'|'N')('i'|'I')('s'|'S')('t'|'T')('i'|'I')('c'|'C');
+distinct:     ('d'|'D')('i'|'I')('s'|'S')('t'|'T')('i'|'I')('n'|'N')('c'|'C')('t'|'T');
+do:           ('d'|'D')('o'|'O');
+drop:         ('d'|'D')('r'|'R')('o'|'O')('p'|'P');
+else:         ('e'|'E')('l'|'L')('s'|'S')('e'|'E');
+elseif:       ('e'|'E')('l'|'L')('s'|'S')('e'|'E')('i'|'I')('f'|'F');
+end:          ('e'|'E')('n'|'N')('d'|'D');
+enforced:     ('e'|'E')('n'|'N')('f'|'F')('o'|'O')('r'|'R')('c'|'C')('e'|'E')('d'|'D');
+error_:       ('e'|'E')('r'|'R')('r'|'R')('o'|'O')('r'|'R');
+except:       ('e'|'E')('x'|'X')('c'|'C')('e'|'E')('p'|'P')('t'|'T');
+exception:    ('e'|'E')('x'|'X')('c'|'C')('e'|'E')('p'|'P')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+execute:      ('e'|'E')('x'|'X')('e'|'E')('c'|'C')('u'|'U')('t'|'T')('e'|'E');
+exists:       ('e'|'E')('x'|'X')('i'|'I')('s'|'S')('t'|'T')('s'|'S');
+explain:      ('e'|'E')('x'|'X')('p'|'P')('l'|'L')('a'|'A')('i'|'I')('n'|'N');
+export:       ('e'|'E')('x'|'X')('p'|'P')('o'|'O')('r'|'R')('t'|'T');
+external:     ('e'|'E')('x'|'X')('t'|'T')('e'|'E')('r'|'R')('n'|'N')('a'|'A')('l'|'L');
+extract:      ('e'|'E')('x'|'X')('t'|'T')('r'|'R')('a'|'A')('c'|'C')('t'|'T');
+files:        ('f'|'F')('i'|'I')('l'|'L')('e'|'E')('s'|'S');
+fill:         ('f'|'F')('i'|'I')('l'|'L')('l'|'L');
+filter_fields: ('f'|'F')('i'|'I')('l'|'L')('t'|'T')('e'|'E')('r'|'R')('_'|'_')('f'|'F')('i'|'I')('e'|'E')('l'|'L')('d'|'D')('s'|'S');
+filter:       ('f'|'F')('i'|'I')('l'|'L')('t'|'T')('e'|'E')('r'|'R');
+first:        ('f'|'F')('i'|'I')('r'|'R')('s'|'S')('t'|'T');
+following:    ('f'|'F')('o'|'O')('l'|'L')('l'|'L')('o'|'O')('w'|'W')('i'|'I')('n'|'N')('g'|'G');
+foreign:      ('f'|'F')('o'|'O')('r'|'R')('e'|'E')('i'|'I')('g'|'G')('n'|'N');
+format:       ('f'|'F')('o'|'O')('r'|'R')('m'|'M')('a'|'A')('t'|'T');
+from:         ('f'|'F')('r'|'R')('o'|'O')('m'|'M');
+full:         ('f'|'F')('u'|'U')('l'|'L')('l'|'L');
+function:     ('f'|'F')('u'|'U')('n'|'N')('c'|'C')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+generated:    ('g'|'G')('e'|'E')('n'|'N')('e'|'E')('r'|'R')('a'|'A')('t'|'T')('e'|'E')('d'|'D');
+grant:        ('g'|'G')('r'|'R')('a'|'A')('n'|'N')('t'|'T');
+group_rows:   ('g'|'G')('r'|'R')('o'|'O')('u'|'U')('p'|'P')('_'|'_')('r'|'R')('o'|'O')('w'|'W')('s'|'S');
+group:        ('g'|'G')('r'|'R')('o'|'O')('u'|'U')('p'|'P');
+having:       ('h'|'H')('a'|'A')('v'|'V')('i'|'I')('n'|'N')('g'|'G');
+hidden:       ('h'|'H')('i'|'I')('d'|'D')('d'|'D')('e'|'E')('n'|'N');
+ignore:       ('i'|'I')('g'|'G')('n'|'N')('o'|'O')('r'|'R')('e'|'E');
+immediate:    ('i'|'I')('m'|'M')('m'|'M')('e'|'E')('d'|'D')('i'|'I')('a'|'A')('t'|'T')('e'|'E');
+immutable:    ('i'|'I')('m'|'M')('m'|'M')('u'|'U')('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E');
+import_:      ('i'|'I')('m'|'M')('p'|'P')('o'|'O')('r'|'R')('t'|'T');
+in:           ('i'|'I')('n'|'N');
+include:      ('i'|'I')('n'|'N')('c'|'C')('l'|'L')('u'|'U')('d'|'D')('e'|'E');
+index:        ('i'|'I')('n'|'N')('d'|'D')('e'|'E')('x'|'X');
+inner:        ('i'|'I')('n'|'N')('n'|'N')('e'|'E')('r'|'R');
+inout:        ('i'|'I')('n'|'N')('o'|'O')('u'|'U')('t'|'T');
+insert:       ('i'|'I')('n'|'N')('s'|'S')('e'|'E')('r'|'R')('t'|'T');
+intersect:    ('i'|'I')('n'|'N')('t'|'T')('e'|'E')('r'|'R')('s'|'S')('e'|'E')('c'|'C')('t'|'T');
+interval:     ('i'|'I')('n'|'N')('t'|'T')('e'|'E')('r'|'R')('v'|'V')('a'|'A')('l'|'L');
+invoker:      ('i'|'I')('n'|'N')('v'|'V')('o'|'O')('k'|'K')('e'|'E')('r'|'R');
+is:           ('i'|'I')('s'|'S');
+isolation:    ('i'|'I')('s'|'S')('o'|'O')('l'|'L')('a'|'A')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+iterate:      ('i'|'I')('t'|'T')('e'|'E')('r'|'R')('a'|'A')('t'|'T')('e'|'E');
+join:         ('j'|'J')('o'|'O')('i'|'I')('n'|'N');
+json:         ('j'|'J')('s'|'S')('o'|'O')('n'|'N');
+key:          ('k'|'K')('e'|'E')('y'|'Y');
+language:     ('l'|'L')('a'|'A')('n'|'N')('g'|'G')('u'|'U')('a'|'A')('g'|'G')('e'|'E');
+last:         ('l'|'L')('a'|'A')('s'|'S')('t'|'T');
+leave:        ('l'|'L')('e'|'E')('a'|'A')('v'|'V')('e'|'E');
+left:         ('l'|'L')('e'|'E')('f'|'F')('t'|'T');
+level:        ('l'|'L')('e'|'E')('v'|'V')('e'|'E')('l'|'L');
+like:         ('l'|'L')('i'|'I')('k'|'K')('e'|'E');
+limit:        ('l'|'L')('i'|'I')('m'|'M')('i'|'I')('t'|'T');
+load:         ('l'|'L')('o'|'O')('a'|'A')('d'|'D');
+loop:         ('l'|'L')('o'|'O')('o'|'O')('p'|'P');
+match:        ('m'|'M')('a'|'A')('t'|'T')('c'|'C')('h'|'H');
+matched:      ('m'|'M')('a'|'A')('t'|'T')('c'|'C')('h'|'H')('e'|'E')('d'|'D');
+materialized: ('m'|'M')('a'|'A')('t'|'T')('e'|'E')('r'|'R')('i'|'I')('a'|'A')('l'|'L')('i'|'I')('z'|'Z')('e'|'E')('d'|'D');
+max:          ('m'|'M')('a'|'A')('x'|'X');
+message:      ('m'|'M')('e'|'E')('s'|'S')('s'|'S')('a'|'A')('g'|'G')('e'|'E');
+min:          ('m'|'M')('i'|'I')('n'|'N');
+model:        ('m'|'M')('o'|'O')('d'|'D')('e'|'E')('l'|'L');
+module:       ('m'|'M')('o'|'O')('d'|'D')('u'|'U')('l'|'L')('e'|'E');
+not:          ('n'|'N')('o'|'O')('t'|'T');
+null:         ('n'|'N')('u'|'U')('l'|'L')('l'|'L');
+nulls:        ('n'|'N')('u'|'U')('l'|'L')('l'|'L')('s'|'S');
+numeric:      ('n'|'N')('u'|'U')('m'|'M')('e'|'E')('r'|'R')('i'|'I')('c'|'C');
+offset:       ('o'|'O')('f'|'F')('f'|'F')('s'|'S')('e'|'E')('t'|'T');
+on:           ('o'|'O')('n'|'N');
+only:         ('o'|'O')('n'|'N')('l'|'L')('y'|'Y');
+options:      ('o'|'O')('p'|'P')('t'|'T')('i'|'I')('o'|'O')('n'|'N')('s'|'S');
+or:           ('o'|'O')('r'|'R');
+order:        ('o'|'O')('r'|'R')('d'|'D')('e'|'E')('r'|'R');
+out:          ('o'|'O')('u'|'U')('t'|'T');
+outer:        ('o'|'O')('u'|'U')('t'|'T')('e'|'E')('r'|'R');
+over:         ('o'|'O')('v'|'V')('e'|'E')('r'|'R');
+overwrite:    ('o'|'O')('v'|'V')('e'|'E')('r'|'R')('w'|'W')('r'|'R')('i'|'I')('t'|'T')('e'|'E');
+partition:    ('p'|'P')('a'|'A')('r'|'R')('t'|'T')('i'|'I')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+percent:      ('p'|'P')('e'|'E')('r'|'R')('c'|'C')('e'|'E')('n'|'N')('t'|'T');
+pivot:        ('p'|'P')('i'|'I')('v'|'V')('o'|'O')('t'|'T');
+policies:     ('p'|'P')('o'|'O')('l'|'L')('i'|'I')('c'|'C')('i'|'I')('e'|'E')('s'|'S');
+policy:       ('p'|'P')('o'|'O')('l'|'L')('i'|'I')('c'|'C')('y'|'Y');
+preceding:    ('p'|'P')('r'|'R')('e'|'E')('c'|'C')('e'|'E')('d'|'D')('i'|'I')('n'|'N')('g'|'G');
+primary:      ('p'|'P')('r'|'R')('i'|'I')('m'|'M')('a'|'A')('r'|'R')('y'|'Y');
+private:      ('p'|'P')('r'|'R')('i'|'I')('v'|'V')('a'|'A')('t'|'T')('e'|'E');
+privilege:    ('p'|'P')('r'|'R')('i'|'I')('v'|'V')('i'|'I')('l'|'L')('e'|'E')('g'|'G')('e'|'E');
+privileges:   ('p'|'P')('r'|'R')('i'|'I')('v'|'V')('i'|'I')('l'|'L')('e'|'E')('g'|'G')('e'|'E')('s'|'S');
+procedure:    ('p'|'P')('r'|'R')('o'|'O')('c'|'C')('e'|'E')('d'|'D')('u'|'U')('r'|'R')('e'|'E');
+proto:        ('p'|'P')('r'|'R')('o'|'O')('t'|'T')('o'|'O');
+public:       ('p'|'P')('u'|'U')('b'|'B')('l'|'L')('i'|'I')('c'|'C');
+qualify:      ('q'|'Q')('u'|'U')('a'|'A')('l'|'L')('i'|'I')('f'|'F')('y'|'Y');
+raise:        ('r'|'R')('a'|'A')('i'|'I')('s'|'S')('e'|'E');
+range:        ('r'|'R')('a'|'A')('n'|'N')('g'|'G')('e'|'E');
+read:         ('r'|'R')('e'|'E')('a'|'A')('d'|'D');
+references:   ('r'|'R')('e'|'E')('f'|'F')('e'|'E')('r'|'R')('e'|'E')('n'|'N')('c'|'C')('e'|'E')('s'|'S');
+remote:       ('r'|'R')('e'|'E')('m'|'M')('o'|'O')('t'|'T')('e'|'E');
+remove:       ('r'|'R')('e'|'E')('m'|'M')('o'|'O')('v'|'V')('e'|'E');
+rename:       ('r'|'R')('e'|'E')('n'|'N')('a'|'A')('m'|'M')('e'|'E');
+repeat:       ('r'|'R')('e'|'E')('p'|'P')('e'|'E')('a'|'A')('t'|'T');
+repeatable:   ('r'|'R')('e'|'E')('p'|'P')('e'|'E')('a'|'A')('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E');
+replace_fields: ('r'|'R')('e'|'E')('p'|'P')('l'|'L')('a'|'A')('c'|'C')('e'|'E')('_'|'_')('f'|'F')('i'|'I')('e'|'E')('l'|'L')('d'|'D')('s'|'S');
+replace:      ('r'|'R')('e'|'E')('p'|'P')('l'|'L')('a'|'A')('c'|'C')('e'|'E');
+respect:      ('r'|'R')('e'|'E')('s'|'S')('p'|'P')('e'|'E')('c'|'C')('t'|'T');
+restrict:     ('r'|'R')('e'|'E')('s'|'S')('t'|'T')('r'|'R')('i'|'I')('c'|'C')('t'|'T');
+restriction:  ('r'|'R')('e'|'E')('s'|'S')('t'|'T')('r'|'R')('i'|'I')('c'|'C')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+return:       ('r'|'R')('e'|'E')('t'|'T')('u'|'U')('r'|'R')('n'|'N');
+returns:      ('r'|'R')('e'|'E')('t'|'T')('u'|'U')('r'|'R')('n'|'N')('s'|'S');
+revoke:       ('r'|'R')('e'|'E')('v'|'V')('o'|'O')('k'|'K')('e'|'E');
+right:        ('r'|'R')('i'|'I')('g'|'G')('h'|'H')('t'|'T');
+rollback:     ('r'|'R')('o'|'O')('l'|'L')('l'|'L')('b'|'B')('a'|'A')('c'|'C')('k'|'K');
+rollup:       ('r'|'R')('o'|'O')('l'|'L')('l'|'L')('u'|'U')('p'|'P');
+row:          ('r'|'R')('o'|'O')('w'|'W');
+rows:         ('r'|'R')('o'|'O')('w'|'W')('s'|'S');
+run:          ('r'|'R')('u'|'U')('n'|'N');
+safe_cast:    ('s'|'S')('a'|'A')('f'|'F')('e'|'E')'_'('c'|'C')('a'|'A')('s'|'S')('t'|'T');
+schema:       ('s'|'S')('c'|'C')('h'|'H')('e'|'E')('m'|'M')('a'|'A');
+search:       ('s'|'S')('e'|'E')('a'|'A')('r'|'R')('c'|'C')('h'|'H');
+security:     ('s'|'S')('e'|'E')('c'|'C')('u'|'U')('r'|'R')('i'|'I')('t'|'T')('y'|'Y');
+select:       ('s'|'S')('e'|'E')('l'|'L')('e'|'E')('c'|'C')('t'|'T');
+show:         ('s'|'S')('h'|'H')('o'|'O')('w'|'W');
+simple:       ('s'|'S')('i'|'I')('m'|'M')('p'|'P')('l'|'L')('e'|'E');
+snapshot:     ('s'|'S')('n'|'N')('a'|'A')('p'|'P')('s'|'S')('h'|'H')('o'|'O')('t'|'T');
+source:       ('s'|'S')('o'|'O')('u'|'U')('r'|'R')('c'|'C')('e'|'E');
+sql:          ('s'|'S')('q'|'Q')('l'|'L');
+stable:       ('s'|'S')('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E');
+start:        ('s'|'S')('t'|'T')('a'|'A')('r'|'R')('t'|'T');
+stored:       ('s'|'S')('t'|'T')('o'|'O')('r'|'R')('e'|'E')('d'|'D');
+storing:      ('s'|'S')('t'|'T')('o'|'O')('r'|'R')('i'|'I')('n'|'N')('g'|'G');
+struct:       ('s'|'S')('t'|'T')('r'|'R')('u'|'U')('c'|'C')('t'|'T');
+system_time:  ('s'|'S')('y'|'Y')('s'|'S')('t'|'T')('e'|'E')('m'|'M')('_'|'_')('t'|'T')('i'|'I')('m'|'M')('e'|'E');
+system:       ('s'|'S')('y'|'Y')('s'|'S')('t'|'T')('e'|'E')('m'|'M');
+table:        ('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E');
+tablesample:  ('t'|'T')('a'|'A')('b'|'B')('l'|'L')('e'|'E')('s'|'S')('a'|'A')('m'|'M')('p'|'P')('l'|'L')('e'|'E');
+target:       ('t'|'T')('a'|'A')('r'|'R')('g'|'G')('e'|'E')('t'|'T');
+temp:         ('t'|'T')('e'|'E')('m'|'M')('p'|'P');
+temporary:    ('t'|'T')('e'|'E')('m'|'M')('p'|'P')('o'|'O')('r'|'R')('a'|'A')('r'|'R')('y'|'Y');
+then:         ('t'|'T')('h'|'H')('e'|'E')('n'|'N');
+time:         ('t'|'T')('i'|'I')('m'|'M')('e'|'E');
+timestamp:    ('t'|'T')('i'|'I')('m'|'M')('e'|'E')('s'|'S')('t'|'T')('a'|'A')('m'|'M')('p'|'P');
+to:           ('t'|'T')('o'|'O');
+transaction:  ('t'|'T')('r'|'R')('a'|'A')('n'|'N')('s'|'S')('a'|'A')('c'|'C')('t'|'T')('i'|'I')('o'|'O')('n'|'N');
+transform:    ('t'|'T')('r'|'R')('a'|'A')('n'|'N')('s'|'S')('f'|'F')('o'|'O')('r'|'R')('m'|'M');
+truncate:     ('t'|'T')('r'|'R')('u'|'U')('n'|'N')('c'|'C')('a'|'A')('t'|'T')('e'|'E');
+type:         ('t'|'T')('y'|'Y')('p'|'P')('e'|'E');
+unbounded:    ('u'|'U')('n'|'N')('b'|'B')('o'|'O')('u'|'U')('n'|'N')('d'|'D')('e'|'E')('d'|'D');
+union:        ('u'|'U')('n'|'N')('i'|'I')('o'|'O')('n'|'N');
+unique:       ('u'|'U')('n'|'N')('i'|'I')('q'|'Q')('u'|'U')('e'|'E');
+unnest:       ('u'|'U')('n'|'N')('n'|'N')('e'|'E')('s'|'S')('t'|'T');
+unpivot:      ('u'|'U')('n'|'N')('p'|'P')('i'|'I')('v'|'V')('o'|'O')('t'|'T');
+until:        ('u'|'U')('n'|'N')('t'|'T')('i'|'I')('l'|'L');
+update:       ('u'|'U')('p'|'P')('d'|'D')('a'|'A')('t'|'T')('e'|'E');
+using:        ('u'|'U')('s'|'S')('i'|'I')('n'|'N')('g'|'G');
+value:        ('v'|'V')('a'|'A')('l'|'L')('u'|'U')('e'|'E');
+values:       ('v'|'V')('a'|'A')('l'|'L')('u'|'U')('e'|'E')('s'|'S');
+view:         ('v'|'V')('i'|'I')('e'|'E')('w'|'W');
+views:        ('v'|'V')('i'|'I')('e'|'E')('w'|'W')('s'|'S');
+volatile:     ('v'|'V')('o'|'O')('l'|'L')('a'|'A')('t'|'T')('i'|'I')('l'|'L')('e'|'E');
+weight:       ('w'|'W')('e'|'E')('i'|'I')('g'|'G')('h'|'H')('t'|'T');
+when:         ('w'|'W')('h'|'H')('e'|'E')('n'|'N');
+where:        ('w'|'W')('h'|'H')('e'|'E')('r'|'R')('e'|'E');
+while:        ('w'|'W')('h'|'H')('i'|'I')('l'|'L')('e'|'E');
+window:       ('w'|'W')('i'|'I')('n'|'N')('d'|'D')('o'|'O')('w'|'W');
+with:         ('w'|'W')('i'|'I')('t'|'T')('h'|'H');
+write:        ('w'|'W')('r'|'R')('i'|'I')('t'|'T')('e'|'E');
+zone:         ('z'|'Z')('o'|'O')('n'|'N')('e'|'E');
 
 comment: '-''-'{_single_line_comment_char}['\n']
        | '#'{_single_line_comment_char}['\n']
@@ -253,6 +392,11 @@ Query:
       OptOrderByClause
       OptLimitOffsetClause
       << ast.NewQuery(nil, $0, $1, $2) >>
+    | WithClause "," select
+      << NewSyntaxError(
+             $1,
+             "Trailing comma after the WITH clause before the "+
+             "SELECT clause is not allowed") >>
     ;
 
 /* Query variant to resolve ambiguous case.
@@ -272,14 +416,21 @@ QueryMaybeExpression:
       OptOrderByClause
       OptLimitOffsetClause
       << ast.NewQuery(nil, $0, $1, $2) >>
+    | WithClause "," select
+      << NewSyntaxError(
+             $1,
+             "Trailing comma after the WITH clause before the "+
+             "SELECT clause is not allowed") >>
     ;
 
 QueryPrimaryOrSetOperation:
       QueryPrimary
+    | QuerySetOperation
     ;
 
 QueryPrimaryOrSetOperationMaybeExpression:
       QueryPrimaryMaybeExpression
+    | QuerySetOperationMaybeExpression
     ;
 
 QueryPrimary:
@@ -293,6 +444,40 @@ QueryPrimaryMaybeExpression:
     | Expression
       /* We require that Expression is an ExpressionSubquery. */
       << ValidateParenthesizedSubquery($0) >>
+    ;
+
+QuerySetOperation:
+      QuerySetOperationPrefix
+    ;
+
+QuerySetOperationPrefix:
+      QueryPrimary QuerySetOperationType AllOrDistinct QueryPrimary
+      << NewSetOperation($0, $1, $2, $3) >>
+    | QuerySetOperationPrefix QuerySetOperationType AllOrDistinct QueryPrimary
+      << NewSetOperation($0, $1, $2, $3) >>
+    ;
+
+QuerySetOperationMaybeExpression:
+      QuerySetOperationPrefixMaybeExpression
+    ;
+
+QuerySetOperationPrefixMaybeExpression:
+      QueryPrimaryMaybeExpression
+      QuerySetOperationType
+      AllOrDistinct
+      QueryPrimary
+      << NewSetOperation($0, $1, $2, $3) >>
+    | QuerySetOperationPrefixMaybeExpression
+      QuerySetOperationType
+      AllOrDistinct
+      QueryPrimary
+      << NewSetOperation($0, $1, $2, $3) >>
+    ;
+
+QuerySetOperationType:
+      union       << WrapWithLoc(ast.Union, $0) >>
+    | except      << WrapWithLoc(ast.Except, $0) >>
+    | intersect   << WrapWithLoc(ast.Intersect, $0) >>
     ;
 
 Select:
@@ -400,9 +585,13 @@ WhereClause:
     ;
 
 OptAllOrDistinct:
+      AllOrDistinct
+    | empty     << NoAllOrDistinctKeyword, nil >>
+    ;
+
+AllOrDistinct:
       all       << WrapWithLoc(AllKeyword, $0) >>
     | distinct  << WrapWithLoc(DistinctKeyword, $0) >>
-    | empty     << NoAllOrDistinctKeyword, nil >>
     ;
 
 OptSelectAsClause:
@@ -1021,15 +1210,166 @@ Identifier:
     ;
 
 KeywordAsIdentifier:
-      date
-    | numeric
-    | decimal
-    | bignumeric
+      abort
+    | access
+    | action
+    | aggregate
+    | add
+    | alter
+    | anonymization
+    | analyze
+    | assert
+    | batch
+    | begin
     | bigdecimal
-    | extract
-    | with
+    | bignumeric
+    | break
+    | call
+    | cascade
+    | check
+    | clamped
+    | clone
+    | copy
+    | cluster
+    | column
+    | columns
+    | commit
+    | connection
+    | constant
+    | constraint
+    | continue
+    | data
+    | database
+    | date
+    | datetime
+    | decimal
+    | declare
+    | definer
+    | delete
+    | describe
+    | deterministic
+    | do
+    | drop
+    | elseif
+    | enforced
+    | error_
+    | exception
+    | execute
+    | explain
+    | export
+    | external
+    | files
+    | filter
+    | filter_fields
+    | fill
+    | first
+    | foreign
+    | format
+    | function
+    | generated
+    | grant
+    | group_rows
+    | hidden
+    | immediate
+    | immutable
+    | import_
+    | include
+    | index
+    | insert
+    | inout
+    | invoker
+    | isolation
+    | iterate
     | json
-    /* | left */
+    | key
+    | language
+    | last
+    | leave
+    | level
+    | load
+    | loop
+    | match
+    | matched
+    | materialized
+    | max
+    | message
+    | min
+    | model
+    | module
+    | numeric
+    | offset
+    | only
+    | options
+    | out
+    | overwrite
+    | percent
+    | pivot
+    | policies
+    | policy
+    | primary
+    | private
+    | privilege
+    | privileges
+    | procedure
+    | public
+    | qualify
+    | raise
+    | read
+    | references
+    | remote
+    | remove
+    | rename
+    | repeat
+    | repeatable
+    | replace
+    | replace_fields
+    | restrict
+    | restriction
+    | returns
+    | return
+    | revoke
+    | rollback
+    | row
+    | run
+    | safe_cast
+    | schema
+    | search
+    | security
+    | show
+    | simple
+    | snapshot
+    | source
+    | sql
+    | stable
+    | start
+    | stored
+    | storing
+    | system
+    | system_time
+    | table
+    | target
+    | temp
+    | temporary
+    | time
+    | timestamp
+    | transaction
+    | transform
+    | truncate
+    | type
+    | unique
+    | unpivot
+    | until
+    | update
+    | value
+    | values
+    | view
+    | views
+    | volatile
+    | weight
+    | while
+    | write
+    | zone
+    | descriptor
     ;
 
 ExpressionSubquery:
@@ -1461,30 +1801,14 @@ StructConstructorPrefixWithKeyword:
 
 StructConstructorPrefixWithKeywordNoArg:
       StructType "("
-      << ast.NewStructConstructorWithKeyword($0) >>
+      << NewStructConstructorWithKeyword($0) >>
     | struct "("
-      <<
-      func() (Attrib, error) {
-          t, err := ast.NewStructConstructorWithKeyword(nil)
-          if err != nil {
-              return nil, err
-          }
-          return UpdateLoc(t, $0)
-      }()
-      >>
+      << NewStructConstructorWithKeyword($0) >>
     ;
 
 StructConstructorPrefixWithoutKeyword:
       "(" Expression "," Expression
-      <<
-      func() (Attrib, error) {
-          t, err := ast.NewStructConstructorWithParens(List($1, $3))
-          if err != nil {
-              return nil, err
-          }
-          return UpdateLoc(t, $0)
-      }()
-      >>
+      << NewStructConstructorWithParens($0, $1, $3) >>
     | StructConstructorPrefixWithoutKeyword "," Expression
       << WithExtraChild($0, $2) >>
     ;
@@ -1504,16 +1828,7 @@ CaseExpression:
       CaseExpressionPrefix end
       << UpdateLoc($0, $1) >>
     | CaseExpressionPrefix else Expression end
-      <<
-      func() (Attrib, error) {
-          e, err := WithExtraChild($0, $2)
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $3)
-      }()
-      >>
+      << CaseExpressionWithElse($0, $2, $3) >>
     ;
 
 CaseExpressionPrefix:
@@ -1523,32 +1838,14 @@ CaseExpressionPrefix:
 
 CaseValueExpressionPrefix:
       case Expression when Expression then Expression
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewCaseValueExpression(List($1, $3, $5))
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewCaseValueExpression($0, $1, $3, $5) >>
     | CaseValueExpressionPrefix when Expression then Expression
       << WithExtraChildren($0, $2, $4) >>
     ;
 
 CaseNoValueExpressionPrefix:
       case when Expression then Expression
-      <<
-      func() (Attrib, error) {
-          e, err := ast.NewCaseNoValueExpression(List($2, $4))
-          if err != nil {
-              return nil, err
-          }
-
-          return UpdateLoc(e, $0)
-      }()
-      >>
+      << NewCaseNoValueExpression($0, $2, $4) >>
     | CaseNoValueExpressionPrefix when Expression then Expression
       << WithExtraChildren($0, $2, $4) >>
     ;

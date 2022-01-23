@@ -82,6 +82,11 @@ func (u *unparser) VisitQuery(n *Query, d interface{}) {
 		u.println("")
 		u.print("(")
 		u.incDepth()
+
+		if n.WithClause != nil {
+			n.WithClause.Accept(u, d)
+		}
+
 		n.QueryExpr.Accept(u, d)
 
 		if n.OrderBy != nil {
@@ -96,6 +101,10 @@ func (u *unparser) VisitQuery(n *Query, d interface{}) {
 		u.println("")
 		u.print(")")
 	} else {
+		if n.WithClause != nil {
+			n.WithClause.Accept(u, d)
+		}
+
 		n.QueryExpr.Accept(u, d)
 
 		if n.OrderBy != nil {
@@ -108,6 +117,58 @@ func (u *unparser) VisitQuery(n *Query, d interface{}) {
 	}
 
 	u.printCloseParenIfNeeded(n)
+}
+
+func (u *unparser) VisitExpressionSubquery(
+	n *ExpressionSubquery, d interface{}) {
+	u.print(n.Modifier.ToSQL())
+	u.print("(")
+	u.incDepth()
+	n.Query.Accept(u, d)
+	u.decDepth()
+	u.print(")")
+}
+
+func (u *unparser) VisitSetOperation(n *SetOperation, d interface{}) {
+	u.printOpenParenIfNeeded(n)
+
+	for i, query := range n.Inputs {
+		if i > 0 {
+			u.print(n.OpType.ToSQL())
+
+			if n.Distinct {
+				u.print("DISTINCT")
+			} else {
+				u.print("ALL")
+			}
+		}
+
+		query.Accept(u, d)
+	}
+
+	u.printCloseParenIfNeeded(n)
+}
+
+func (u *unparser) VisitWithClause(n *WithClause, d interface{}) {
+	u.println("WITH")
+	u.incDepth()
+
+	for i, with := range n.With {
+		if i > 0 {
+			u.println(",")
+		}
+
+		u.println("")
+		with.Alias.Accept(u, d)
+		u.print("AS (")
+		u.incDepth()
+		with.Query.Accept(u, d)
+		u.decDepth()
+		u.println("")
+		u.print(")")
+	}
+
+	u.decDepth()
 }
 
 func (u *unparser) VisitOrderBy(n *OrderBy, d interface{}) {

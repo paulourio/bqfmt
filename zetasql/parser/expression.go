@@ -6,6 +6,7 @@ import (
 
 	"github.com/paulourio/bqfmt/zetasql/ast"
 	zerrors "github.com/paulourio/bqfmt/zetasql/errors"
+	"github.com/paulourio/bqfmt/zetasql/token"
 )
 
 func SetExpressionParenthesized(open, expr, close Attrib) (Attrib, error) {
@@ -186,4 +187,54 @@ func getFunctionCall(v interface{}) (*ast.FunctionCall, ast.Loc) {
 
 	panic(fmt.Errorf("%w: could not get FunctionCall from %v",
 		zerrors.ErrMalformedParser, reflect.TypeOf(v)))
+}
+
+func NewStructConstructorWithKeyword(kw Attrib) (Attrib, error) {
+	if tok, ok := kw.(*token.Token); ok {
+		t, err := ast.NewStructConstructorWithKeyword(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		return UpdateLoc(t, tok)
+	}
+
+	return ast.NewStructConstructorWithKeyword(kw)
+}
+
+func NewStructConstructorWithParens(
+	open, field1, field2 Attrib) (Attrib, error) {
+	t, err := ast.NewStructConstructorWithParens(List(field1, field2))
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(t, open)
+}
+
+func NewCaseValueExpression(caseKw, value, when, then Attrib) (Attrib, error) {
+	e, err := ast.NewCaseValueExpression(List(value, when, then))
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(e, caseKw)
+}
+
+func NewCaseNoValueExpression(caseKw, when, then Attrib) (Attrib, error) {
+	e, err := ast.NewCaseNoValueExpression(List(when, then))
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(e, caseKw)
+}
+
+func CaseExpressionWithElse(expr, elseValue, end Attrib) (Attrib, error) {
+	e, err := WithExtraChild(expr, elseValue)
+	if err != nil {
+		return nil, err
+	}
+
+	return UpdateLoc(e, end)
 }

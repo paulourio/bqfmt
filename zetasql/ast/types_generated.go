@@ -347,7 +347,7 @@ type StructConstructorArg struct {
 type StructConstructorWithParens struct {
 	FieldExpressions []ExpressionHandler
 
-	Node
+	Expression
 }
 
 // StructConstructorWithKeyword is resulted from structs constructed
@@ -8379,7 +8379,7 @@ func (o *Operation) VisitStructConstructorArg(
 }
 func (o *Operation) VisitStructConstructorWithParens(
 	n *StructConstructorWithParens, d interface{}) {
-	o.visitor.VisitNodeHandler(n, d)
+	o.visitor.VisitExpressionHandler(n, d)
 }
 func (o *Operation) VisitStructConstructorWithKeyword(
 	n *StructConstructorWithKeyword, d interface{}) {

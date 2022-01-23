@@ -1,0 +1,28 @@
+
+select (1,2,3), ((1,2,3)), (((1,2,3)))
+--
+QueryStatement [0-38]
+  Query [0-38]
+    Select [0-38]
+      SelectList [7-38]
+        SelectColumn [7-14]
+          StructConstructorWithParens [7-14]
+            IntLiteral(1) [8-9]
+            IntLiteral(2) [10-11]
+            IntLiteral(3) [12-13]
+        SelectColumn [16-25]
+          StructConstructorWithParens [17-24]
+            IntLiteral(1) [18-19]
+            IntLiteral(2) [20-21]
+            IntLiteral(3) [22-23]
+        SelectColumn [27-38]
+          StructConstructorWithParens [29-36]
+            IntLiteral(1) [30-31]
+            IntLiteral(2) [32-33]
+            IntLiteral(3) [34-35]
+--
+SELECT
+  (1, 2, 3),
+  (1, 2, 3),
+  (1, 2, 3)
+==

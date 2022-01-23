@@ -579,7 +579,7 @@ def main():
 
     gen.add_node(
         name='StructConstructorWithParens',
-        composition='Node',
+        composition='Expression',
         comment=(
             'StructConstructorWithParens is resulted from structs '
             'constructed with (expr, expr, ...) with at least two '

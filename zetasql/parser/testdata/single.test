@@ -1,20 +1,5 @@
 
-select foo(100, (bar(200)))
+select case when a like 'something%' then 1 end,
 --
-QueryStatement [0-27]
-  Query [0-27]
-    Select [0-27]
-      SelectList [7-27]
-        SelectColumn [7-27]
-          FunctionCall [7-27]
-            PathExpression [7-10]
-              Identifier(foo) [7-10]
-            IntLiteral(100) [11-14]
-            FunctionCall [17-25]
-              PathExpression [17-20]
-                Identifier(bar) [17-20]
-              IntLiteral(200) [21-24]
---
-SELECT
-  foo(100, (bar(200)))
+
 ==

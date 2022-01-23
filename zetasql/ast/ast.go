@@ -310,6 +310,38 @@ func (n *Identifier) SingleNodeDebugString() string {
 		ToIdentifierLiteral(n.IDString))
 }
 
+func (n *ExpressionSubquery) SingleNodeDebugString() string {
+	var opts string
+	if n.Modifier != NoSubqueryModifier {
+		opts = fmt.Sprintf("(modifier=%v)", n.Modifier)
+	}
+
+	return fmt.Sprintf("%s%s", n.kind.String(), opts)
+}
+
+func (n *SetOperation) SingleNodeDebugString() string {
+	var opts string
+
+	op := n.GetSQLForOperation()
+	if op != "" {
+		opts = fmt.Sprintf("(%s)", op)
+	}
+
+	return fmt.Sprintf("%s%s", n.kind.String(), opts)
+}
+
+func (n *SetOperation) GetSQLForOperation() string {
+	var kw string
+
+	if n.Distinct {
+		kw = "DISTINCT"
+	} else {
+		kw = "ALL"
+	}
+
+	return fmt.Sprintf("%s %s", n.OpType.ToSQL(), kw)
+}
+
 func (n *Join) SingleNodeDebugString() string {
 	if n.JoinType == DefaultJoin {
 		return n.kind.String()

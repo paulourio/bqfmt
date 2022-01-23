@@ -1,7 +1,6 @@
 package literal
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -125,14 +124,14 @@ type unescaper struct {
 	isBytes   bool
 
 	// Working data
-	data   []byte // The string as bytes of slices.
-	quotes []byte // The quotes of the string.
+	data   []rune // The string as bytes of slices.
+	quotes []rune // The quotes of the string.
 	out    []rune // The output.
 	pos    int
 }
 
 func (u *unescaper) Unescape() (string, error) {
-	str := []byte(u.source)
+	str := []rune(u.source)
 	u.quotes, u.data = str[:u.quotesLen], str[u.quotesLen:]
 
 	if err := u.checkForClosingString(); err != nil {
@@ -172,6 +171,7 @@ func (u *unescaper) Unescape() (string, error) {
 func (u *unescaper) checkForClosingString() error {
 	// We need to walk byte for byte skipping unescaped characters.
 	isClosed := false
+	quotes := string(u.quotes)
 
 	for i := 0; i+u.quotesLen <= len(u.data); i++ {
 		if u.data[i] == '\\' {
@@ -180,10 +180,10 @@ func (u *unescaper) checkForClosingString() error {
 			continue
 		}
 
-		isClosing := bytes.HasPrefix(u.data[i:], u.quotes)
+		isClosing := strings.HasPrefix(string(u.data[i:]), quotes)
 		if isClosing && i+u.quotesLen < len(u.data) {
 			return &UnescapeError{
-				Msg:    "String cannot contain unescaped " + string(u.quotes),
+				Msg:    "String cannot contain unescaped " + quotes,
 				Offset: u.offset + i,
 			}
 		}
@@ -193,7 +193,7 @@ func (u *unescaper) checkForClosingString() error {
 
 	if !isClosed {
 		return &UnescapeError{
-			Msg:    "String must end with " + string(u.quotes),
+			Msg:    "String must end with " + quotes,
 			Offset: u.offset + len(u.data),
 		}
 	}
@@ -327,7 +327,7 @@ func (u *unescaper) consumeOctal() error {
 		}
 	}
 
-	value := byte(0)
+	value := rune(0)
 	octalEnd := u.pos + 2
 
 	for ; u.pos <= octalEnd; u.pos++ {
@@ -344,7 +344,7 @@ func (u *unescaper) consumeOctal() error {
 	}
 
 	u.pos = octalEnd + 1
-	u.out = append(u.out, rune(value))
+	u.out = append(u.out, value)
 
 	return nil
 }
@@ -370,7 +370,7 @@ func (u *unescaper) consumeHex() error {
 
 	values := make([]byte, hex.DecodedLen(2))
 
-	n, err := hex.Decode(values, u.data[hexStart:hexEnd])
+	n, err := hex.Decode(values, []byte(string(u.data[hexStart:hexEnd])))
 	if err != nil {
 		return &UnescapeError{
 			Msg: "Illegal escape sequence: Hex escape must be " +
@@ -468,7 +468,7 @@ func (u *unescaper) consumeUnicodeLongForm() error {
 
 	values := make([]byte, hex.DecodedLen(8))
 
-	n, err := hex.Decode(values, u.data[hexStart:hexEnd])
+	n, err := hex.Decode(values, []byte(string(u.data[hexStart:hexEnd])))
 	if err != nil {
 		return &UnescapeError{
 			Msg: "Illegal escape sequence: \\U must be followed " +
@@ -517,7 +517,7 @@ func (u *unescaper) consumeUnicodeLongForm() error {
 	return nil
 }
 
-func isOctalDigit(c byte) bool {
+func isOctalDigit(c rune) bool {
 	return c >= '0' && c <= '7'
 }
 
@@ -608,6 +608,7 @@ func Escape(src string, style StringStyle) string {
 		}
 	}
 
+	fmt.Println("Escaping ", src)
 	return quote + escape(src, rune(quote[0])) + quote
 }
 

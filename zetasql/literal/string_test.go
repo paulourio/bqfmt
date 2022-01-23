@@ -545,8 +545,6 @@ var invalidRawBytesCases = []bytesTestCase{
 }
 
 func TestParseingOfAllEscapeCharacters(t *testing.T) {
-	t.Parallel()
-
 	validEscapes := []byte{
 		'a', 'b', 'f', 'n', 'r', 't', 'v', '\\',
 		'?', '"', '\'', '`', 'u', 'U', 'x', 'X',
@@ -590,8 +588,6 @@ func TestParseingOfAllEscapeCharacters(t *testing.T) {
 	}
 }
 func TestParseHexEscapes(t *testing.T) {
-	t.Parallel()
-
 	for i := 0; i < 256; i++ {
 		lead := fmt.Sprintf("%X", i/16)[0]
 		end := fmt.Sprintf("%x", i%16)[0]
@@ -628,22 +624,18 @@ func TestInvalidRawBytes(t *testing.T) {
 }
 
 func TestInvalidString(t *testing.T) {
-	t.Parallel()
 	runStringTestCases(t, invalidStringTestCases)
 }
 
 func TestNewlines(t *testing.T) {
-	t.Parallel()
 	runStringTestCases(t, newlineTestCases)
 }
 
 func TestUTF8Unescape(t *testing.T) {
-	t.Parallel()
 	runStringTestCases(t, utf8UnescapeTestCases)
 }
 
 func TestUnescapeString(t *testing.T) {
-	t.Parallel()
 	runBytesTestCases(t, invalidBytesCases)
 }
 
@@ -674,6 +666,8 @@ func TestValidRawString(t *testing.T) {
 	for i, input := range cases {
 		name := fmt.Sprintf("#%d", i+1)
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			testRawStringValue(t, input)
 		})
 	}
@@ -736,6 +730,8 @@ func runStringTestCases(t *testing.T, tests []stringTestCase) {
 	for i, test := range tests {
 		name := fmt.Sprintf("#%d", i+1)
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, input := range test.Inputs {
 				result, err := literal.ParseString(input)
 				if !assert.Equal(t, test.Expected, result) ||
@@ -751,6 +747,8 @@ func runBytesTestCases(t *testing.T, tests []bytesTestCase) {
 	for i, test := range tests {
 		name := fmt.Sprintf("#%d", i+1)
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, input := range test.Inputs {
 				result, err := literal.ParseBytes(input)
 				var resultOk bool
