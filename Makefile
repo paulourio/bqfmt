@@ -1,3 +1,4 @@
+GOCC = ~/dev/gocc/gocc
 GOCCFLAGS = -a # -debug_parser
 
 .PHONY: build
@@ -27,4 +28,4 @@ zetasql/ast/types_generated.go: zetasql/ast/types_generated.go.j2 zetasql/ast/ge
 	cd zetasql/ast && python gen_types.py
 
 zetasql/parser/productionstable.go: zetasql/zetasql.bnf
-	cd zetasql && gocc $(GOCCFLAGS) zetasql.bnf
+	cd zetasql && $(GOCC) $(GOCCFLAGS) zetasql.bnf

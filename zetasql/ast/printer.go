@@ -3,6 +3,7 @@ package ast
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"strings"
 	"text/tabwriter"
 
@@ -18,7 +19,7 @@ func Sprint(node NodeHandler, opts *PrintOptions) string {
 
 	if opts == nil {
 		opts = &PrintOptions{
-			SoftMaxColumns:          80,
+			SoftMaxColumns:          70,
 			NewlineBeforeClause:     true,
 			AlignLogicalWithClauses: true,
 			Indentation:             2,
@@ -134,6 +135,8 @@ type formatter struct {
 	depth                  int
 	last                   rune
 	lastWasSingleCharUnary bool
+	// noFlushInNextFormat disables line flushing in the next call to Format()
+	noFlushInNextFormat bool
 }
 
 func (p *printer) String() string {
@@ -200,6 +203,32 @@ func (p *printer) unnestWithDepth(d int) string {
 	aligned = strings.ReplaceAll(aligned, "\n", "\n"+alignment)
 
 	return aligned
+}
+
+// printNestedWithSep receives a slice of NodeHandler items and print each
+// in a nested printer.
+func (p *printer) printNestedWithSep(
+	items interface{}, d interface{}, sep string) {
+	pp := p.nest()
+
+	list := reflect.ValueOf(items)
+
+	for i := 0; i < list.Len(); i++ {
+		if i > 0 {
+			pp.print(sep)
+		}
+
+		pp.visitNested(list.Index(i).Interface().(NodeHandler), d)
+	}
+
+	p.print(pp.unnest())
+}
+
+// visitNested visits a node with a nested printer.
+func (p *printer) visitNested(n NodeHandler, d interface{}) {
+	pp := p.nest()
+	n.Accept(pp, d)
+	p.print(pp.unnest())
 }
 
 func debugContent(s string) string {
@@ -317,53 +346,42 @@ func (p *printer) VisitLeafHandler(n LeafHandler, d interface{}) {
 }
 
 func (p *printer) VisitQuery(n *Query, d interface{}) {
-	root := p.nest()
+	p.printOpenParenIfNeeded(n)
+	p1 := p.nest()
 
 	if n.WithClause != nil {
-		n.WithClause.Accept(root, d)
-		root.println("\n")
+		n.WithClause.Accept(p1, d)
+		// Force an empty line after the WithClause.
+		p1.println("\n")
 	}
 
-	pp := p.nest()
-	pp.printOpenParenIfNeeded(n)
-
-	n.QueryExpr.Accept(pp, d)
+	n.QueryExpr.Accept(p1, d)
 
 	if n.OrderBy != nil {
-		pp.printClause(pp.keyword("ORDER") + " \v" + pp.keyword("BY"))
-
-		pp2 := p.nest()
-
-		for i, item := range n.OrderBy.OrderingExpression {
-			if i > 0 {
-				pp2.print(",")
-			}
-
-			item.Accept(pp2, d)
-		}
-
-		pp.print(pp2.unnest())
+		p1.printClause(p1.keyword("ORDER"))
+		p2 := p1.nest()
+		p2.print(p2.keyword("BY"))
+		p2.printNestedWithSep(n.OrderBy.OrderingExpressions, d, ",")
+		p1.print(p2.unnest())
 	}
 
 	if n.LimitOffset != nil {
-		pp.printClause(pp.keyword("LIMIT"))
+		p1.printClause(p1.keyword("LIMIT"))
 
-		pp2 := p.nest()
+		p2 := p1.nest()
 
-		n.LimitOffset.Limit.Accept(pp2, d)
+		n.LimitOffset.Limit.Accept(p2, d)
+
 		if n.LimitOffset.Offset != nil {
-			pp2.print(p.keyword("OFFSET"))
-			n.LimitOffset.Offset.Accept(pp2, d)
+			p2.print(p2.keyword("OFFSET"))
+			n.LimitOffset.Offset.Accept(p2, d)
 		}
 
-		pp.print(pp2.unnest())
+		p1.print(p2.unnest())
 	}
 
-	pp.printCloseParenIfNeeded(n)
-
-	root.print(pp.unnest())
-
-	p.print(root.unnest())
+	p1.printCloseParenIfNeeded(n)
+	p.print(p1.unnest())
 }
 
 func (p *printer) VisitExpressionSubquery(
@@ -372,11 +390,7 @@ func (p *printer) VisitExpressionSubquery(
 
 	pp.print(n.Modifier.ToSQL())
 	pp.print("(")
-
-	pp2 := pp.nest()
-	n.Query.Accept(pp2, d)
-	pp.print(pp2.unnest())
-
+	pp.visitNested(n.Query, d)
 	pp.print(")")
 	p.print(pp.unnest())
 }
@@ -389,9 +403,9 @@ func (p *printer) VisitSetOperation(n *SetOperation, d interface{}) {
 			p.print(n.OpType.ToSQL())
 
 			if n.Distinct {
-				p.print("DISTINCT")
+				p.print(p.keyword("DISTINCT"))
 			} else {
-				p.print("ALL")
+				p.print(p.keyword("ALL"))
 			}
 		}
 
@@ -402,43 +416,29 @@ func (p *printer) VisitSetOperation(n *SetOperation, d interface{}) {
 }
 
 func (p *printer) VisitPartitionBy(n *PartitionBy, d interface{}) {
-	kw := p.keyword("PARTITION") + " \v" + p.keyword("BY")
-
-	p.print(kw)
-
-	p.incDepth()
-
-	for i, item := range n.PartitioningExpressions {
-		if i > 0 {
-			p.print(",")
-		}
-
-		item.Accept(p, d)
+	if n.Parent().Kind() == QueryKind {
+		p.printClause(p.keyword("PARTITION"))
+	} else {
+		p.print(p.keyword("PARTITION"))
 	}
 
-	p.decDepth()
+	p1 := p.nest()
+	p1.print(p1.keyword("BY"))
+	p1.printNestedWithSep(n.PartitioningExpressions, d, ",")
+	p.print(p1.unnest())
 }
 
 func (p *printer) VisitOrderBy(n *OrderBy, d interface{}) {
-	kw := p.keyword("ORDER") + " \v" + p.keyword("BY")
-
 	if n.Parent().Kind() == QueryKind {
-		p.printClause(kw)
+		p.printClause(p.keyword("ORDER"))
 	} else {
-		p.print(kw)
+		p.print(p.keyword("ORDER"))
 	}
 
-	p.incDepth()
-
-	for i, item := range n.OrderingExpression {
-		if i > 0 {
-			p.print(",")
-		}
-
-		item.Accept(p, d)
-	}
-
-	p.decDepth()
+	p1 := p.nest()
+	p1.print(p1.keyword("BY"))
+	p1.printNestedWithSep(n.OrderingExpressions, d, ",")
+	p.print(p1.unnest())
 }
 
 func (p *printer) VisitOrderingExpression(
@@ -483,112 +483,104 @@ func (p *printer) VisitSelect(n *Select, d interface{}) {
 
 	pp.printOpenParenIfNeeded(n)
 
-	pp2 := p.nest()
-	pp2.printClause(pp.keyword("SELECT"))
+	pp2 := pp.nest()
+	pp2.printClause(pp2.keyword("SELECT"))
+
+	pp3 := pp2.nest()
 
 	if n.Distinct {
-		pp2.println("\v" + pp.keyword("DISTINCT"))
+		pp3.println(pp3.keyword("DISTINCT"))
 	}
 
-	n.SelectList.Accept(pp2, d)
-	pp.print(strings.Trim(pp2.String(), "\n"))
+	n.SelectList.Accept(pp3, d)
+	pp2.print(pp3.unnest())
 
 	if n.FromClause != nil {
-		pp.printClause(pp.keyword("FROM"))
-		pp2 := p.nest()
-		n.FromClause.Accept(pp2, d)
-		pp.print(pp2.unnest())
+		pp2.printClause(pp2.keyword("FROM"))
+		pp2.visitNested(n.FromClause, d)
 	}
 
 	if n.WhereClause != nil {
-		pp.printClause(pp.keyword("WHERE"))
+		pp2.printClause(pp2.keyword("WHERE"))
 
-		pp2 := pp.nest()
+		pp3 := pp2.nest()
 
 		// If the WHERE clause contains AND or OR, we will format them
 		// as if they were clauses, right-aligned with the WHERE clause.
 		if n.WhereClause.Expression.Kind() == AndExprKind {
 			bin := n.WhereClause.Expression.(*AndExpr)
+
 			for i, conjunct := range bin.Conjuncts {
 				if i > 0 {
 					if p.fmt.opts.AlignLogicalWithClauses {
 						// Clear buffer and write AND as a clause.
-						pp.print(pp2.unnest())
-						pp.printClause(pp.keyword("AND"))
+						pp2.print(pp3.unnest())
+						pp2.printClause(pp2.keyword("AND"))
 						// Create new nested builder.
-						pp2 = pp.nest()
+						pp3 = pp2.nest()
 					} else {
-						pp2.printClause(p.keyword("AND"))
+						pp2.printClause(pp2.keyword("AND"))
 					}
 				}
 
-				pp3 := pp.nest()
-				conjunct.Accept(pp3, d)
-				pp2.print(pp3.unnest())
+				pp3.visitNested(conjunct, d)
 			}
 		} else if n.WhereClause.Expression.Kind() == OrExprKind {
 			bin := n.WhereClause.Expression.(*OrExpr)
 			for i, disjunct := range bin.Disjuncts {
 				if i > 0 {
 					if p.fmt.opts.AlignLogicalWithClauses {
-						pp.print(pp2.unnest())
-						pp.printClause(p.keyword("OR"))
-						pp2 = pp.nest()
+						pp2.print(pp3.unnest())
+						pp2.printClause(pp2.keyword("OR"))
+						pp2 = pp2.nest()
 					} else {
-						pp2.printClause(p.keyword("OR"))
+						pp2.printClause(pp2.keyword("OR"))
 					}
 				}
 
-				pp3 := pp.nest()
-				disjunct.Accept(pp3, d)
-				pp2.print(pp3.unnest())
+				pp3.visitNested(disjunct, d)
 			}
 		} else {
-			n.WhereClause.Accept(pp2, d)
+			n.WhereClause.Accept(pp3, d)
 		}
 
-		pp.print(pp2.unnest())
+		pp2.print(pp3.unnest())
 	}
 
 	if n.GroupBy != nil {
-		pp.printClause(pp.keyword("GROUP") + " \v" + pp.keyword("BY"))
-		pp2 := p.nest()
-
-		for i, item := range n.GroupBy.GroupingItems {
-			if i > 0 {
-				pp2.print(",")
-			}
-
-			item.Expression.Accept(pp2, d)
-		}
-
-		pp.print(pp2.unnest())
+		pp2.printClause(pp2.keyword("GROUP") + " \v" + pp2.keyword("BY"))
+		pp3 := pp2.nest()
+		pp3.printNestedWithSep(n.GroupBy.GroupingItems, d, ",")
+		pp2.print(pp3.unnest())
 	}
 
 	if n.Having != nil {
-		pp.printClause(pp.keyword("HAVING"))
-		pp2 := p.nest()
-		n.Having.Expr.Accept(pp2, d)
-		pp.print(pp2.unnest())
+		pp2.printClause(pp2.keyword("HAVING"))
+		pp2.visitNested(n.Having, d)
 	}
 
 	if n.Qualify != nil {
-		pp.printClause(pp.keyword("QUALIFY"))
-		pp2 := p.nest()
-		n.Qualify.Accept(pp2, d)
-		pp.print(pp2.unnest())
+		pp2.printClause(pp2.keyword("QUALIFY"))
+		pp2.visitNested(n.Qualify, d)
 	}
 
 	if n.WindowClause != nil {
-		pp.printClause(pp.keyword("WINDOW"))
-		pp2 := p.nest()
-		n.WindowClause.Accept(pp2, d)
-		pp.print(pp2.unnest())
+		pp2.printClause(pp2.keyword("WINDOW"))
+		pp2.visitNested(n.WindowClause, d)
 	}
 
-	pp.println("")
-	pp.printCloseParenIfNeeded(n)
-	p.print(strings.Trim(pp.String(), "\n"))
+	// If this select is inside a Query node, we want to possibly align
+	// SELECT, FROM, WHERE and other clauses with Query's ORDER BY and LIMIT.
+	// Thus, we will not unnest is this case.
+	if n.Parent() != nil && n.Parent().Kind() == QueryKind {
+		pp.print(pp2.String())
+		p.print(pp.String())
+	} else {
+		pp.print(pp2.unnest())
+		pp.printCloseParenIfNeeded(n)
+		pp.println("")
+		p.print(pp.unnest())
+	}
 }
 
 func (p *printer) VisitSelectList(n *SelectList, d interface{}) {
@@ -601,18 +593,22 @@ func (p *printer) VisitSelectList(n *SelectList, d interface{}) {
 
 		pp2 := pp.nest()
 		col.Accept(pp2, d)
-		pp.print(strings.Trim(pp2.String(), "\v"))
+		pp.print(pp2.String())
 	}
 
 	p.print(pp.unnestLeft())
 }
 
 func (p *printer) VisitSelectColumn(n *SelectColumn, d interface{}) {
-	n.Expression.Accept(p, d)
+	pp := p.nest()
+	n.Expression.Accept(pp, d)
+	p.print(pp.unnest())
 
 	if n.Alias != nil {
-		p.print("\v" + p.keyword("AS"))
-		p.print(p.identifier(n.Alias.Identifier.IDString))
+		pp = p.nest()
+		pp.print(pp.keyword("AS"))
+		pp.print(pp.identifier(n.Alias.Identifier.IDString))
+		p.print(pp.unnest())
 	}
 }
 
@@ -636,23 +632,29 @@ func (p *printer) VisitJoin(n *Join, d interface{}) {
 	switch n.JoinType {
 	case DefaultJoin:
 		pp.println("")
+		pp.println("\v")
 		pp.print("JOIN")
 	case CommaJoin:
 		pp.print(",")
 	case CrossJoin:
 		pp.println("")
+		pp.println("\v")
 		pp.print("CROSS JOIN")
 	case FullJoin:
 		pp.println("")
+		pp.println("\v")
 		pp.print("FULL JOIN")
 	case InnerJoin:
 		pp.println("")
+		pp.println("\v")
 		pp.print("INNER JOIN")
 	case LeftJoin:
 		pp.println("")
+		pp.println("\v")
 		pp.print("LEFT JOIN")
 	case RightJoin:
 		pp.println("")
+		pp.println("\v")
 		pp.print("RIGHT JOIN")
 	}
 
@@ -664,29 +666,27 @@ func (p *printer) VisitJoin(n *Join, d interface{}) {
 
 	if n.ClauseList != nil {
 		pp.println("")
-		n.ClauseList.Accept(pp, d)
+		pp.visitNested(n.ClauseList, d)
 	}
 
 	if n.OnClause != nil {
 		pp.println("")
-		n.OnClause.Accept(pp, d)
+		pp.visitNested(n.OnClause, d)
 	}
 
 	if n.UsingClause != nil {
 		pp.println("")
-		n.UsingClause.Accept(pp, d)
-	}
-
-	if n.Parent().Kind() == JoinKind {
-		pp.println("\n")
+		pp.visitNested(n.UsingClause, d)
 	}
 
 	p.print(pp.unnestLeft())
 }
 
 func (p *printer) VisitOnClause(n *OnClause, d interface{}) {
-	p.printClause("ON")
-	n.Expression.Accept(p, d)
+	p1 := p.nest()
+	p1.printClause(p1.keyword("ON"))
+	n.Expression.Accept(p1, d)
+	p.print(p1.unnestLeft())
 }
 
 func (p *printer) VisitUnnestExpression(
@@ -735,6 +735,10 @@ func (p *printer) VisitBinaryExpression(n *BinaryExpression, d interface{}) {
 			p.print(align + p.keyword("NOT LIKE") + align)
 		}
 	} else {
+		// The binary operator may be interpreted as a separator that allows
+		// breaking line. In binary expressions, we do not want to allow
+		// line breaking right after the operator.
+		p.fmt.noFlushInNextFormat = true
 		p.print(align + n.Op.String() + align)
 	}
 
@@ -749,6 +753,7 @@ func (p *printer) VisitInExpression(n *InExpression, d interface{}) {
 	pp2 := pp.nest()
 
 	n.LHS.Accept(pp2, d)
+	pp2.print(p.keyword("IN"))
 	pp.print(pp2.unnest())
 
 	if n.InList != nil {
@@ -832,11 +837,12 @@ func (p *printer) VisitFunctionCall(n *FunctionCall, d interface{}) {
 
 		pp3 := pp2.nest()
 		arg.Accept(pp3, d)
-		pp2.print(strings.Trim(pp3.String(), "\n"))
+		printedArg := strings.Trim(pp3.String(), "\n")
+		if strings.Contains(printedArg, "\n") {
+			pp2.println("")
+		}
+		pp2.print(printedArg)
 	}
-
-	fmt.Printf("\n==== ARGS:\n%v\n====\n%s\n====\n",
-		debugContent(pp2.String()), alignNested(pp2.String()))
 
 	pp.print(pp2.unnest())
 
@@ -858,9 +864,6 @@ func (p *printer) VisitFunctionCall(n *FunctionCall, d interface{}) {
 
 	pp.print(")")
 	pp.printCloseParenIfNeeded(n)
-
-	fmt.Printf("\n==== FUNCTION:\n%v\n====\n%s\n====\n",
-		debugContent(pp.String()), alignNested(pp.String()))
 
 	p.print(pp.unnest())
 }
@@ -928,71 +931,67 @@ func (p *printer) VisitWindowFrameExpr(n *WindowFrameExpr, d interface{}) {
 }
 
 func (p *printer) VisitAndExpr(n *AndExpr, d interface{}) {
-	pp := p.nest()
+	p.printOpenParenIfNeeded(n)
 
-	pp.printOpenParenIfNeeded(n)
+	p1 := p.nest()
 
 	for i, conjunct := range n.Conjuncts {
 		if i > 0 {
-			if p.fmt.opts.AlignLogicalWithClauses && isInsideOfWhereClause(n) {
+			if p.fmt.opts.AlignLogicalWithClauses &&
+				(isInsideOfWhereClause(n) || isInsideOfOnClause(n)) {
 				// Clear buffer and write AND as a clause.
-				p.print(pp.unnest())
-				pp.printClause(pp.keyword("AND"))
+				p.print(p1.unnest())
+				p.printClause(p.keyword("AND"))
 				// Create new nested builder.
-				pp = p.nest()
+				p1 = p.nest()
 			} else {
-				pp.printClause(pp.keyword("AND"))
+				p1.printClause(p1.keyword("AND"))
 			}
 		}
 
 		if conjunct.Kind() == AndExprKind {
-			conjunct.Accept(pp, d)
+			conjunct.Accept(p1, d)
 		} else {
-			pp2 := pp.nest()
-			conjunct.Accept(pp2, d)
-			pp.print(pp2.unnest())
+			p1.visitNested(conjunct, d)
 		}
 	}
 
-	pp.printCloseParenIfNeeded(n)
+	p.print(p1.unnestLeft())
 
-	p.print(pp.unnest())
+	p.printCloseParenIfNeeded(n)
 }
 
 func (p *printer) VisitOrExpr(n *OrExpr, d interface{}) {
-	pp := p.nest()
+	p1 := p.nest()
 
-	pp.printOpenParenIfNeeded(n)
+	p1.printOpenParenIfNeeded(n)
 
 	for i, disjunct := range n.Disjuncts {
 		if i > 0 {
-			if pp.fmt.opts.AlignLogicalWithClauses && isInsideOfWhereClause(n) {
+			if p1.fmt.opts.AlignLogicalWithClauses &&
+				(isInsideOfWhereClause(n) && isInsideOfOnClause(n)) {
 				// Clear buffer and write AND as a clause.
-				pp.print(pp.unnest())
-				pp.printClause(pp.keyword("OR"))
+				p.print(p1.unnest())
+				p.printClause(p.keyword("OR"))
 				// Create new nested builder.
-				pp = p.nest()
+				p1 = p.nest()
 			} else {
-				pp.printClause(pp.keyword("OR"))
+				p1.printClause(p1.keyword("OR"))
 			}
 		}
 
-		pp2 := pp.nest()
-		disjunct.Accept(pp2, d)
-		pp.print(pp2.unnest())
+		p1.visitNested(disjunct, d)
 	}
 
-	pp.printCloseParenIfNeeded(n)
-
-	p.print(pp.unnest())
+	p1.printCloseParenIfNeeded(n)
+	p.print(p1.unnest())
 }
 
 // isInsideOfWhereClause returns true when the current node is is inside
 // of a WHERE clause directly. The node can be inside of other AndExpr
 // and OrExpr.
 func isInsideOfWhereClause(n NodeHandler) bool {
-	p := n.Parent()
-	for p != nil {
+	for p := n.Parent(); p != nil; p = p.Parent() {
 		if p.Kind() == WhereClauseKind {
 			return true
 		}
@@ -1000,8 +999,23 @@ func isInsideOfWhereClause(n NodeHandler) bool {
 		if p.Kind() != AndExprKind && p.Kind() != OrExprKind {
 			return false
 		}
+	}
 
-		p = p.Parent()
+	return false
+}
+
+// isInsideOfOnClause returns true when the current node is is inside
+// of an ON clause directly. The node can be inside of other AndExpr
+// and OrExpr.
+func isInsideOfOnClause(n NodeHandler) bool {
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		if p.Kind() == OnClauseKind {
+			return true
+		}
+
+		if p.Kind() != AndExprKind && p.Kind() != OrExprKind {
+			return false
+		}
 	}
 
 	return false
@@ -1009,9 +1023,9 @@ func isInsideOfWhereClause(n NodeHandler) bool {
 
 func (p *printer) VisitCaseNoValueExpression(
 	n *CaseNoValueExpression, d interface{}) {
-	pp := p.nest()
+	p1 := p.nest()
 
-	pp.print(pp.keyword("CASE") + " \v")
+	p1.print(p1.keyword("CASE") + " \v")
 
 	args := n.Arguments
 	for len(args) >= 2 {
@@ -1019,36 +1033,39 @@ func (p *printer) VisitCaseNoValueExpression(
 			"alignBinaryOp": 1,
 		}
 
-		pp.println("")
-		pp.print(pp.keyword("WHEN") + " \v")
+		p1.println("")
+		p1.print(p1.keyword("WHEN") + " \v")
 
-		pp2 := p.nest()
-		args[0].Accept(pp2, ctx)
-		pp.print(strings.Trim(pp2.String(), "\n\v"))
+		p2 := p1.nest()
+		args[0].Accept(p2, ctx)
+		p1.print(strings.Trim(p2.String(), "\n\v"))
 
-		count := strings.Count(pp.fmt.buffer.String(), "\v")
+		count := strings.Count(p1.fmt.buffer.String(), "\v")
 		if count == 1 {
-			pp.print("\v")
+			p1.print("\v")
 		}
 
-		pp.print(pp.keyword("THEN") + " \v")
-		args[1].Accept(pp, d)
+		p1.print(p1.keyword("THEN") + " \v")
+		p2 = p1.nest()
+		args[1].Accept(p2, d)
+		p1.print(p2.unnestWithDepth(4))
 		args = args[2:]
 	}
 
 	if len(args) == 1 {
-		pp.println("")
-		pp.print(" ")
-		// count := strings.Count(pp.fmt.buffer.String(), "\v")
-		pp.print("\v\v")
-		pp.print(pp.keyword("ELSE") + " \v")
-		args[0].Accept(pp, d)
+		p1.println("")
+		p1.print(" ")
+		p1.print("\v\v\v")
+		p1.print(p1.keyword("ELSE") + " \v")
+		p2 := p1.nest()
+		args[0].Accept(p2, d)
+		p1.print(p2.unnestWithDepth(4))
 	}
 
-	pp.println("")
-	pp.print(pp.keyword("END"))
+	p1.println("")
+	p1.print(p1.keyword("END"))
 
-	p.print(pp.unnest())
+	p.print(p1.unnest())
 }
 
 func (p *printer) VisitCaseValueExpression(
@@ -1074,16 +1091,16 @@ func (p *printer) VisitCaseValueExpression(
 		args[0].Accept(pp2, ctx)
 		pp.print("\v" + strings.Trim(pp2.String(), "\n"))
 
-		// count := strings.Count(pp.fmt.buffer.String(), "\v")
-		// if count == 1 {
-		// 	pp.print("\v")
-		// }
+		count := strings.Count(pp.fmt.buffer.String(), "\v")
+		if count == 1 {
+			pp.print("\v")
+		}
 
 		pp.print("\v" + pp.keyword("THEN"))
 
 		pp2 = pp.nest()
 		args[1].Accept(pp2, d)
-		pp.print(pp2.unnestWithDepth(3))
+		pp.print(pp2.unnestWithDepth(4))
 
 		args = args[2:]
 	}
@@ -1091,17 +1108,15 @@ func (p *printer) VisitCaseValueExpression(
 	if len(args) == 1 {
 		pp.println("")
 		pp.print(" ")
-		// count := strings.Count(pp.fmt.buffer.String(), "\v")
-		pp.print("\v\v")
+		pp.print("\v\v\v")
 		pp.print(pp.keyword("ELSE") + " \v")
-		args[0].Accept(pp, d)
+		p2 := pp.nest()
+		args[0].Accept(p2, d)
+		pp.print(p2.unnestWithDepth(4))
 	}
 
 	pp.println("")
 	pp.print(pp.keyword("END"))
-
-	fmt.Printf("\n==== CASEVALUE:\n%v\n====\n%s\n====\n",
-		debugContent(pp.String()), alignNested(pp.String()))
 
 	p.print(pp.unnest())
 }
@@ -1203,15 +1218,7 @@ func (p *printer) VisitIntervalExpr(n *IntervalExpr, d interface{}) {
 
 func (p *printer) VisitUsingClause(n *UsingClause, d interface{}) {
 	p.printClause(p.keyword("USING") + " (")
-
-	for i, key := range n.Keys {
-		if i > 0 {
-			p.print(",")
-		}
-
-		key.Accept(p, d)
-	}
-
+	p.printNestedWithSep(n.Keys, d, ",")
 	p.print(")")
 }
 
@@ -1274,17 +1281,7 @@ func (p *printer) VisitArrayConstructor(n *ArrayConstructor, d interface{}) {
 	}
 
 	pp.print("[")
-
-	for i, elem := range n.Elements {
-		if i > 0 {
-			pp.print(",")
-		}
-
-		pp2 := pp.nest()
-		elem.Accept(pp2, d)
-		pp.print(pp2.unnest())
-	}
-
+	pp.printNestedWithSep(n.Elements, d, ",")
 	pp.print("]")
 	p.print(pp.unnest())
 }
@@ -1308,11 +1305,7 @@ func (p *printer) VisitArrayElement(n *ArrayElement, d interface{}) {
 	pp.print(pp2.unnest())
 
 	pp.print("[")
-
-	pp2 = pp.nest()
-	n.Position.Accept(pp2, d)
-	pp.print(pp2.unnest())
-
+	pp.visitNested(n.Position, d)
 	pp.print("]")
 
 	p.print(pp.unnest())
@@ -1329,52 +1322,37 @@ func (p *printer) VisitStructConstructorWithKeyword(
 	}
 
 	pp.print("(")
-
-	pp2 := pp.nest()
-
-	for i, field := range n.Fields {
-		if i > 0 {
-			pp2.println(",")
-		}
-
-		pp3 := pp.nest()
-		field.Accept(pp3, d)
-		pp2.print(pp3.unnest())
-	}
-
-	pp.print(pp2.unnest())
+	pp.printNestedWithSep(n.Fields, d, ",")
 	pp.print(")")
 
 	p.print(pp.unnest())
 }
 
+func (p *printer) VisitStructConstructorWithParens(
+	n *StructConstructorWithParens, d interface{}) {
+	pp := p.nest()
+
+	pp.print("(")
+	pp.printNestedWithSep(n.FieldExpressions, d, ",")
+	pp.print(")")
+	p.print(pp.unnest())
+}
+
 func (p *printer) VisitStructType(n *StructType, d interface{}) {
-	root := p.nest()
-	pp := root.nest()
+	pp := p.nest()
+	pp2 := pp.nest()
 
-	for i, field := range n.StructFields {
-		if i > 0 {
-			pp.print(",")
-		}
+	pp2.printNestedWithSep(n.StructFields, d, ",")
 
-		pp2 := pp.nest()
-		field.Accept(pp2, d)
-		pp.print(pp2.unnest())
-	}
-
-	root.print(root.keyword("STRUCT") + "<" + pp.unnest() + ">")
-	p.print(root.unnest())
+	pp.print(pp.keyword("STRUCT") + "<" + pp2.unnest() + ">")
+	p.print(pp.unnest())
 }
 
 func (p *printer) VisitStructField(n *StructField, d interface{}) {
 	root := p.nest()
 
 	n.Name.Accept(root, d)
-
-	pp := root.nest()
-
-	n.Type.Accept(pp, d)
-	root.print(pp.unnest())
+	root.visitNested(n.Type, d)
 	p.print(root.unnest())
 }
 
@@ -1395,19 +1373,8 @@ func (p *printer) VisitInList(n *InList, d interface{}) {
 	pp := p.nest()
 
 	pp.print("(")
-
-	for i, elem := range n.List {
-		if i > 0 {
-			pp.print(",")
-		}
-
-		pp2 := pp.nest()
-		elem.Accept(pp2, d)
-		pp.print(pp2.unnest())
-	}
-
+	pp.printNestedWithSep(n.List, d, ",")
 	pp.print(")")
-
 	p.print(pp.unnest())
 }
 
@@ -1452,11 +1419,13 @@ func (p *formatter) Format(s string) {
 	// the formatted buffer.
 	defer func() {
 		if p.buffer.Len() >= p.maxLength &&
-			p.lastIsSeparator() {
+			p.lastIsSeparator() &&
+			!p.noFlushInNextFormat {
 			p.FlushLine()
 		}
 
 		p.lastWasSingleCharUnary = false
+		p.noFlushInNextFormat = false
 	}()
 
 	data := []rune(s)

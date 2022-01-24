@@ -176,7 +176,7 @@ type OrderingExpression struct {
 }
 
 type OrderBy struct {
-	OrderingExpression []*OrderingExpression
+	OrderingExpressions []*OrderingExpression
 
 	Node
 }
@@ -2250,14 +2250,14 @@ func (n *OrderingExpression) initOrderingSpec(d interface{}) error {
 }
 
 func NewOrderBy(
-	orderingexpression interface{},
+	orderingexpressions interface{},
 ) (*OrderBy, error) {
 	var err error
 
 	nn := &OrderBy{}
 	nn.SetKind(OrderByKind)
 
-	err = nn.InitOrderingExpression(orderingexpression)
+	err = nn.InitOrderingExpressions(orderingexpressions)
 	if err != nil {
 		return nil, err
 	}
@@ -2265,23 +2265,23 @@ func NewOrderBy(
 	return nn, err
 }
 
-func (n *OrderBy) InitOrderingExpression(d interface{}) error {
-	if n.OrderingExpression != nil {
-		return fmt.Errorf("OrderBy.OrderingExpression: %w",
+func (n *OrderBy) InitOrderingExpressions(d interface{}) error {
+	if n.OrderingExpressions != nil {
+		return fmt.Errorf("OrderBy.OrderingExpressions: %w",
 			ErrFieldAlreadyInitialized)
 	}
 
-	n.OrderingExpression = make([]*OrderingExpression, 0, defaultCapacity)
+	n.OrderingExpressions = make([]*OrderingExpression, 0, defaultCapacity)
 
-	return n.initOrderingExpression(d)
+	return n.initOrderingExpressions(d)
 }
 
-func (n *OrderBy) initOrderingExpression(d interface{}) error {
+func (n *OrderBy) initOrderingExpressions(d interface{}) error {
 	switch t := d.(type) {
 	case nil:
 	case *Wrapped:
 		n.ExpandLoc(t.Loc.Start, t.Loc.End)
-		return n.initOrderingExpression(t.Value)
+		return n.initOrderingExpressions(t.Value)
 	case NodeHandler:
 		n.AddChild(t)
 	case []interface{}:
@@ -2290,14 +2290,14 @@ func (n *OrderBy) initOrderingExpression(d interface{}) error {
 		}
 	default:
 		newElem := d.(*OrderingExpression)
-		n.OrderingExpression = append(n.OrderingExpression, newElem)
+		n.OrderingExpressions = append(n.OrderingExpressions, newElem)
 	}
 
 	return nil
 }
 
 func (n *OrderBy) AddChild(c NodeHandler) {
-	n.OrderingExpression = append(n.OrderingExpression, c.(*OrderingExpression))
+	n.OrderingExpressions = append(n.OrderingExpressions, c.(*OrderingExpression))
 
 	n.Node.AddChild(c)
 	c.SetParent(n)
@@ -2309,7 +2309,7 @@ func (n *OrderBy) AddChildren(children []NodeHandler) {
 			continue
 		}
 
-		n.OrderingExpression = append(n.OrderingExpression, c.(*OrderingExpression))
+		n.OrderingExpressions = append(n.OrderingExpressions, c.(*OrderingExpression))
 
 		n.Node.AddChild(c)
 		c.SetParent(n)
@@ -7266,7 +7266,7 @@ func (n *OrderingExpression) String() string {
 
 func (n *OrderBy) String() string {
 	return fmt.Sprintf("OrderBy(%v)",
-		n.OrderingExpression,
+		n.OrderingExpressions,
 	)
 }
 

@@ -346,7 +346,7 @@ def main():
         composition='Node',
         fields=[
             Field(
-                'OrderingExpression',
+                'OrderingExpressions',
                 '*OrderingExpression',
                 FieldLoader.REPEATED)
         ])

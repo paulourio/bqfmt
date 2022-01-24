@@ -471,20 +471,6 @@ func IsUnparenthesizedNotExpression(a Attrib) (r bool) {
 	return
 }
 
-func getExpressionHandler(v interface{}) (ast.ExpressionHandler, ast.Loc) {
-	switch t := v.(type) {
-	case ast.ExpressionHandler:
-		return t, ast.Loc{Start: t.StartLoc(), End: t.EndLoc()}
-	case *ast.Wrapped:
-		// Return the inner expression but with the current location.
-		e, _ := getExpressionHandler(t.Value)
-		return e, t.Loc
-	}
-
-	panic(fmt.Errorf("%w: could not get ExpressionHandler from %v",
-		zerrors.ErrMalformedParser, reflect.TypeOf(v)))
-}
-
 func getNodeHandler(v interface{}) (ast.NodeHandler, ast.Loc) {
 	switch t := v.(type) {
 	case ast.NodeHandler:

@@ -608,7 +608,6 @@ func Escape(src string, style StringStyle) string {
 		}
 	}
 
-	fmt.Println("Escaping ", src)
 	return quote + escape(src, rune(quote[0])) + quote
 }
 

@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"reflect"
 	"strings"
 )
 
@@ -72,6 +73,32 @@ func (u *unparser) printCloseParenIfNeeded(n NodeHandler) {
 	if expr, ok := n.(QueryExpressionHandler); ok && expr.IsParenthesized() {
 		u.print(")")
 		return
+	}
+}
+
+func (u *unparser) printSliceWithSeparator(
+	items interface{}, d interface{}, sep string) {
+	list := reflect.ValueOf(items)
+
+	for i := 0; i < list.Len(); i++ {
+		if i > 0 {
+			u.print(sep)
+		}
+
+		list.Index(i).Interface().(NodeHandler).Accept(u, d)
+	}
+}
+
+func (u *unparser) printSliceWithSeparatorAndLines(
+	items interface{}, d interface{}, sep string) {
+	list := reflect.ValueOf(items)
+
+	for i := 0; i < list.Len(); i++ {
+		if i > 0 {
+			u.println(sep)
+		}
+
+		list.Index(i).Interface().(NodeHandler).Accept(u, d)
 	}
 }
 
@@ -175,15 +202,7 @@ func (u *unparser) VisitOrderBy(n *OrderBy, d interface{}) {
 	u.println("")
 	u.print("ORDER BY")
 	u.incDepth()
-
-	for i, item := range n.OrderingExpression {
-		if i > 0 {
-			u.print(",")
-		}
-
-		item.Accept(u, d)
-	}
-
+	u.printSliceWithSeparator(n.OrderingExpressions, d, ",")
 	u.decDepth()
 }
 
@@ -292,30 +311,14 @@ func (u *unparser) VisitGroupBy(n *GroupBy, d interface{}) {
 	u.println("")
 	u.print("GROUP BY")
 	u.incDepth()
-
-	for i, item := range n.GroupingItems {
-		if i > 0 {
-			u.print(",")
-		}
-
-		item.Expression.Accept(u, d)
-	}
-
+	u.printSliceWithSeparator(n.GroupingItems, d, ",")
 	u.decDepth()
 }
 
 func (u *unparser) VisitSelectList(n *SelectList, d interface{}) {
 	u.println("")
 	u.incDepth()
-
-	for i, col := range n.Columns {
-		if i > 0 {
-			u.println(",")
-		}
-
-		col.Accept(u, d)
-	}
-
+	u.printSliceWithSeparatorAndLines(n.Columns, d, ",")
 	u.decDepth()
 }
 
@@ -482,15 +485,7 @@ func (u *unparser) VisitUsingClause(n *UsingClause, d interface{}) {
 	u.println("")
 	u.print("USING(")
 	u.incDepth()
-
-	for i, key := range n.Keys {
-		if i > 0 {
-			u.print(",")
-		}
-
-		key.Accept(u, d)
-	}
-
+	u.printSliceWithSeparator(n.Keys, d, ",")
 	u.decDepth()
 	u.print(")")
 }
@@ -528,15 +523,7 @@ func (u *unparser) VisitDotIdentifier(n *DotIdentifier, d interface{}) {
 
 func (u *unparser) VisitPathExpression(n *PathExpression, d interface{}) {
 	u.printOpenParenIfNeeded(n)
-
-	for i, p := range n.Names {
-		if i > 0 {
-			u.print(".")
-		}
-
-		p.Accept(u, d)
-	}
-
+	u.printSliceWithSeparator(n.Names, d, ".")
 	u.printCloseParenIfNeeded(n)
 }
 
@@ -576,13 +563,7 @@ func (u *unparser) VisitFunctionCall(n *FunctionCall, d interface{}) {
 		u.print("DISTINCT")
 	}
 
-	for i, arg := range n.Arguments {
-		if i > 0 {
-			u.print(",")
-		}
-
-		arg.Accept(u, d)
-	}
+	u.printSliceWithSeparator(n.Arguments, d, ",")
 
 	switch n.NullHandlingModifier {
 	case DefaultNullHandling:
@@ -673,15 +654,7 @@ func (u *unparser) VisitArrayType(n *ArrayType, d interface{}) {
 
 func (u *unparser) VisitStructType(n *StructType, d interface{}) {
 	u.print("STRUCT<")
-
-	for i, f := range n.StructFields {
-		if i > 0 {
-			u.print(",")
-		}
-
-		f.Accept(u, d)
-	}
-
+	u.printSliceWithSeparator(n.StructFields, d, ",")
 	u.print(">")
 
 	if n.TypeParameters() != nil {
@@ -693,15 +666,7 @@ func (u *unparser) VisitTypeParameterList(
 	n *TypeParameterList, d interface{}) {
 	u.print("(")
 	u.incDepth()
-
-	for i, p := range n.Parameters {
-		if i > 0 {
-			u.print(",")
-		}
-
-		p.Accept(u, d)
-	}
-
+	u.printSliceWithSeparator(n.Parameters, d, ",")
 	u.decDepth()
 	u.print(")")
 }
@@ -722,16 +687,17 @@ func (u *unparser) VisitArrayConstructor(n *ArrayConstructor, d interface{}) {
 	}
 
 	u.print("[")
-
-	for i, e := range n.Elements {
-		if i > 0 {
-			u.print(",")
-		}
-
-		e.Accept(u, d)
-	}
-
+	u.printSliceWithSeparator(n.Elements, d, ",")
 	u.print("]")
+}
+
+func (u *unparser) VisitStructConstructorWithParens(
+	n *StructConstructorWithParens, d interface{}) {
+	u.print("(")
+	u.incDepth()
+	u.printSliceWithSeparator(n.FieldExpressions, d, ",")
+	u.decDepth()
+	u.print(")")
 }
 
 func (u *unparser) VisitArrayElement(n *ArrayElement, d interface{}) {
@@ -858,15 +824,7 @@ func (u *unparser) VisitStarModifiers(n *StarModifiers, d interface{}) {
 
 	if len(n.ReplaceItems) > 0 {
 		u.print("REPLACE (")
-
-		for i, item := range n.ReplaceItems {
-			if i > 0 {
-				u.print(",")
-			}
-
-			item.Accept(u, d)
-		}
-
+		u.printSliceWithSeparator(n.ReplaceItems, d, ",")
 		u.print(")")
 	}
 }

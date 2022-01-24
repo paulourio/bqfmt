@@ -10,14 +10,14 @@ import (
 )
 
 func SetExpressionParenthesized(open, expr, close Attrib) (Attrib, error) {
-	e := expr.(ast.ExpressionHandler)
+	e, loc := getExpressionHandler(expr)
 
 	e.SetParenthesized(true)
 
 	// Do not include the location in the parentheses. Semantic
 	// error messages about this expression should point at the
 	// start of the expression, not at the opening parentheses.
-	return WrapWithLoc(e, open, close)
+	return WrapWithLoc(e, open, close, loc)
 }
 
 func NewBetweenExpression(
@@ -237,4 +237,18 @@ func CaseExpressionWithElse(expr, elseValue, end Attrib) (Attrib, error) {
 	}
 
 	return UpdateLoc(e, end)
+}
+
+func getExpressionHandler(v interface{}) (ast.ExpressionHandler, ast.Loc) {
+	switch t := v.(type) {
+	case ast.ExpressionHandler:
+		return t, ast.Loc{Start: t.StartLoc(), End: t.EndLoc()}
+	case *ast.Wrapped:
+		// Return the inner expression but with the current location.
+		e, _ := getExpressionHandler(t.Value)
+		return e, t.Loc
+	}
+
+	panic(fmt.Errorf("%w: could not get ExpressionHandler from %v",
+		zerrors.ErrMalformedParser, reflect.TypeOf(v)))
 }
